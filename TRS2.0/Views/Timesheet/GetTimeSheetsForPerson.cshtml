@@ -1,0 +1,624 @@
+﻿@model TRS2._0.Models.ViewModels.TimesheetViewModel
+@using System.Globalization
+@using TRS2._0.Models.DataModels
+
+@{
+    ViewData["Title"] = "Timesheet Overview";
+    var monthName = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(@Model.CurrentMonth);
+    var monthNameCapitalized = char.ToUpper(monthName[0]) + monthName.Substring(1);
+}    
+
+<div class="container-fluid" style="max-width: 2000px;  padding-right: 5; padding-left: 5; margin-right: auto; margin-left: auto;">
+    <h2 style="margin-bottom: 0;">Timesheet for @Model.Person.Name @Model.Person.Surname - @monthNameCapitalized @Model.CurrentYear</h2>
+    <!-- Sección de controles para cambiar de mes, con el selector de fechas en el centro -->
+    <div class="d-flex justify-content-between mb-3">
+        <!-- Contenedor para botones, selectores y "Save All" -->
+        <div class="d-flex align-items-center" style="width: 40%;">
+            <!-- Botón Previous -->
+            <button id="prevMonthButton" class="btn btn-primary">Previous</button>
+
+            <!-- Selectores de Mes y Año -->
+            <select id="monthSelect" class="form-control mx-2">
+                <option value="">Seleccione mes para cambiar...</option>
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+            </select>
+            <select id="yearSelect" class="form-control mx-2">
+                <option value="">Seleccione año para cambiar...</option>
+                @for (int year = DateTime.Now.Year - 10; year <= DateTime.Now.Year + 10; year++)
+                {
+                    <option value="@year">@year</option>
+                }
+            </select>
+
+            <button id="goButton" class="btn btn-primary mx-2">Ir</button>
+            <!-- Botón Next -->
+            <button id="nextMonthButton" class="btn btn-primary mx-2">Next</button>
+        </div>
+                
+        <div class="d-flex justify-content-center align-items-center" style="width: 10%;">
+            <!-- Botón Save All con estilo verde -->
+            <button id="saveAllButton" class="btn btn-success">Save All</button>
+        </div>
+
+
+        <!-- Contenedor para la barra de progreso -->
+        <div class="w-50 d-flex align-items-center">
+            <span class="mr-2 font-weight-bold">Total Hours this month: @Model.TotalHours.ToString("0.0")</span>
+            <div class="progress w-100 position-relative">
+                <div class="progress-bar bg-success" role="progressbar" style="width: @ViewBag.PercentageUsed%" aria-valuenow="@ViewBag.PercentageUsed" aria-valuemin="0" aria-valuemax="100">
+                    <span class="position-absolute w-100 text-center font-weight-bold" style="color: black;">@ViewBag.PercentageUsed%</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+
+    <div class="table-responsive">
+        <div class="scrollable-table-container">
+            <table id="timesheetTable" class="table table-bordered table-striped table-hover">
+                <!-- El resto de tu tabla aquí -->
+
+                <thead class="thead-dark">
+                    <tr>
+                        <th>
+                            <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">Proyecto - Acrónimo</div>
+                            <div style="text-align: center;">Wp - Título</div>
+
+                        </th>
+                        <th>Dedication - Estimated Hours</th>
+                        @foreach (var day in Model.MonthDays)
+                        {
+                            <th>
+
+                            <div style="border-bottom: 1px solid white; margin-bottom: 2px; margin-top: 8px; text-align: center;">@day.Day.ToString("00")</div>
+                            <div style="text-align: center;">@day.ToString("ddd").ToUpper()</div>
+
+                            </th>
+                        }
+                        <th>
+                            <div style="border-bottom: 1px solid white; margin-bottom: 2px; text-align: center; font-weight: bold">ACTUAL</div>
+                            <div style="text-align: center; font-weight: bold;">ESTIMATED HOURS</div>
+                        </th> <!-- Columna de Total -->
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var wp in Model.WorkPackages)
+                    {
+                        <tr>
+                            <td class="single-line-cell">
+                                
+                                <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">@wp.ProjectSAPCode (@wp.ProjectName)</div>
+                                <div style="text-align: center;">@wp.WpName @wp.WpTitle</div>
+
+                            </td>
+
+                            <td class="second-line-cell">
+                                Dedication: @String.Format("{0:P1}", wp.Effort) - Estimated Hours: @wp.EstimatedHours
+                            </td>
+                            <!-- Celdas para cada día del mes -->
+                            @foreach (var day in Model.MonthDays)
+                            {
+                                var isWeekend = day.DayOfWeek == DayOfWeek.Saturday || day.DayOfWeek == DayOfWeek.Sunday;
+                                var leave = Model.LeavesthisMonth.FirstOrDefault(l => l.Day.Date == day.Date);
+                                var hasTravel = Model.TravelsthisMonth.Any(t => day.Date >= t.StartDate && day.Date <= t.EndDate);
+                                var isFuture = day.Date > DateTime.Now.Date; // Verifica si el día es posterior al día actual
+                                var isHoliday = Model.Holidays.Any(h => h.Date == day.Date); // Verifica si el día es una fiesta nacional
+                                var cellStyle = "";
+
+
+                                // Aplica estilos específicos para cada condición
+                                if (isHoliday)
+                                {
+                                    cellStyle = "background-color: #FFD700;"; // Dorado para fiestas nacionales
+                                }
+                                else if (hasTravel && !isFuture)
+                                {
+                                    cellStyle = "background-color: lightgreen;"; // Verde para días de viaje
+                                }
+                                else if (isWeekend || isFuture) // Considera los días futuros como fines de semana para el estilo
+                                {
+                                    cellStyle = "background-color: #6c757d;"; // Gris para fines de semana y días futuros
+                                }
+                                else if (leave != null)
+                                {
+                                    switch (leave.Type)
+                                    {
+                                        case 1: // Ausencia
+                                            cellStyle = "background-color: lightsalmon;";
+                                            break;
+                                        case 2: // Vacaciones personales
+                                            cellStyle = "background-color: lightblue;";
+                                            break;
+                                        case 3: // Fuera de contrato
+                                            cellStyle = "background-color: purple;";
+                                            break;
+                                    }
+                                }
+
+                                // Genera la celda con el estilo adecuado
+
+                                <td class="hour-input-cell" style="@cellStyle">
+                                    @if (!isWeekend && leave == null && !hasTravel && !isFuture && !isHoliday)
+                                    {
+                                        var timesheetEntry = wp.Timesheets.FirstOrDefault(ts => ts.Day.Date == day.Date);
+                                        <input type="text" class="form-control input-hours"
+                                               value="@((timesheetEntry != null) ? timesheetEntry.Hours.ToString("0.##") : "0")"  
+                                               data-projectid="@wp.ProjectId"
+                                               data-wpid="@wp.WpId"
+                                               data-day="@day.ToString("yyyy-MM-dd")"
+                                               data-original-value="@((timesheetEntry != null) ? timesheetEntry.Hours.ToString("0.##") : "0")" />
+                                               
+                                    }
+                                    else
+                                    {
+                                        @:
+                                    }
+                                </td>
+                                
+                            }
+
+
+
+                            <td>
+                                @{
+                                    var totalActual = wp.Timesheets.Sum(ts => ts.Hours);
+                                    var totalEstimado = wp.EstimatedHours;
+                                    string textColor;
+
+                                    if (totalActual == totalEstimado)
+                                    {
+                                        textColor = "#006400"; // Verde oscuro
+                                        
+                                    }
+                                    else if (totalActual > totalEstimado)
+                                    {
+                                        textColor = "#FF8C00"; // Naranja oscuro
+                                        
+                                    }
+                                    else
+                                    {
+                                        textColor = "#00008B"; // Azul oscuro
+                                        
+                                    }
+                                }
+                                <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center; font-weight: bold; color: @textColor">
+                                    @totalActual.ToString("0.#")
+                                </div>
+                                <div style="text-align: center; font-weight: bold; color: @textColor">
+                                    @totalEstimado.ToString("0.#")
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    <!-- Fila de Totales aquí -->
+                </tbody>
+                <tfoot>
+                    <tr style="background-color: #343a40; color: white;">                    
+                        <th style="background-color: #343a40; color: white;">Total Daily</th>
+                        <th style="background-color: #343a40; color: white;"></th> <!-- Espacio vacío para la columna de Dedication - Estimated Hours -->
+                        @foreach (var day in Model.MonthDays)
+                        {
+                            // Calcular el total actual y estimado para el día
+                            var totalActualForDay = Model.TotalHoursWithDedication.ContainsKey(day) ? Model.TotalHoursWithDedication[day] : 0;
+                            var totalEstimadoForDay = Model.HoursPerDayWithDedication.ContainsKey(day) ? Model.HoursPerDayWithDedication[day] : 0;
+                            string textColorForDay;
+                            string backgroundStyle;
+
+                            if (totalActualForDay == totalEstimadoForDay)
+                            {
+                                textColorForDay = "#006400"; // Verde oscuro
+                                backgroundStyle = "background-color: #e6ffe6;"; // Verde muy muy claro
+                            }
+                            else if (totalActualForDay > totalEstimadoForDay)
+                            {
+                                textColorForDay = "#FF8C00"; // Naranja oscuro
+                                backgroundStyle = "background-color: #fff0e6;"; // Naranja muy muy claro
+                            }
+                            else
+                            {
+                                textColorForDay = "#00008B"; // Azul oscuro
+                                backgroundStyle = "background-color: #e6f3ff;"; // Azul muy muy claro
+                            }
+
+                            <td style="@backgroundStyle font-weight: bold; color: @textColorForDay;">
+                                <div style="border-bottom: 1px solid black; text-align: center;">
+                                    @totalActualForDay.ToString("0.#")
+                                </div>
+                                <div style="text-align: center;">
+                                    @totalEstimadoForDay.ToString("0.#")
+                                </div>
+                            </td>
+                        }
+                        <th style="background-color: #343a40; color: white;"></th> <!-- Espacio vacío para la columna de Total -->
+                    </tr>
+                </tfoot>
+
+            </table>
+        </div>
+    </div>
+</div>
+<hr/>
+<div class="below-main-table" style="display: flex; justify-content: space-between; margin-top: 20px;">
+<div class="legend-box" style="width: 300px; margin-left:10px; padding: 10px; margin-top: 20px; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,.1);">
+    <h4 style="margin-bottom: 20px; text-align: center; font-weight: bold">Leyenda</h4>
+    <div class="mb-2">
+        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: lightsalmon; border: 1px solid black;">&nbsp;</span>
+        <span style="margin-left: 8px;">Ausencia</span>
+    </div>
+    <div class="mb-2">
+        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: lightblue; border: 1px solid black;">&nbsp;</span>
+        <span style="margin-left: 8px;">Vacaciones</span>
+    </div>
+    <div class="mb-2">
+        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: purple; border: 1px solid black;">&nbsp;</span>
+        <span style="margin-left: 8px;">Fuera de contrato</span>
+    </div>
+    <div class="mb-2">
+        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: lightgreen; border: 1px solid black;">&nbsp;</span>
+        <span style="margin-left: 8px;">Días de viaje</span>
+    </div>
+        <div class="mb-2">
+            <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: #FFD700; border: 1px solid black;">&nbsp;</span>
+            <span style="margin-left: 8px;">Fiestas Nacionales</span>
+        </div>
+</div>
+    <div class="travel-table-container" style="flex-grow: 1; overflow-x: auto; margin-left: 20px; margin-right:20px;">
+        <h4 style="margin-bottom: 5px; text-align: center; font-weight: bold">TRAVELS</h4>
+        <table class="table table-bordered" style="min-width: 600px;">
+            <thead>
+                <tr>
+                    <th>Id de la liquidación</th>
+                    <th>Proyecto</th>
+                    <th>Dedicación</th>
+                    <th>StartDate</th>
+                    <th>EndDate</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.TravelsthisMonth != null && Model.TravelsthisMonth.Any())
+                {
+                    foreach (var travel in Model.TravelsthisMonth)
+                    {
+                        <tr>
+                            <td>@travel.LiqId</td>
+                            <td>@travel.ProjectSAPCode - @travel.ProjectAcronimo</td>
+                            <td>@String.Format("{0:P0}", travel.Dedication)</td>
+                            <td>@travel.StartDate.ToString("yyyy-MM-dd")</td>
+                            <td>@travel.EndDate.ToString("yyyy-MM-dd")</td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="5">No hay viajes registrados para este mes</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+</div>
+<script>
+    document.getElementById('prevMonthButton').addEventListener('click', function () {
+        // Asumiendo que tienes un personId y el mes y año actuales disponibles
+        var personId = @Model.Person.Id;
+        var currentYear = @Model.CurrentYear;
+        var currentMonth = @Model.CurrentMonth;
+
+        // Ajusta el año y el mes para el botón Previous
+        if (currentMonth === 1) {
+            // Si es enero, cambia a diciembre del año anterior
+            currentMonth = 12;
+            currentYear -= 1;
+        } else {
+            // En cualquier otro caso, solo disminuye el mes
+            currentMonth -= 1;
+        }
+
+        // Construye la URL con los parámetros ajustados
+        var redirectUrl = `/Timesheet/GetTimeSheetsForPerson?personId=${personId}&year=${currentYear}&month=${currentMonth}`;
+
+        // Redirige a la URL
+        window.location.href = redirectUrl;
+    });
+
+    document.getElementById('nextMonthButton').addEventListener('click', function () {
+        // Asumiendo que tienes un personId y el mes y año actuales disponibles
+        var personId = @Model.Person.Id;
+        var currentYear = @Model.CurrentYear;
+        var currentMonth = @Model.CurrentMonth;
+
+        // Ajusta el año y el mes para el botón Previous
+        if (currentMonth === 12) {
+            // Si es diciembre, cambia a enero del año siguiente
+            currentMonth = 1;
+            currentYear += 1;
+        } else {
+            // En cualquier otro caso, solo disminuye el mes
+            currentMonth += 1;
+        }
+
+        // Construye la URL con los parámetros ajustados
+        var redirectUrl = `/Timesheet/GetTimeSheetsForPerson?personId=${personId}&year=${currentYear}&month=${currentMonth}`;
+
+        // Redirige a la URL
+        window.location.href = redirectUrl;
+    });
+
+        
+        document.getElementById('goButton').addEventListener('click', function () {
+            var selectedMonth = document.getElementById('monthSelect').value;
+            var selectedYear = document.getElementById('yearSelect').value;
+
+            // Asumiendo que tienes un personId disponible, por ejemplo, guardado en un data attribute en algún lugar
+            var personId = @Model.Person.Id
+
+            // Construye la URL con los parámetros seleccionados
+            var redirectUrl = `/Timesheet/GetTimeSheetsForPerson?personId=${personId}&year=${selectedYear}&month=${selectedMonth}`;
+
+            // Redirige a la URL
+            window.location.href = redirectUrl;
+        });
+
+           
+        document.getElementById('saveAllButton').addEventListener('click', function () {
+            var changedTimesheets = [];
+
+            document.querySelectorAll('.input-hours').forEach(input => {
+            // Reemplaza la coma por un punto para asegurar el correcto parsing del valor decimal
+            var originalValue = input.getAttribute('data-original-value').replace(',', '.');
+            var currentValue = input.value.replace(',', '.');
+
+            // Parsea ambos valores como flotantes
+            originalValue = parseFloat(originalValue);
+            currentValue = parseFloat(currentValue);
+
+                console.log(originalValue, currentValue);
+                if (Math.round(currentValue * 100) / 100 !== Math.round(originalValue * 100) / 100) {                
+                    changedTimesheets.push({
+                        ProjectId: parseInt(input.getAttribute('data-projectid'), 10),
+                        WpId: parseInt(input.getAttribute('data-wpid'), 10),
+                        PersonId: @Model.Person.Id,
+                        Day: input.getAttribute('data-day'),
+                        Hours: currentValue
+                    });                    
+                }
+            });
+
+            if (changedTimesheets.length > 0) {
+                fetch('@Url.Action("SaveTimesheetHours", "Timesheet")', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ TimesheetDataList: changedTimesheets })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Timesheets updated successfully.');
+                            location.reload();
+                        } else {
+                            alert('Error saving timesheets.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('There was an error processing your request.');
+                    });
+            } else {
+                alert('No changes to save.');
+            }
+        });
+</script>
+
+
+
+
+
+
+    <style >
+    .single-line-cell {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: bold;
+        text-align: center;
+        vertical-align: middle;
+        max-width: 500px;
+        max-height : 10px;
+    }
+
+    .second-line-cell {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: bold;
+        text-align: center;
+        vertical-align: middle;
+        max-width: 500px;
+        max-height: 10px;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+        margin-bottom: 1rem;
+    }
+
+    .scrollable-table-container {
+        max-height: 800px;
+        overflow-y: auto;
+    }
+
+    .table {
+        width: 100%;
+        margin-bottom: 1rem;
+        color: #212529;
+        border-collapse: collapse;
+    }
+
+        .table td {
+            padding: 8px; /* Ajusta el padding para permitir el centrado vertical */
+            vertical-align: middle; /* Asegura que el contenido de la celda se alinee verticalmente en el centro */
+            text-align: center; /* Alinea el contenido de la celda horizontalmente en el centro */
+        }
+
+    .table-bordered {
+        border: 1px solid #dee2e6;
+    }
+
+    .table-striped tbody tr:nth-of-type(odd) {
+        background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    .table-hover tbody tr:hover {
+        color: #212529;
+        background-color: rgba(0, 0, 0, 0.075);
+    }
+
+    .thead-dark th {
+        color: #fff;
+        background-color: #343a40;
+        border-color: #454d55;
+        text-align: center; /* Centra el texto horizontalmente */
+        vertical-align: middle; /* Centra el texto verticalmente */        
+    }
+
+    th, td {
+        text-align: center; /* Centra el texto horizontalmente */
+        vertical-align: middle; /* Centra el texto verticalmente */
+
+    }
+
+    .table thead th {
+        position: sticky;
+        top: 0;
+        
+        z-index: 2; /* Asegura que la fila se mantenga sobre el contenido scrolleable */
+    }
+
+
+
+    .hour-input-cell {
+        width: 75px;
+        min-width: 75px;
+        max-width: 75px;
+        padding: .3rem;
+        text-align: center;
+        vertical-align: middle;
+        line-height: 0.75;
+    }
+
+    .input-hours {
+        width: 100%;
+        border: 1px solid #ced4da;
+        line-height: 0.75;
+        padding: .375rem .75rem;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    /* Estilos para las celdas según el tipo de ausencia */
+    .leave-absence {
+        background-color: lightsalmon;
+    }
+
+    .personal-holiday {
+        background-color: lightblue;
+    }
+
+    .out-of-contract {
+        background-color: purple;
+    }
+
+    /* Estilo para días de viaje */
+    .travel-day {
+        background-color: lightgreen;
+    }
+
+        /* Asegura que los inputs en celdas de fin de semana o días no editables no sean modificables */
+        .bg-secondary input, .leave-absence input, .personal-holiday input, .out-of-contract input, .travel-day input {
+            pointer-events: none;
+            background-color: inherit; /* Hace que el input sea transparente al color de fondo de la celda */
+        }
+
+       
+
+    /* Establece un ancho fijo para la primera columna */
+    .table .first-column {
+        width: 200px; /* Define el ancho fijo */
+        max-width: 200px; /* Previene que la celda se expanda más de lo necesario */
+    }
+    
+
+    .bg-secondary, .leave-absence, .personal-holiday, .out-of-contract, .travel-day {
+        pointer-events: none;
+        background-color: inherit; /* Hace que el input sea transparente al color de fondo de la celda */
+    }
+
+    /* Estilos para resaltar las celdas según su estado */
+    .leave-absence {
+        background-color: lightsalmon;
+    }
+
+    .personal-holiday {
+        background-color: lightblue;
+    }
+
+    .out-of-contract {
+        background-color: purple;
+    }
+
+    .travel-day {
+        background-color: lightgreen;
+    }
+
+    .effort-match, .effort-mismatch {
+        font-weight: bold;
+    }
+
+    .effort-match {
+        background-color: #90ee90;
+        color: darkgreen;
+    }
+
+    .effort-mismatch {
+        background-color: #ffcccc;
+        color: darkred;
+    }
+
+    h2 {
+        text-align: center;
+        font-weight: bold;
+        margin-top: 5px;
+    }
+
+    .d-flex.align-items-center select.form-control,
+    .d-flex.align-items-center button.btn {
+        height: calc(2.25rem + 2px); /* Asegura que todos los elementos tengan la misma altura */
+        margin-bottom: 0; /* Elimina el margen inferior por defecto para los elementos del formulario */
+    }
+
+    /* Espaciado entre elementos para una mejor distribución y alineación */
+    .mx-2 {
+        margin-left: .5rem !important;
+        margin-right: .5rem !important;
+    }
+
+
+</style>
+
+
+

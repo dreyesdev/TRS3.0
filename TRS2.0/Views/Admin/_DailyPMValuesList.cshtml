@@ -1,0 +1,24 @@
+﻿@model IEnumerable<TRS2._0.Models.DataModels.DailyPMValue>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Año</th>
+            <th>Mes</th>
+            <th>Días Laborables</th>
+            <th>Valor PM por Día</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>@item.Year</td>
+                <td>@item.Month</td>
+                <td>@item.WorkableDays</td>
+                <td>@item.PmPerDay</td>
+            </tr>
+        }
+    </tbody>
+</table>
+

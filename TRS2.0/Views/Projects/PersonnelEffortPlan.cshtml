@@ -1,0 +1,377 @@
+﻿@model TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel
+@using System.Globalization
+@using TRS2._0.Models.DataModels
+@using static TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel
+
+@{
+    ViewData["Title"] = "Personnel Effort Plan";
+    var personnelInfosList = ViewBag.PersonnelInfos as List<PersonnelInfo>;
+}
+
+<div class="container-fluid">
+    <h2>Personnel Effort Plan for @Model.Project.Acronim Proyect
+        <div style="display: block; margin-top: 5px;">
+            <button id="saveAllButton" class="btn btn-primary btn-sm">Save All</button>
+        </div>
+    </h2>    
+    <div class="table-responsive">
+        @if (Model.WorkPackages.Any())
+        {
+            <div class="scrollable-table-container">
+            <table class="table table-bordered table-striped table-hover">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>
+                            @Model.Project.Acronim
+                            
+                        </th>
+                        <th>WP</th>
+                            @foreach (var month in Model.GetMonthsForProject())
+                        {
+                            <th>@month.ToString("MMM yyyy") (M @Model.GetMonthIndex(month))</th>
+                        }
+                    </tr>
+                </thead>
+                    <tbody>
+
+                        @foreach (var wp in Model.WorkPackages)
+                        {
+                            foreach (var personnelEffort in wp.PersonnelEfforts)
+                            {
+                                var personnelInfo = personnelInfosList.FirstOrDefault(pi => pi.PersonId == personnelEffort.PersonId);
+
+                                <tr>
+                                    <td>
+                                        <a href="#" class="person-link" data-personid="@personnelEffort.PersonId">@personnelEffort.PersonName</a>
+                                    </td>
+                                    <td>
+                                        <a href="#" class="wp-link" data-wpid="@wp.WpId">@wp.WpName</a>
+                                    </td>
+
+                                    @foreach (var month in Model.UniqueMonths)
+                                    {
+                                        var monthStatus = personnelInfo?.MonthlyStatuses.FirstOrDefault(ms => ms.Month == month);
+                                        var cellClass = "effort-cell"; // Clase por defecto
+                                        var cellStyle = ""; // Estilo por defecto
+
+                                        if (monthStatus != null)
+                                        {
+                                            List<string> gradientColors = new List<string>();
+
+                                            // Añade el gradiente existente si hay uno
+                                            if (monthStatus.Status == 3 && !string.IsNullOrEmpty(monthStatus.Gradient))
+                                            {
+                                                // Primero, quita el prefijo y sufijo del gradiente completo
+                                                var gradientWithoutWrapper = monthStatus.Gradient
+                                                .Replace("linear-gradient(to right, ", "")
+                                                .Replace(");", "");
+
+                                                // Luego, divide por coma para obtener los colores individuales
+                                                var colors = gradientWithoutWrapper.Split(',');
+
+                                                // Ahora, limpia cada color individualmente
+                                                var cleanedColors = colors.Select(color => color.Trim().TrimEnd(new char[] { ')' }));
+
+                                                // Finalmente, agrega los colores limpios a la lista de gradientColors
+                                                gradientColors.AddRange(cleanedColors);
+                                            }
+
+
+                                            switch (monthStatus.Status)
+                                            {
+                                                case 1:
+                                                    cellClass += " out-of-contract";
+                                                    cellStyle = "background-color: orange;";
+                                                    break;
+                                                case 2:
+                                                    cellClass += " overload";
+                                                    cellStyle = "background-color: yellow;";
+                                                    break;
+
+                                                case 3: // Estado normal con posible gradiente
+                                                                                                      
+                                                    break;
+
+                                                case 4:                                                    
+                                                    var currentProjId = ViewBag.ProjId;
+                                                    // Comprueba si hay viajes asociados al proyecto actual
+                                                    var hasCurrentProjectTravel = monthStatus.UniqueProjIds.Contains(currentProjId);
+                                                    var hasOtherProjectTravel = monthStatus.UniqueProjIds.Any(id => id != currentProjId);
+                                                    var totalUniqueProjects = monthStatus.UniqueProjIds.Count;                                                    
+
+                                                    if (hasCurrentProjectTravel)
+                                                    {
+                                                        gradientColors.Add("darkgreen"); // Añade verde oscuro para viajes al proyecto actual
+                                                    }
+                                                    if (hasOtherProjectTravel)
+                                                    {
+                                                        gradientColors.Add("hotpink"); // Añade rosa para viajes a otros proyectos
+                                                    }
+                                                    
+                                                    break;
+                                                    // Construye el estilo del gradiente solo si hay colores en la lista
+                                                                                                 
+                                            }
+                                            if (monthStatus.Status != 1 && monthStatus.Status != 2)
+                                            {                                                                                  
+                                                if (gradientColors.Count == 1)
+                                                {
+                                                    // Si solo hay un color, usa background-color para un fondo sólido de ese color
+                                                    cellStyle = $"background-color: {gradientColors.First()};";
+                                                }
+                                                else if (gradientColors.Count > 1)
+                                                {
+                                                    // Si hay más de un color, construye un gradiente
+                                                    cellStyle = $"background-image: linear-gradient(to right, {String.Join(", ", gradientColors)});";
+                                                }
+                                                else
+                                                {
+                                                    // Aquí puedes manejar los casos predeterminados para cuando no hay gradientes ni condiciones especiales
+                                                    // Por ejemplo, podrías establecer un color de fondo predeterminado o dejarlo vacío si no es necesario
+                                                    cellStyle = ""; // Ajusta esto según sea necesario
+                                                }
+                                            }
+                                        }
+
+                                        // Determina si el mes actual está activo para este WP
+                                        var isActiveMonth = wp.ActiveMonths.Contains(month);
+                                        // Intenta obtener el valor del esfuerzo, o usa 0.00 si no está presente
+                                        var effortValue = personnelEffort.Efforts.ContainsKey(month) ? personnelEffort.Efforts[month] : 0.00M;
+
+                                        <td class="@cellClass" style="@cellStyle">
+                                            @if (isActiveMonth)
+                                            {
+                                                <!-- Mostrar input con esfuerzo o 0.00 si no hay esfuerzo -->
+                                                <input type="text" class="form-control input-effort"
+                                                       value="@effortValue.ToString("0.00", CultureInfo.InvariantCulture)"
+                                                       data-personid="@personnelEffort.PersonId"
+                                                       data-wpid="@wp.WpId"
+                                                       data-month="@month.ToString("yyyy-MM-dd")"
+                                                       data-original-value="@effortValue.ToString("0.00", CultureInfo.InvariantCulture)" />
+                                            }
+                                            else
+                                            {
+                                                
+
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        }
+
+                    </tbody>
+
+            </table>
+            </div>
+            <hr> <!-- Línea divisoria -->
+            <div class="legend" style="display: flex; justify-content: space-around; padding: 10px;">
+                <div><span style="height: 20px; width: 20px; background-color: lightsalmon; display: inline-block;"></span> Leave</div>
+                <div><span style="height: 20px; width: 20px; background-color: lightblue; display: inline-block;"></span> Holiday</div>
+                <div><span style="height: 20px; width: 20px; background-color: yellow; display: inline-block;"></span> Overload</div>
+                <div><span style="height: 20px; width: 20px; background-color: darkorange; display: inline-block;"></span> Out of Contract</div>
+                <div><span style="height: 20px; width: 20px; background-color: purple; display: inline-block;"></span> No Contract Period</div>
+                <div><span style="height: 20px; width: 20px; background-color: darkgreen; display: inline-block;"></span> Inside Travel</div>
+                <div><span style="height: 20px; width: 20px; background-color: hotpink; display: inline-block;"></span> Outside Travel</div>
+            </div>
+}
+else
+{
+    <p>No active work packages for this project.</p>
+}
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('saveAllButton').addEventListener('click', async function () { // Marca esta función como async
+            var changedEfforts = [];
+            var availableEfforts = @Html.Raw(Json.Serialize(ViewBag.AvailableEfforts));
+            var projectId = '@ViewBag.projId'; 
+            document.querySelectorAll('.input-effort').forEach(input => {
+                var originalValue = input.getAttribute('data-original-value');
+                var currentValue = parseFloat(input.value.replace(',', '.')).toFixed(2);
+                var formattedDate = formatDateTimeStringForModelBinding(input.getAttribute('data-month'));
+
+                if (currentValue !== originalValue) {
+                    changedEfforts.push({
+                        PersonId: parseInt(input.getAttribute('data-personid'), 10),
+                        WpId: parseInt(input.getAttribute('data-wpid'), 10),
+                        Month: formattedDate,
+                        Effort: currentValue
+                    });
+                }
+            });
+
+            if (changedEfforts.length > 0) {
+                try {
+                    // Utiliza await para esperar a que la promesa de fetch se resuelva
+                    const response = await fetch('@Url.Action("SaveEfforts", "Projects")', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ Efforts: changedEfforts, ProjectId: projectId })
+                    });
+
+                    const data = await response.json(); // Espera a obtener la respuesta JSON
+
+                    if (data.success) {                        
+                        if (data.notifications && data.notifications.length > 0) {
+                            alert(data.notifications.join('\n'));
+                        }
+                        alert('Efforts saved successfully');
+                        window.location.href = window.location.href.split('?')[0] + '?upd=' + new Date().getTime();
+                    } else {
+                        alert('There was an error saving the efforts');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('There was an error processing your request');
+                }
+            } else {
+                alert('No changes to save');
+            }
+        });
+
+
+
+        function formatDateTimeStringForModelBinding(dateString) {
+            var date = new Date(dateString);
+            var year = date.getFullYear();
+            var month = (date.getMonth() + 1).toString().padStart(2, '0'); // Meses van de 0 a 11, así que añade 1
+            var day = date.getDate().toString().padStart(2, '0');
+
+            return `${year}-${month}-${day}`;
+        }
+
+        document.querySelectorAll('.wp-link').forEach(link => {
+            link.addEventListener('click', function (event) {
+                event.preventDefault();
+                var wpid = this.getAttribute('data-wpid');
+                var projId = '@ViewBag.projId'; // Asegúrate de que ViewBag.projId esté disponible
+                window.location.href = '/Projects/PersonnelEffortPlan/' + projId + '/' + wpid;
+            });
+        });
+        document.querySelectorAll('.person-link').forEach(link => {
+            link.addEventListener('click', function (event) {
+                event.preventDefault();
+                var personId = this.getAttribute('data-personid');
+                var projId = '@ViewBag.projId'; // Asegúrate de que ViewBag.projId esté disponible
+                window.location.href = '/Projects/GetPersonnelEffortsByPerson/' + projId + '/' + personId;
+            });
+        });
+        
+
+
+    </script>
+}
+
+<style>
+    .input-effort {
+        width: 100%; /* Asegura que el input ocupe toda la celda */
+        min-width: 60px; /* Ajusta el mínimo ancho para mostrar tres caracteres */
+        text-align: center; /* Centra el texto */
+    }
+
+    .effort-cell {
+        min-width: 60px; /* Igual al mínimo ancho del input */
+        padding: 0; /* Elimina el relleno para permitir que el input llene la celda */
+        text-align: center; /* Centra el texto */
+    }
+
+    .person-name-column {
+        font-weight: bold;
+        width: 250px; /* Ajusta este valor según tus necesidades */
+        white-space: nowrap; /* Evita que el texto se envuelva a la siguiente línea */
+        overflow: hidden; /* Oculta el texto que exceda el ancho de la celda */
+        text-overflow: ellipsis; /* Añade puntos suspensivos si el texto es demasiado largo */
+
+    }
+
+    .scrollable-table-container {
+        overflow-y: auto;
+        max-height: 800px; /* Aumenta este valor para mostrar más filas */
+    }
+
+    .table thead th {
+        position: sticky;
+        top: 0;        
+        z-index: 10;
+    }
+
+    /* Estilo para la cabecera de la primera y segunda columna */
+    .table th:first-child, .table th:nth-child(2) {
+        position: sticky;
+        left: 0; /* Para la primera columna */
+        z-index: 11; /* Asegurarse de que está por encima del resto */
+        background-color: var(--blue-dark); /* Color de fondo oscuro */
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .table th:nth-child(2) {
+        left: 250px; /* Ajusta este valor al ancho de tu primera columna */
+        z-index: 11;
+    }
+
+    /* Estilos para las celdas de cuerpo en la primera y segunda columna */
+    .table td:first-child, .table td:nth-child(2) {
+        position: sticky;
+        left: 0; /* Para la primera columna */
+        background-color: white; /* Fondo blanco para las celdas del cuerpo */
+        z-index: 10;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .table td:nth-child(2) {
+        left: 250px; /* Ajusta este valor al ancho de tu primera columna */
+        z-index: 10;
+    }
+
+    /* Ajustes para el ancho de las columnas fijas */
+    .table th:first-child, .table td:first-child {
+        min-width: 250px; /* o el ancho que necesites */
+        max-width: 250px;
+    }
+
+    .table th:nth-child(2), .table td:nth-child(2) {
+        min-width: 100px; /* o el ancho que necesites */
+        max-width: 100px;
+    }
+
+    /* Ajustar bordes para celdas adyacentes */
+    .table td:nth-child(3), .table th:nth-child(3) {
+        border-left: 2px solid #dee2e6; /* Asegúrate de que el color del borde coincida con el estilo de tu tabla */
+    }
+
+    h2 {
+        text-align: center;
+        font-weight: bold;
+    }
+
+    .bg-dark-gray {
+        background-color: #6c757d !important; /* Gris oscuro, puedes ajustar el color según tus necesidades */
+        min-width: 60px; /* Ajusta el mínimo ancho para mostrar tres caracteres */
+        text-align: center; /* Centra el texto */
+    }
+
+</style>
+
+        @functions {
+    public bool HasInsideTravel(List<TravelDetails> travelDetails, int currentProjectId)
+    {
+        return travelDetails.Any(td => td.ProjId == currentProjectId);
+    }
+
+    public bool HasOutsideTravel(List<TravelDetails> travelDetails, int currentProjectId)
+    {
+        return travelDetails.Any(td => td.ProjId != currentProjectId);
+    }
+
+    public List<int> ProjectIdsinTravels(List<TravelDetails> travelDetails)
+    {
+        return travelDetails.Select(td => td.ProjId).Distinct().ToList();
+    }
+}

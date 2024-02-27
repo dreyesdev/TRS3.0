@@ -1,0 +1,53 @@
+﻿@model TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel
+@using System.Globalization
+
+<table class="table table-bordered table-striped table-hover">
+    <thead class="thead-dark">
+        <tr>
+            <th>Project</th>
+            <th>Person</th>
+            <th>WP</th>
+            @foreach (var month in Model.GetUniqueMonths())
+            {
+                <th>@month.ToString("MMM yyyy") (M @Model.GetMonthIndex(month))</th>
+            }
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var projectEffort in Model.ProjectsPersonnelEfforts)
+        {
+            foreach (var wp in projectEffort.WorkPackages)
+            {
+                foreach (var personnelEffort in wp.PersonnelEfforts)
+                {
+                    <tr>
+                        <td>@projectEffort.ProjectName</td>
+                        <td>@personnelEffort.PersonName</td>
+                        <td>@wp.WpName</td>
+                        @foreach (var month in Model.UniqueMonths)
+                        {
+                            <td class="@(!wp.ActiveMonths.Contains(month) ? "bg-dark" : "effort-cell")">
+                                @if (wp.ActiveMonths.Contains(month))
+                                {
+                                    decimal effortValue = 0;
+                                    personnelEffort.Efforts.TryGetValue(month, out effortValue);
+                                    <input type="text" class="form-control input-effort"
+                                           value="@effortValue.ToString("0.00", CultureInfo.InvariantCulture)"
+                                           data-personid="@personnelEffort.PersonId"
+                                           data-wpid="@wp.WpId"
+                                           data-effort-id="@personnelEffort.EffortId"
+                                           data-month="@month.ToString("yyyy-MM-dd")"
+                                           data-original-value="@effortValue.ToString("0.00", CultureInfo.InvariantCulture)" />
+                                }
+                                else
+                                {
+                                    <!-- Celda bloqueada sin contenido -->
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+            }
+        }
+    </tbody>
+</table>

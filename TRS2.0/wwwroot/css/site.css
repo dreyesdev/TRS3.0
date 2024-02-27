@@ -1,0 +1,179 @@
+/* Utiliza los colores exactos del logo para mantener la coherencia de la marca */
+:root {
+    --primary-color: #005A9C; /* Azul oscuro */
+    --secondary-color: #59AFFF; /* Azul claro */
+    --text-color: #ffffff; /* Blanco para el texto */
+}
+
+body, html {
+    height: 100%;
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.welcome-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: var(--primary-color); /* Color de fondo principal */
+}
+
+.hero-section {
+    text-align: center;
+    color: var(--text-color);
+}
+
+    .hero-section h1 {
+        font-size: 3rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .hero-section p {
+        font-size: 1.5rem;
+        margin-top: 0;
+    }
+
+/* Responsive design adjustments might be needed for smaller screens */
+@media (max-width: 768px) {
+    .hero-section h1 {
+        font-size: 2.5rem;
+    }
+
+    .hero-section p {
+        font-size: 1rem;
+    }
+}
+
+/* Colores personalizados basados en el azul oscuro del logo */
+:root {
+    --blue-dark: #005A9C; /* Asumiendo que este es el color azul oscuro del logo */
+    --blue-light: #59AFFF; /* Un tono más claro de azul para contrastar */
+    --text-color: #ffffff; /* Blanco para el texto */
+    --background-color: #f8f9fa; /* Un fondo claro para el contenido */
+}
+
+/* Personalización de la cabecera de la tarjeta */
+.card-header {
+    background-color: var(--blue-dark);
+    color: var(--text-color);
+}
+
+/* Fondo del cuerpo de la tarjeta para que no sea abusivo con el azul oscuro */
+.card-body {
+    background-color: var(--background-color);
+}
+
+/* Personalización para los títulos de las secciones */
+h2, .card-header {
+    background-color: var(--blue-dark);
+    color: var(--text-color);
+    padding: 10px;
+    border-radius: 0.25rem;
+}
+
+/* Botones de acción */
+.btn-success, .edit-link, .delete-link, .update-link, .cancel-link {
+    background-color: var(--blue-light);
+    color: var(--text-color);
+    border: none;
+}
+
+    .btn-success:hover, .edit-link:hover, .delete-link:hover, .update-link:hover, .cancel-link:hover {
+        background-color: var(--blue-dark);
+    }
+
+/* Estilos para la tabla */
+.table {
+    border-collapse: collapse;
+}
+
+    .table th {
+        background-color: var(--blue-dark);
+        color: var(--text-color);
+    }
+
+    .table td, .table th {
+        padding: 0.75rem;
+        vertical-align: top;
+        border-top: 1px solid #dee2e6;
+    }
+
+/* Estilos para inputs en la tabla */
+.input-effort, #newWpName, #newWpTitle, #newWpStartDate, #newWpEndDate, #newWpPms {
+    border: 2px solid var(--blue-light);
+    border-radius: 0.25rem;
+}
+
+/* Hover sobre celdas editables */
+.editable:hover {
+    background-color: var(--background-color);
+    cursor: pointer;
+}
+
+/* Ajustes responsivos */
+@media (max-width: 768px) {
+    /* Aquí puedes agregar estilos para dispositivos móviles si es necesario */
+}
+
+/* Clases adicionales para el resaltado de esfuerzos */
+.effort-low {
+    /* Tus estilos existentes */
+}
+
+.effort-high {
+    /* Tus estilos existentes */
+}
+
+.effort-equal {
+    /* Tus estilos existentes */
+}
+
+.card-header {
+    background-color: #005A9C; /* Azul oscuro, ajusta el código de color según tu logo */
+    color: #FFFFFF; /* Blanco */
+    /* Otros estilos que desees mantener, como el padding, etc. */
+}
+
+/* Personaliza la barra de navegación */
+.navbar {
+    background-color: #005A9C; /* El azul oscuro de tu logo */
+    padding: 0.5rem 1rem; /* Ajusta el relleno según tus preferencias */
+}
+
+/* Estilos para los elementos de la lista de navegación */
+.navbar-nav .nav-item {
+    margin: 0 1rem; /* Agrega espacio horizontal entre los elementos */
+}
+
+/* Estilos para los enlaces de navegación */
+.navbar-nav .nav-link {
+    color: #FFFFFF; /* Blanco para que resalte sobre el azul oscuro */
+    font-size: 1.2rem; /* Aumenta el tamaño de la fuente */
+    padding: 0.5rem 1rem; /* Relleno para hacer los enlaces más grandes y fáciles de clickear */
+}
+
+    /* Cambia el color de los enlaces al pasar el mouse */
+    .navbar-nav .nav-link:hover {
+        color: #59AFFF; /* Un azul claro para el hover, ajusta el color según tus preferencias */
+        background-color: rgba(255, 255, 255, 0.2); /* Un ligero resaltado en hover */
+        border-radius: 0.25rem; /* Bordes redondeados para el fondo en hover */
+    }
+
+/* Estilos para el logotipo, si lo necesitas */
+.navbar-brand {
+    font-size: 1.5rem; /* Tamaño de la fuente para el logotipo si lo deseas más grande */
+    color: #FFFFFF; /* Establece el color de tu logotipo */
+    padding: 0.5rem 1rem; /* Ajusta el relleno según sea necesario */
+}
+
+/* Asegúrate de que la barra de navegación sea responsiva */
+@media (max-width: 768px) {
+    .navbar-nav {
+        margin-top: 1rem;
+    }
+
+        .navbar-nav .nav-item {
+            margin: 0; /* Elimina el margen en dispositivos móviles */
+        }
+}

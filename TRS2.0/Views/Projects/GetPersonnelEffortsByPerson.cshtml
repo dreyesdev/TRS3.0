@@ -1,0 +1,382 @@
+﻿@model TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel
+@using System.Globalization
+@using TRS2._0.Models.DataModels
+
+@{
+    string personName = Model.ProjectsPersonnelEfforts.FirstOrDefault()?.WorkPackages.FirstOrDefault()?.PersonnelEfforts.FirstOrDefault()?.PersonName ?? "Selected Person";
+}
+
+<div class="container-fluid">
+    <h2>Personnel Effort Plan for @personName
+        <div style="display: block; margin-top: 5px;">
+            <button id="saveAllButton" class="btn btn-primary btn-sm">Save All</button>
+        </div>
+    </h2>
+    <div class="table-responsive">
+        <div class="scrollable-table-container">
+            <table class="table table-bordered table-striped table-hover">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>Project</th>
+                        <th>Person</th>
+                        <th>WP</th>
+                        @foreach (var monthKey in ViewBag.ProjectMonths)
+                        {
+                            <th>@DateTime.Parse(monthKey + "-01").ToString("MMM yyyy")</th>
+                        }
+                    </tr>
+                    <tr>
+                        <!-- Espacios para las primeras tres columnas que no tienen PMs -->
+                        <th>
+                            <div><span style="height: 10px; width: 10px; background-color: lightgreen; display: inline-block;"></span> Equal Effort</div>
+                            <div><span style="height: 10px; width: 10px; background-color: yellow; display: inline-block;"></span> Exceeds Target</div>
+                            <div><span style="height: 10px; width: 10px; background-color: lightblue; display: inline-block;"></span> Below Target</div>
+                        </th>
+                        <th>
+                            <div style="border-bottom: 1px solid #333; margin-bottom: 2px; text-align: center; font-weight: bold">ACTUAL EFFORT</div>
+                            <div style="text-align: center; font-weight: bold;">TARGET EFFORT</div>
+                        </th>
+                        <th></th>
+                        <!-- Calcula y muestra los PMs disponibles para cada mes -->
+                        @foreach (var monthKey in ViewBag.ProjectMonths)
+                        {
+                            // Redondear los valores a dos decimales para comparación y visualización
+                            var totalEffort = Math.Round(ViewBag.TotalEffortsPerMonth.ContainsKey(monthKey) ? ViewBag.TotalEffortsPerMonth[monthKey] : 0.00M, 2);
+                            // Asegúrate de que pmValue sea 0 si no hay un valor correspondiente en PMValuesPerMonth para el monthKey
+                            var pmValue = Math.Round(ViewBag.PMValuesPerMonth.ContainsKey(monthKey) ? ViewBag.PMValuesPerMonth[monthKey] : 0.00M, 2);
+                            var dispValue = pmValue - totalEffort; // Calcula el disponible
+                            var dispColor = dispValue > 0 ? "#90EE90" : dispValue == 0 ? "yellow" : "red"; // Decide el color
+                            // Determinar el color basado en la comparación
+                            var color = totalEffort > pmValue ? "yellow" :
+                            totalEffort < pmValue ? "lightblue" : "lightgreen";
+
+                            <th>
+                                <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center; color: @color">@totalEffort</div>
+                                <div style="text-align: center; color: @color">@pmValue</div>
+                                <!-- Muestra el disponible y su color -->
+                                <div style="text-align: center; color: @dispColor">Disp: @dispValue</div>
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var projectEffort in Model.ProjectsPersonnelEfforts)
+                    {
+                        foreach (var wp in projectEffort.WorkPackages)
+                        {
+                            foreach (var personnelEffort in wp.PersonnelEfforts)
+                            {
+                                <tr>
+                                    <td>
+                                        <a href="@Url.Action("PersonnelEffortPlan", "Projects", new { projId = projectEffort.ProjectId })">@projectEffort.ProjectName</a>
+                                    </td>
+                                    <td>@personnelEffort.PersonName</td>
+                                    <td>
+                                        <a href="@Url.Action("PersonnelEffortPlan", "Projects", new { projId = projectEffort.ProjectId, wpId = wp.WpId })">@wp.WpName</a>
+                                    </td>
+                                    @foreach (var monthStatus in ViewBag.PersonnelInfo.MonthlyStatuses)
+                                    {
+                                        var cellClass = "effort-cell";
+                                        var cellStyle = "";
+                                        
+                                        bool hasGradient = !string.IsNullOrEmpty(monthStatus.Gradient);
+                                        
+                                        var projectIdsInMonthTravel = ProjectIdsinTravels(monthStatus.TravelDetails);
+
+                                        bool hasMultipleProjectsTravel = projectIdsInMonthTravel.Count > 1;
+                                        bool currentProjectHasTravel = projectIdsInMonthTravel.Contains(projectEffort.ProjectId);
+
+                                        // Primero maneja los estados Out of Contract y Overloaded, que tienen prioridad
+                                        switch (monthStatus.Status)
+                                        {
+                                            case 1:
+                                                cellClass += " out-of-contract";
+                                                cellStyle = "background-color: orange;";
+                                                break;
+                                            case 2:
+                                                cellClass += " overload";
+                                                cellStyle = "background-color: yellow;";
+                                                break;
+                                            default:
+                                                
+                                                // Para estados normales o cuando hay viajes, revisa Inside/Outside Travel
+                                                if (HasOutsideTravel(monthStatus.TravelDetails, projectEffort.ProjectId))
+                                                {
+                                                    cellStyle = hasGradient ? $"background-image: {monthStatus.Gradient}, hotpink;" : "background-color: hotpink;";
+                                                    
+                                                }
+                                                if (HasInsideTravel(monthStatus.TravelDetails, projectEffort.ProjectId))
+                                                {
+                                                    cellStyle = hasGradient ? $"background-image: {monthStatus.Gradient}, darkgreen;" : "background-color: darkgreen;";
+                                                }
+                                                
+                                                else if (hasGradient)
+                                                {
+                                                    cellStyle = $"background-image: {monthStatus.Gradient};";
+                                                }
+                                                break;
+                                        }
+
+                                        <td class="@cellClass" style="@cellStyle">
+                                            <input type="text" class="form-control input-effort"
+                                                   value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")"
+                                                   data-personid="@personnelEffort.PersonId"
+                                                   data-wpid="@wp.WpId"
+                                                   data-month="@monthStatus.Month.ToString("yyyy-MM-dd")"
+                                                   data-original-value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")" />
+                                        </td>
+                                    }
+
+                                </tr>
+                            }
+                        }
+                    }
+                </tbody>
+
+            </table>
+        </div>
+    </div>
+    <hr> <!-- Línea divisoria -->
+    <div class="legend" style="display: flex; justify-content: space-around; padding: 10px;">
+        <div><span style="height: 20px; width: 20px; background-color: lightsalmon; display: inline-block;"></span> Leave</div>
+        <div><span style="height: 20px; width: 20px; background-color: lightblue; display: inline-block;"></span> Holiday</div>
+        <div><span style="height: 20px; width: 20px; background-color: yellow; display: inline-block;"></span> Overload</div>
+        <div><span style="height: 20px; width: 20px; background-color: darkorange; display: inline-block;"></span> Out of Contract</div>
+        <div><span style="height: 20px; width: 20px; background-color: purple; display: inline-block;"></span> No Contract Period</div>
+        <div><span style="height: 20px; width: 20px; background-color: darkgreen; display: inline-block;"></span> Inside Travel</div>
+        <div><span style="height: 20px; width: 20px; background-color: hotpink; display: inline-block;"></span> Outside Travel</div>        
+    </div>
+
+</div>
+
+<script>
+
+    document.getElementById('saveAllButton').addEventListener('click', async function () { 
+        var changedEfforts = [];    
+        
+        var projectId = '@ViewBag.projId';
+        document.querySelectorAll('.input-effort').forEach(input => {
+            var originalValue = input.getAttribute('data-original-value'); // Sin parseFloat aquí
+            // Reemplaza la coma por punto y convierte a número flotante
+            var originalValueFloat = parseFloat(originalValue.replace(',', '.'));
+            originalValueFloat = originalValueFloat.toFixed(2);
+            var currentValue = parseFloat(input.value.replace(',', '.')).toFixed(2); // Redondeo a 2 decimales
+            var formattedDate = formatDateTimeStringForModelBinding(input.getAttribute('data-month'));
+            console.log(originalValueFloat, currentValue);
+
+            if (currentValue !== originalValueFloat) { // Verifica si el valor ha cambiado
+
+                changedEfforts.push({
+
+                    PersonId: parseInt(input.getAttribute('data-personid'), 10),
+                    WpId: parseInt(input.getAttribute('data-wpid'), 10),
+                    Month: formattedDate,
+                    Effort: currentValue
+                });
+                
+            }
+        });
+
+        if (changedEfforts.length > 0) {
+            try {
+                // Realiza la solicitud POST utilizando fetch con async/await
+                const response = await fetch('@Url.Action("SaveEfforts", "Projects")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ Efforts: changedEfforts, ProjectId: projectId })
+                });
+
+                if (!response.ok) { // Verifica si la respuesta no fue exitosa
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json(); // Espera a obtener la respuesta JSON
+
+                if (data.success) {
+                    if (data.notifications && data.notifications.length > 0) {
+                        alert(data.notifications.join('\n'));
+                    }
+                    alert('Efforts saved successfully');
+                    window.location.href = window.location.href.split('?')[0] + '?upd=' + new Date().getTime();
+                } else {
+                    // Manejo de errores específicos del servidor o lógica de negocio
+                    alert('There was an error saving the efforts');
+                }
+            } catch (error) {
+                // Manejo de errores de red o de respuesta
+                console.error('Error:', error);
+                alert('There was an error processing your request');
+            }
+        } else {
+            alert('No changes to save');
+        }
+    });
+
+
+    function formatDateTimeStringForModelBinding(dateString) {
+        var date = new Date(dateString);
+        var year = date.getFullYear();
+        var month = (date.getMonth() + 1).toString().padStart(2, '0'); // Meses van de 0 a 11, así que añade 1
+        var day = date.getDate().toString().padStart(2, '0');
+
+        return `${year}-${month}-${day}`;
+    }
+
+    // Función para guardar todos los esfuerzos de una persona
+    document.querySelectorAll('.wp-link').forEach(link => {
+        link.addEventListener('click', function (event) {
+            event.preventDefault();
+            var wpid = this.getAttribute('data-wpid');
+            var projId = '@ViewBag.projId'; // Asegúrate de que ViewBag.projId esté disponible
+            window.location.href = '/Projects/PersonnelEffortPlan/' + projId + '/' + wpid;
+        });
+    });
+
+
+</script>
+    
+
+<style>
+    .input-effort {
+        width: 100%; /* Asegura que el input ocupe toda la celda */
+        min-width: 60px; /* Ajusta el mínimo ancho para mostrar tres caracteres */
+        text-align: center; /* Centra el texto */
+    }
+
+    .effort-cell {
+        min-width: 60px; /* Igual al mínimo ancho del input */
+        padding: 0; /* Elimina el relleno para permitir que el input llene la celda */
+        text-align: center; /* Centra el texto */
+    }
+
+    .person-name-column {
+        font-weight: bold;
+        width: 250px; /* Ajusta este valor según tus necesidades */
+        white-space: nowrap; /* Evita que el texto se envuelva a la siguiente línea */
+        overflow: hidden; /* Oculta el texto que exceda el ancho de la celda */
+        text-overflow: ellipsis; /* Añade puntos suspensivos si el texto es demasiado largo */
+    }
+
+    .scrollable-table-container {
+        overflow-y: auto;        
+        max-height: 800px; /* Aumenta este valor para mostrar más filas */
+    }
+
+    .table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background-color: var(--blue-dark); /* Asegura que el fondo no sea transparente */
+    }
+        
+
+    /* Ajustar si es necesario para las celdas adyacentes */
+    .table th:nth-child(2), .table td:nth-child(2), .table th:nth-child(3), .table td:nth-child(3) {
+        position: sticky;
+        background-color: white; /* Fondo blanco para las celdas del cuerpo */
+        z-index: 10; /* Ajusta según necesidad para mantener la consistencia del z-index */
+    }
+
+    /* Estilo para la cabecera de la primera y segunda columna */
+    .table th:first-child, .table th:nth-child(2) {
+        position: sticky;
+        left: 0; /* Para la primera columna */
+        z-index: 11; /* Asegurarse de que está por encima del resto */
+        background-color: var(--blue-dark); /* Color de fondo oscuro */
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .table th:nth-child(2) {
+        left: 200px; /* Ajusta este valor al ancho de tu primera columna */
+        z-index: 11;
+    }
+
+    /* Estilos para las celdas de cuerpo en la primera y segunda columna */
+    .table td:first-child, .table td:nth-child(2) {
+        position: sticky;
+        left: 0; /* Para la primera columna */
+        background-color: white; /* Fondo blanco para las celdas del cuerpo */
+        z-index: 10;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .table td:nth-child(2) {
+        left: 200px; /* Ajusta este valor al ancho de tu primera columna */
+        z-index: 10;
+    }
+
+    /* Ajustes para el ancho de las columnas fijas */
+    .table th:first-child, .table td:first-child {
+        min-width: 200px; /* o el ancho que necesites */
+        max-width: 200px;
+    }
+
+    .table th:nth-child(2), .table td:nth-child(2) {
+        min-width: 250px; /* o el ancho que necesites */
+        max-width: 250px;
+    }
+
+    /* Ajustar bordes para celdas adyacentes */
+    .table td:nth-child(3), .table th:nth-child(3) {
+        border-left: 2px solid #dee2e6; /* Asegúrate de que el color del borde coincida con el estilo de tu tabla */
+    }
+
+    /* Estilo para la cabecera de la tercera columna */
+    .table th:nth-child(3) {
+        position: sticky;
+        left: 450px; /* Ajusta este valor a la suma del ancho de tus dos primeras columnas */
+        z-index: 11; /* Asegúrate de que esté por encima del resto */
+        background-color: var(--blue-dark); /* Color de fondo oscuro */
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    /* Estilos para las celdas de cuerpo en la tercera columna */
+    .table td:nth-child(3) {
+        position: sticky;
+        left: 450px; /* Ajusta este valor a la suma del ancho de tus dos primeras columnas */
+        background-color: white; /* Fondo blanco para las celdas del cuerpo */
+        z-index: 10;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    /* Ajustes para el ancho de las columnas fijas */
+    .table th:nth-child(3), .table td:nth-child(3) {
+        min-width: 100px; /* o el ancho que necesites */
+        max-width: 100px;
+    }
+
+    /* Ajustar bordes para celdas adyacentes */
+    .table td:nth-child(4), .table th:nth-child(4) {
+        border-left: 2px solid #dee2e6; /* Asegúrate de que el color del borde coincida con el estilo de tu tabla */
+    }
+
+    h2 {
+        text-align: center;
+        font-weight: bold;
+    }
+
+
+</style>
+
+@functions {
+    public bool HasInsideTravel(List<TravelDetails> travelDetails, int currentProjectId)
+    {
+        return travelDetails.Any(td => td.ProjId == currentProjectId);
+    }
+
+    public bool HasOutsideTravel(List<TravelDetails> travelDetails, int currentProjectId)
+    {
+        return travelDetails.Any(td => td.ProjId != currentProjectId);
+    }
+
+    public List<int> ProjectIdsinTravels(List<TravelDetails> travelDetails)
+    {
+        return travelDetails.Select(td => td.ProjId).Distinct().ToList();
+    }
+}

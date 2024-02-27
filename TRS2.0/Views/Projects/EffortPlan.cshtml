@@ -1,0 +1,511 @@
+﻿@model TRS2._0.Models.ViewModels.EffortPlanViewModel
+
+@{
+    ViewData["Title"] = "Effort Plan";
+}
+
+<div class="container-fluid my-custom-container">
+    <h2 class="effort-plan-title">
+        Effort Plan
+        <hr class="title-divider">
+        <div class="action-buttons">
+            <button class="btn btn-primary distribute-linearly-all">Lineal All</button>
+            <button class="btn btn-success save-all">Save All</button>
+            <button class="btn btn-warning clear-all">Clear All</button>
+        </div>
+        <div id="savingIndicator" style="display: none;">Guardando...</div>
+    </h2>
+
+@if (Model.WorkPackages.Any())
+{
+    <div class="scrollable-table-container">
+        <table class="table table-bordered table-striped table-hover">
+            <thead class="thead-dark">
+                <tr>
+                        <th>
+                            <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center">Total Effort</div>
+                            <div style="text-align: center">Effort Target</div>
+                        </th>
+                    <th>Actions</th>
+                    <th>WP</th>
+                        @foreach (var month in Model.GetMonthsInRange())
+                        {
+                            <th>
+                                <div class="month-year-header">          
+                                    
+                                    <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center">@month.ToString("MMM").Substring(0, 1).ToUpper()@month.ToString("MMM").Substring(1).ToLower()</div>
+                                    <div style="text-align: center">@month.ToString("yyyy")</div>
+                                </div>
+                            </th>
+                        }
+
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var wp in Model.WorkPackages)
+                {
+                        // Calcular el Effort Target una vez para este WP
+                        var effortTargetForThisWp = wp.getPMs(wp.WpId);
+                    <tr>
+                        <td class="@(wp.TotalEffort != wp.getPMs(wp.WpId) ? "effort-mismatch" : "effort-match")">
+                            
+                                <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center">@wp.TotalEffort</div>
+                                <div style="text-align: center">@wp.getPMs(wp.WpId)</div>
+                        </td>
+                        <td>
+                            <div class="button-container">
+                                <button data-wpid="@wp.WpId" class="btn btn-success save-effort">Save</button>
+                                <span class="vertical-bar">|</span>
+                                <button data-wpid="@wp.WpId" class="btn btn-info distribute-linearly">Lineal</button>
+                                    <span class="vertical-bar">|</span>
+                                    <button data-wpid="@wp.WpId" class="btn btn-warning clear-line">Clear</button>
+
+                            </div>
+                        </td>
+
+                        <td>@wp.WpName</td>
+                        @foreach (var month in Model.GetMonthsInRange())
+                        {
+                            <td class="@(wp.IsValidMonth(month) ? "effort-cell" : "bg-dark")">
+                                @if (wp.IsValidMonth(month))
+                                {
+                                        <input type="text" class="form-control input-effort" value="@wp.MonthlyEfforts.GetValueOrDefault(month, 0)" data-wpid="@wp.WpId" data-month="@month" data-wptarget="@effortTargetForThisWp" />
+                                }
+                                else
+                                {
+                                    <!-- Celda bloqueada sin contenido -->
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>            
+    </div>
+}
+else
+{
+    
+<p>No hay paquetes de trabajo para este proyecto.</p>
+}
+</div>
+<style>
+    .input-effort {
+        width: 100%;
+        min-width: 60px;
+        text-align: center;
+        line-height: 22px; /* Ajusta esto según la altura de tus input */
+        height: 40px; /* Asegúrate de que la altura del input sea adecuada */
+        padding: 0 12px; /* Elimina el padding vertical */
+        box-sizing: border-box;
+    }
+
+    .effort-cell {
+        min-width: 60px; /* Igual al mínimo ancho del input */
+        padding: 0; /* Elimina el relleno para permitir que el input llene la celda */
+        text-align: center; /* Centra el texto */
+    }
+
+    .person-name-column {
+        font-weight: bold;
+        width: 250px; /* Ajusta este valor según tus necesidades */
+        white-space: nowrap; /* Evita que el texto se envuelva a la siguiente línea */
+        overflow: hidden; /* Oculta el texto que exceda el ancho de la celda */
+        text-overflow: ellipsis; /* Añade puntos suspensivos si el texto es demasiado largo */
+    }
+
+    .scrollable-table-container {
+        overflow-y: auto;
+        max-height: 800px; /* Aumenta este valor para mostrar más filas */
+    }
+
+    .table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    /* Estilo para la cabecera de la primera y segunda columna */
+    .table th:first-child, .table th:nth-child(2) {
+        position: sticky;
+        left: 0; /* Para la primera columna */
+        z-index: 11; /* Asegurarse de que está por encima del resto */
+        background-color: var(--blue-dark); /* Color de fondo oscuro */
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .table th:nth-child(2) {
+        left: 150px; /* Ajusta este valor al ancho de tu primera columna */
+        z-index: 11;
+    }
+
+    /* Estilos para las celdas de cuerpo en la primera y segunda columna */
+    .table td:first-child, .table td:nth-child(2) {
+        position: sticky;
+        left: 0; /* Para la primera columna */
+        background-color: white; /* Fondo blanco para las celdas del cuerpo */
+        z-index: 10;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .table td:nth-child(2) {
+        left: 150px; /* Ajusta este valor al ancho de tu primera columna */
+        z-index: 10;
+    }
+
+    /* Ajustes para el ancho de las columnas fijas */
+    .table th:first-child, .table td:first-child {
+        min-width: 150px; /* o el ancho que necesites */
+        max-width: 150px;
+    }
+
+    .table th:nth-child(2), .table td:nth-child(2) {
+        min-width: 300px; /* o el ancho que necesites */
+        max-width: 300px;
+    }
+
+    /* Ajustar bordes para celdas adyacentes */
+    .table td:nth-child(3), .table th:nth-child(3) {
+        border-left: 2px solid #dee2e6; /* Asegúrate de que el color del borde coincida con el estilo de tu tabla */
+    }
+
+    /* Estilo para la cabecera de la tercera columna */
+    .table th:nth-child(3) {
+        position: sticky;
+        left: 450px; /* Ajusta este valor a la suma del ancho de tus dos primeras columnas */
+        z-index: 11; /* Asegúrate de que esté por encima del resto */
+        background-color: var(--blue-dark); /* Color de fondo oscuro */
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    /* Estilos para las celdas de cuerpo en la tercera columna */
+    .table td:nth-child(3) {
+        position: sticky;
+        left: 450px; /* Ajusta este valor a la suma del ancho de tus dos primeras columnas */
+        background-color: white; /* Fondo blanco para las celdas del cuerpo */
+        z-index: 10;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    /* Ajustes para el ancho de las columnas fijas */
+    .table th:nth-child(3), .table td:nth-child(3) {
+        min-width: 100px; /* o el ancho que necesites */
+        max-width: 100px;
+    }
+
+    /* Ajustar bordes para celdas adyacentes */
+    .table td:nth-child(4), .table th:nth-child(4) {
+        border-left: 2px solid #dee2e6; /* Asegúrate de que el color del borde coincida con el estilo de tu tabla */
+    }
+
+    h2 {
+        text-align: center;
+        font-weight: bold;
+
+    }
+
+    .effort-match {
+        background-color: #90ee90; /* Verde claro */
+        color: darkgreen; /* Verde oscuro para ambos valores */
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .effort-mismatch {
+        background-color: #ffcccc; /* Rojo claro */
+        color: darkred; /* Rojo oscuro para ambos valores */
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .effort-target {
+        color: black; /* Negro para effort target */
+    }
+
+    .vertical-bar {
+        margin: 2px; /* Ajusta el espaciado horizontal alrededor de la barra */
+        color: #333; /* Ajusta el color de la barra */
+    }
+
+    .button-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .my-custom-container {
+        margin-left: auto;
+        margin-right: auto;
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+
+    .distribute-linearly-all, .save-all {
+        margin-left: 10px; /* Espacio entre el título y los botones */
+    }
+
+    .btn {
+        margin: 5px; /* Añade margen alrededor de los botones para mejor separación */
+    }
+
+    .table td, .table th {
+        height: 50px; /* Ajusta según necesites */
+        vertical-align: middle; /* Centra el contenido verticalmente */
+    }
+
+    .effort-plan-title {
+        text-align: center;
+        display: block; /* Asegura que el <h2> se maneje como un bloque */
+        position: relative; /* Para posicionar correctamente los elementos internos */
+    }
+
+    .title-divider {
+        border-top: 2px solid white; /* Línea divisoria blanca */
+        width: 30%; /* Ajusta el ancho según necesites */
+        margin: 0 auto 10px; /* Centra la línea y añade espacio debajo */
+    }
+
+    .action-buttons {
+        display: inline-block; /* Coloca los botones en línea */
+        margin: 0 auto; /* Centra los botones horizontalmente */
+    }
+
+        .action-buttons .btn {
+            margin: 0 5px; /* Espacio entre botones */
+        }
+
+    .month-year-header {
+        text-align: center;
+    }
+    
+
+
+
+</style>
+
+@section Scripts {
+    <script>        
+        // Script para manejar la lógica de guardar los esfuerzos
+        document.querySelectorAll('.save-effort').forEach(button => {
+            button.addEventListener('click', function () {
+                var wpid = this.getAttribute('data-wpid');
+                var inputs = document.querySelectorAll(`.input-effort[data-wpid="${wpid}"]`);
+                var efforts = {};
+
+                inputs.forEach(input => {
+                    var dateString = input.getAttribute('data-month');
+                    var stringValue = input.value.replace(',', '.'); // Reemplazar comas por puntos
+                    var value = parseFloat(stringValue);
+                    if (!isNaN(value)) {
+                        var formattedDate = formatDateTimeString(dateString);                        
+                        if (formattedDate) {
+                            efforts[formattedDate] = value.toString();
+                        }
+                    }
+                });
+
+                var dataToSend = {
+                    wpId: parseInt(wpid, 10),
+                    efforts: efforts
+                };
+
+                fetch('/Wps/SaveEfforts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(dataToSend)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        location.reload();
+                    })
+                    .catch(error => {
+                        // Manejar el error aquí
+                    });
+            });
+        });
+
+
+
+        document.querySelectorAll('.distribute-linearly').forEach(button => {
+            button.addEventListener('click', function () {
+                var wpid = this.getAttribute('data-wpid');
+                var inputs = document.querySelectorAll(`.input-effort[data-wpid="${wpid}"]`);
+                var effortTarget = parseFloat(inputs[0].getAttribute('data-wptarget'));
+                var activeInputs = Array.from(inputs).filter(input => input.parentElement.classList.contains('effort-cell'));
+                var activeInputsCount = activeInputs.length;
+
+                if (activeInputsCount === 0) return; // Prevenir división por cero.
+
+                var effortPerMonth = effortTarget / activeInputsCount;
+                var sumDistributedEffort = 0;
+
+                // Distribuir el esfuerzo inicialmente a todos los inputs
+                activeInputs.forEach((input, index) => {
+                    input.value = effortPerMonth.toFixed(2);
+                    sumDistributedEffort += parseFloat(input.value);
+                });
+
+                // Calcular el exceso después del redondeo
+                var excessEffort = effortTarget - sumDistributedEffort;
+
+                // Repartir el exceso entre las últimas 5 casillas o las disponibles si son menos de 5
+                var excessDistributionCount = Math.min(5, activeInputsCount);
+                for (let i = 0; i < excessDistributionCount; i++) {
+                    let index = activeInputsCount - 1 - i; // Empezar desde el último input hacia atrás
+                    let currentInputEffort = parseFloat(activeInputs[index].value);
+                    let adjustedEffort = currentInputEffort + (excessEffort / excessDistributionCount);
+
+                    // Asegurarse de que el esfuerzo ajustado no supere 1
+                    adjustedEffort = Math.min(adjustedEffort, 1).toFixed(2);
+
+                    activeInputs[index].value = adjustedEffort;
+                }
+            });
+        });
+
+
+
+
+
+
+        document.querySelector('.distribute-linearly-all').addEventListener('click', function () {
+            let uniqueWpIds = new Set(); // Crear un conjunto para almacenar wpid únicos
+
+            // Primero, recopilar todos los wpid únicos
+            document.querySelectorAll('.input-effort[data-wpid]').forEach(input => {
+                uniqueWpIds.add(input.getAttribute('data-wpid'));
+            });
+
+            // Luego, iterar sobre cada wpid único para aplicar la distribución lineal
+            uniqueWpIds.forEach(wpid => {
+                let inputs = document.querySelectorAll(`.input-effort[data-wpid="${wpid}"]`);
+                let effortTarget = parseFloat(inputs[0].getAttribute('data-wptarget'));
+                let activeInputs = Array.from(inputs).filter(input => input.parentElement.classList.contains('effort-cell'));
+                let activeInputsCount = activeInputs.length;
+
+                if (activeInputsCount === 0) return; // Prevenir división por cero.
+
+                let effortPerMonth = effortTarget / activeInputsCount;
+                let sumDistributedEffort = 0;
+
+                // Distribuye el esfuerzo inicialmente a todos los inputs
+                activeInputs.forEach((input, index) => {
+                    input.value = effortPerMonth.toFixed(2);
+                    sumDistributedEffort += parseFloat(input.value);
+                });
+
+                // Calcular el exceso después del redondeo
+                var excessEffort = effortTarget - sumDistributedEffort;
+
+                // Repartir el exceso entre las últimas 5 casillas o las disponibles si son menos de 5
+                var excessDistributionCount = Math.min(5, activeInputsCount);
+                for (let i = 0; i < excessDistributionCount; i++) {
+                    let index = activeInputsCount - 1 - i; // Empezar desde el último input hacia atrás
+                    let currentInputEffort = parseFloat(activeInputs[index].value);
+                    let adjustedEffort = currentInputEffort + (excessEffort / excessDistributionCount);
+
+                    // Asegurarse de que el esfuerzo ajustado no supere 1
+                    adjustedEffort = Math.min(adjustedEffort, 1);
+
+                    activeInputs[index].value = adjustedEffort.toFixed(2);
+                }
+            });
+        });
+
+
+
+        document.querySelector('.save-all').addEventListener('click', function () {
+            // Mostrar el indicador de guardado
+            document.getElementById('savingIndicator').style.display = 'block';
+
+            var allEfforts = [];
+
+            document.querySelectorAll('.input-effort').forEach(input => {
+                var wpid = parseInt(input.getAttribute('data-wpid'), 10);
+                var dateString = input.getAttribute('data-month');
+                var effort = parseFloat(input.value.replace(',', '.'));
+                var formattedDate = formatDateTimeString(dateString); // Asegúrate de que esta función está definida correctamente
+
+                if (!isNaN(effort) && formattedDate) { // Verificación adicional para la fecha formateada
+                    allEfforts.push({
+                        WpId: wpid,
+                        Month: formattedDate,
+                        Value: effort
+                    });
+                }
+            });
+
+            // Realizar la solicitud fetch
+            fetch('/Wps/SaveAllEfforts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ Efforts: allEfforts })
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Data saved successfully:', data);
+                    location.reload(); // Recargar la página después de guardar
+                })
+                .catch(error => {
+                    console.error('Error saving data:', error);
+                })
+                .finally(() => {
+                    // Ocultar el indicador de guardado independientemente del resultado
+                    document.getElementById('savingIndicator').style.display = 'none';
+                });
+        });
+
+
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelector('.clear-all').addEventListener('click', function () {
+                document.querySelectorAll('.input-effort').forEach(input => {
+                    input.value = '0'; // Coloca un 0 en todos los inputs
+                });
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.clear-line').forEach(button => {
+                button.addEventListener('click', function () {
+                    var wpid = this.getAttribute('data-wpid');
+                    document.querySelectorAll(`.input-effort[data-wpid="${wpid}"]`).forEach(input => {
+                        input.value = '0';
+                    });
+                });
+            });
+        });
+
+
+
+        function formatDateTimeString(dateTimeStr) {
+            var parts = dateTimeStr.split(' ');
+            if (parts.length === 2) {
+                var dateParts = parts[0].split('/');
+                if (dateParts.length === 3) {
+                    var year = dateParts[2];
+                    var month = dateParts[1];
+                    var day = dateParts[0];
+                    return `${year}-${month}-${day}`;
+                }
+            }
+            return null;
+        }
+
+
+    </script>
+
+}
+

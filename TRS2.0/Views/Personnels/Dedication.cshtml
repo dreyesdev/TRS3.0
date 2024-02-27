@@ -1,0 +1,323 @@
+﻿@model IEnumerable<TRS2._0.Models.DataModels.Personnel>
+
+
+@{
+    ViewData["Title"] = "Dedication";
+    var selectedPersonId = ViewBag.SelectedPersonId;
+}
+
+<h2>Dedication</h2>
+
+<div class="container">
+    <div class="row">
+        <!-- Columna de selección de personal -->
+        <div class="col-md-6">
+            <h2>Person Selection</h2>
+
+            <!-- Dropdown para seleccionar personal -->
+            <select id="personnelSelect" class="form-control">
+                <option value="">Please select a person from the list below:</option>
+                @foreach (var person in Model)
+                {
+                    <option value="@person.Id">@person.Name @person.Surname</option>
+                }
+            </select>
+
+            <!-- Barra de búsqueda -->
+            <p>Or start typing here the name of the person:</p>
+            <input type="text" id="searchTerm" class="form-control" placeholder="Start typing..." onkeyup="filterPersonnel()" />
+
+            <!-- Resultados de búsqueda -->
+            <div id="searchResults"></div>
+        </div>
+
+        <!-- Columna de detalles del personal -->
+        <div class="col-md-6">
+            <h2>Person Details</h2>
+            <div id="personDetails" class="card">
+                <!-- Aquí se cargarán los detalles del personal -->
+            </div>
+        </div>
+    </div>
+</div>
+<hr />
+
+<div id="dedicationTableContainer">
+    <!-- Tabla de dedicación se cargará aquí -->
+</div>
+
+
+
+@section Scripts{
+
+    <script>
+    document.getElementById('personnelSelect').addEventListener('change', function () {
+            var personId = this.value;
+            fetchPersonDetails(personId);
+            loadDedicationData(personId);
+        });
+    
+    function filterPersonnel() {
+                var searchTerm = document.getElementById('searchTerm').value;
+
+                $.ajax({
+                    url: '@Url.Action("GetFilteredPersonnel", "Personnels")',
+                data: { searchTerm: searchTerm },
+                success: function (data) {
+                    var resultsDiv = document.getElementById('searchResults');
+                    resultsDiv.innerHTML = ''; // Limpiar resultados anteriores
+
+                    data.forEach(function (person) {
+                        var personDiv = document.createElement('div');
+                        personDiv.className = 'person-result';
+                        personDiv.textContent = person.name + ' ' + person.surname;
+                        personDiv.setAttribute('data-person-id', person.id);
+
+                        personDiv.onclick = function () {
+                            // Marcar el resultado seleccionado como activo y limpiar los demás
+                            document.querySelectorAll('.person-result').forEach(function (el) {
+                                el.classList.remove('active');
+                            });
+                            this.classList.add('active');
+
+                            fetchPersonDetails(person.id);
+                            loadDedicationData(person.id);
+                        };
+
+                        resultsDiv.appendChild(personDiv);
+                    });
+                }
+            });
+    }
+        function fetchPersonDetails(personId) {
+                $.ajax({
+                    url: '@Url.Action("GetPersonDetails", "Personnels")',
+                    data: { id: personId },
+                    success: function (response) {
+                        var detailsDiv = document.getElementById('personDetails');
+                        var searchTermInput = document.getElementById('searchTerm');
+                        detailsDiv.innerHTML = '';
+                        if (response.success) {
+                            var data = response.data;
+                            // Asignar el nombre completo de la persona al campo de búsqueda
+                            searchTermInput.value = data.fullName || '';
+                            detailsDiv.innerHTML = '<div class="card-body">' +
+                                '<h5 class="card-title">' + (data.fullName || '') + '</h5>' +
+                                '<p> </p>' +
+                                '<p><span class="card-detail-label">Affiliation:</span> ' + (data.affiliation || '') + '</p>' +
+                                '<p><span class="card-detail-label">Department:</span> ' + (data.departmentName || '') + '</p>' +
+                                '<p><span class="card-detail-label">Group:</span> ' + (data.personnelGroupName || '') + '</p>' +
+                                '<p><span class="card-detail-label">Group Leader:</span> ' + (data.responsiblePerson || '') + '</p>' +
+                                '<p><span class="card-detail-label">Contract Start:</span> ' + (data.startDate || '') + '</p>' +
+                                '<p><span class="card-detail-label">Contract End:</span> ' + (data.endDate || '') + '</p>'
+                                '</div>';
+                        } else {
+                            // Manejar el caso en que la persona no se encontró
+                            detailsDiv.innerHTML = '<p>Person details not found.</p>';
+                    }
+                }
+            });
+            // Ocultar la lista de resultados
+            document.getElementById('searchResults').style.display = 'none';
+        }
+
+        document.getElementById('searchResults').addEventListener('click', function (event) {
+            if (event.target && event.target.matches('div.person-result')) {
+                var personId = event.target.getAttribute('data-person-id');
+                fetchPersonDetails(personId);
+            }
+        });
+        // Mostrar la lista de resultados cuando el campo de búsqueda recibe el foco
+        document.getElementById('searchTerm').addEventListener('focus', function () {
+            document.getElementById('searchResults').style.display = 'block';
+        });
+
+        function loadDedicationData(personId) {
+            $.ajax({
+                url: '@Url.Action("GetDedicationData", "Personnels")',
+                data: { personId: personId },
+                success: function (data) {                    
+                    var tableHtml = '<table class="table table-bordered">';
+                    tableHtml += '<thead class="thead-light"><tr>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">#</th>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">Start Date</th>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">End Date</th>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">Dedication</th>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">Actions</th>';
+                    tableHtml += '</tr></thead>';
+                    tableHtml += '<tbody>';
+
+                    data.forEach(function (item, index) {
+                        tableHtml += '<tr id="row-' + item.id + '">'; // Añade un ID único a cada fila
+                        tableHtml += `<td style="text-align: center;">${index + 1}</td>`;
+                        tableHtml += `<td style="text-align: center;"><input type='date' value='${item.startDate}' class='form-control' style='width: 100%;'/></td>`;
+                        tableHtml += `<td style="text-align: center;"><input type='date' value='${item.endDate}' class='form-control' style='width: 100%;'/></td>`;
+                        tableHtml += `<td style="text-align: center;"><input type='text' value='${Math.round(item.dedicationValue)}' class='form-control' style='width: 100%;'/></td>`;
+                        tableHtml += `<td style="text-align: center;"><button class="btn btn-primary btn-sm" onclick="updateDedication(${item.id},${item.pId})">Update</button>`;
+                        tableHtml += `<span class="mx-2">|</span>`;
+                        tableHtml += `<button class="btn btn-danger btn-sm" onclick="removeDedication(${item.id},${item.pId})">Remove</button></td>`;
+                        tableHtml += '</tr>';
+                    });
+                    // Agregar la fila en blanco al final
+                    var nextIndex = data.length + 1; // El índice de la nueva fila
+                    tableHtml += '<tr id="new-row">';
+                    tableHtml += `<td style="text-align: center;">${nextIndex}</td>`;
+                    tableHtml += `<td><input type='date' class='form-control' style='width: 100%;'/></td>`;
+                    tableHtml += `<td><input type='date' class='form-control' style='width: 100%;'/></td>`;
+                    tableHtml += `<td><input type='text' class='form-control' style='width: 100%;'/></td>`;
+                    tableHtml += `<td style="text-align: center;"><button class="btn btn-success btn-sm" onclick="addDedication(${personId})">Add</button></td>`;
+                    tableHtml += '</tr>';
+                    tableHtml += '</tbody></table>';
+                    $('#dedicationTableContainer').html(tableHtml);
+                },
+                error: function (error) {
+                    console.error("Error loading dedication data", error);
+                }
+            });
+        }
+                
+        function updateDedication(id, pId) {
+            // Recuperar los datos de los inputs en la fila correspondiente
+            var row = $('#row-' + id); // Selecciona la fila por ID
+            var startDate = row.find("input[type='date']").eq(0).val();
+            var endDate = row.find("input[type='date']").eq(1).val();
+            var dedication = row.find("input[type='text']").val();
+
+            // Llamar a la acción del controlador para actualizar
+            $.ajax({
+                url: '@Url.Action("UpdateDedication", "Personnels")',
+                type: 'POST',
+                data: {
+                    id: id,
+                    startDate: startDate,
+                    endDate: endDate,
+                    dedication: parseFloat(dedication)
+                },
+                success: function (response) {
+                    alert(response.message);
+                    loadDedicationData(pId);
+                    
+                },
+                error: function (error) {
+                    // Manejar error
+                }
+            });
+        }
+
+        function removeDedication(id,piD) {
+            // Llamar a la acción del controlador para eliminar
+            $.ajax({
+                url: '@Url.Action("RemoveDedication", "Personnels")',
+                type: 'POST',
+                data: { id: id },
+                success: function (response) {
+                    alert(response.message);
+                    loadDedicationData(piD);
+                    // Recargar la tabla o mostrar mensaje de éxito
+                },
+                error: function (error) {
+                    // Manejar error
+                }
+            });
+        }
+
+
+        function addDedication(personId) {
+            var row = $('#new-row');
+            var startDate = row.find("input[type='date']").eq(0).val();
+            var endDate = row.find("input[type='date']").eq(1).val();
+            var dedication = row.find("input[type='text']").val();
+
+            // Verificar que las fechas y la dedicación no estén vacías
+            if (!startDate || !endDate || !dedication) {
+                alert('Please fill in all fields.');
+                return;
+            }
+
+            // Llamar a la acción del controlador para agregar una nueva dedicación
+            $.ajax({
+                url: '@Url.Action("AddDedication", "Personnels")',
+                type: 'POST',
+                data: {
+                    personId: personId,
+                    startDate: startDate,
+                    endDate: endDate,
+                    dedication: parseFloat(dedication)
+                },
+                success: function (response) {
+                    alert(response.message);
+                    if (response.success) {
+                        loadDedicationData(personId); // Recargar la tabla
+                    }
+                },
+                error: function (error) {
+                    // Manejar el error
+                    console.error("Error adding dedication", error);
+                }
+            });
+        }
+</script>
+}
+
+<style>
+    .person-result {
+        cursor: pointer;
+        padding: 5px;
+    }
+
+        .person-result:hover {
+            background-color: #eee;
+        }
+
+        .person-result.active {
+            background-color: #4c87c6;
+        }
+
+    .card-detail-label {
+        font-weight: bold;
+    }
+
+    .card-title {
+        font-weight: bold;
+    }
+
+    #searchResults {
+        max-height: 200px; /* Ajusta esto según tus necesidades */
+        overflow-y: auto;
+        display: none; /* Inicialmente oculto */
+    }
+
+    
+   
+    /* Estilos para la tabla */
+    .table {
+        width: 100%;
+        border-collapse: collapse; /* Para bordes más definidos */
+        margin-bottom: 1rem; /* Espaciado debajo de la tabla */
+    }
+
+        .table th, .table td {
+            padding: 0.75rem;
+            vertical-align: top;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .table thead th {
+            vertical-align: bottom;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .table tbody + tbody {
+            border-top: 2px solid #dee2e6;
+        }
+
+        .table-sm th,
+        .table-sm td {
+            padding: 0.3rem;
+        }
+
+    h2 {
+        text-align: center;
+        font-weight: bold;
+    }
+</style>

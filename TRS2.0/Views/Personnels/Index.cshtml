@@ -1,0 +1,154 @@
+﻿@model IEnumerable<TRS2._0.Models.DataModels.Personnel>
+
+@{
+    ViewData["Title"] = "Personnel Selection";
+}
+
+<div class="container">
+    <div class="row">
+        <!-- Columna de selección de personal -->
+        <div class="col-md-6">
+            <h2>Person Selection</h2>
+
+            <!-- Dropdown para seleccionar personal -->
+            <select id="personnelSelect" class="form-control">
+                <option value="">Please select a person from the list below:</option>
+                @foreach (var person in Model)
+                {
+                    <option value="@person.Id">@person.Name @person.Surname</option>
+                }
+            </select>
+
+            <!-- Barra de búsqueda -->
+            <p>Or start typing here the name of the person:</p>
+            <input type="text" id="searchTerm" class="form-control" placeholder="Start typing..." onkeyup="filterPersonnel()" />
+
+            <!-- Resultados de búsqueda -->
+            <div id="searchResults"></div>
+        </div>
+
+        <!-- Columna de detalles del personal -->
+        <div class="col-md-6">
+            <h2>Person Details</h2>
+            <div id="personDetails" class="card">
+                <!-- Aquí se cargarán los detalles del personal -->
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('personnelSelect').addEventListener('change', function () {
+            var personId = this.value;
+            fetchPersonDetails(personId);
+            
+        });
+
+        function filterPersonnel() {
+            var searchTerm = document.getElementById('searchTerm').value;
+
+            $.ajax({
+                url: '@Url.Action("GetFilteredPersonnel", "Personnels")',
+                data: { searchTerm: searchTerm },
+                success: function (data) {
+                    var resultsDiv = document.getElementById('searchResults');
+                    resultsDiv.innerHTML = ''; // Limpiar resultados anteriores
+
+                    data.forEach(function (person) {
+                        var personDiv = document.createElement('div');
+                        personDiv.className = 'person-result';
+                        personDiv.textContent = person.name + ' ' + person.surname;
+                        personDiv.setAttribute('data-person-id', person.id);
+
+                        personDiv.onclick = function () {
+                            // Marcar el resultado seleccionado como activo y limpiar los demás
+                            document.querySelectorAll('.person-result').forEach(function (el) {
+                                el.classList.remove('active');
+                            });
+                            this.classList.add('active');
+
+                            fetchPersonDetails(person.id);
+                        };
+
+                        resultsDiv.appendChild(personDiv);
+                    });
+                }
+            });
+        }
+        function fetchPersonDetails(personId) {
+            $.ajax({
+                url: '@Url.Action("GetPersonDetails", "Personnels")',
+                data: { id: personId },
+                success: function (response) {
+                    var detailsDiv = document.getElementById('personDetails');
+                    var searchTermInput = document.getElementById('searchTerm');
+                    detailsDiv.innerHTML = '';
+                    if (response.success) {
+                        var data = response.data;
+                        // Asignar el nombre completo de la persona al campo de búsqueda
+                        searchTermInput.value = data.fullName || '';
+                        detailsDiv.innerHTML = '<div class="card-body">' +
+                            '<h5 class="card-title">' + (data.fullName || '') + '</h5>' +
+                            '<p> </p>' +
+                            '<p><span class="card-detail-label">Affiliation:</span> ' + (data.affiliation || '') + '</p>' +
+                            '<p><span class="card-detail-label">Department:</span> ' + (data.departmentName || '') + '</p>' +
+                            '<p><span class="card-detail-label">Group:</span> ' + (data.personnelGroupName || '') + '</p>' +
+                            '<p><span class="card-detail-label">Group Leader:</span> ' + (data.responsiblePerson || '') + '</p>' +
+                            '<p><span class="card-detail-label">Contract Start:</span> ' + (data.startDate || '') + '</p>' +
+                            '<p><span class="card-detail-label">Contract End:</span> ' + (data.endDate || '') + '</p>'
+
+                        '</div>';
+                    } else {
+                        // Manejar el caso en que la persona no se encontró
+                        detailsDiv.innerHTML = '<p>Person details not found.</p>';
+                    }
+                }
+            });
+            // Ocultar la lista de resultados
+            document.getElementById('searchResults').style.display = 'none';
+        }
+
+
+        document.getElementById('searchResults').addEventListener('click', function (event) {
+            if (event.target && event.target.matches('div.person-result')) {
+                var personId = event.target.getAttribute('data-person-id');
+                fetchPersonDetails(personId);
+            }
+        });
+        // Mostrar la lista de resultados cuando el campo de búsqueda recibe el foco
+        document.getElementById('searchTerm').addEventListener('focus', function () {
+            document.getElementById('searchResults').style.display = 'block';
+        });
+    </script>
+}
+
+<style>
+    .person-result {
+        cursor: pointer;
+        padding: 5px;
+    }
+
+        .person-result:hover {
+            background-color: #eee;
+        }
+
+        .person-result.active {
+            background-color: #4c87c6;
+        }
+
+    .card-detail-label {
+        font-weight: bold;
+    }
+
+    .card-title {
+        font-weight: bold;
+    }
+
+    #searchResults {
+        max-height: 200px; /* Ajusta esto según tus necesidades */
+        overflow-y: auto;
+        display: none; /* Inicialmente oculto */
+    }
+</style>
+

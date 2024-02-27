@@ -1,0 +1,220 @@
+﻿<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - TRS2.0</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link href='https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.9.0/fullcalendar.min.css' rel='stylesheet' />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link href="https://cdn.datatables.net/1.10.22/css/dataTables.bootstrap4.min.css" rel="stylesheet" />   
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.22/css/jquery.dataTables.css">
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.22/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/v/bs4/dt-1.10.22/datatables.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.22/js/dataTables.bootstrap4.min.js"></script>
+    
+</head>
+
+
+<body>
+    <header>
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+            <div class="container-fluid">
+                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
+                    <img src="~/Images/logo.png" alt="TRS 2.0 Logo" style="height: 50px;"> <!-- Ajusta la ruta y el tamaño según tus necesidades -->                    
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
+                        aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                    <ul class="navbar-nav flex-grow-1">
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Inicio</a>
+                        </li>                     
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Projects" asp-action="InitialRedirect">Proyectos</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Personnels" asp-action="Index">Personal</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="TimeSheet" asp-action="Index">Investigador</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Admin" asp-action="Index">Admin</a>
+                        </li>
+                    </ul>
+                    <partial name="_LoginPartial" />
+                </div>
+            </div>
+        </nav>
+    </header>
+    <!-- Menú secundario de proyectos, solo se muestra en las vistas de detalles de proyecto -->
+    @if (Context.Request.Path.StartsWithSegments("/Projects/Details") ||
+    Context.Request.Path.StartsWithSegments("/Projects/EffortPlan") ||
+    Context.Request.Path.StartsWithSegments("/Projects/PersonnelSelection") ||
+    Context.Request.Path.StartsWithSegments("/Projects/PersonnelEffortPlan") ||
+    Context.Request.Path.StartsWithSegments("/Projects/GetPersonnelEffortsByPerson")) // Asegúrate de que esta ruta exista en tu controlador
+    {
+        <div class="project-details-menu">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                <div class="container-fluid">
+                    <!-- Botón para Details & Wps -->
+                    <a class="navbar-brand btn btn-outline-primary me-2" href="@Url.Action("Details", "Projects", new { id = ViewBag.ProjId })">
+                        Details & Wps
+                    </a>
+
+                    <!-- Separador -->
+                    <span class="vertical-separator"></span>
+
+                    <!-- Botón para Effort Plan -->
+                    <a class="navbar-brand btn btn-outline-primary me-2" href="@Url.Action("EffortPlan", "Projects", new { projId = ViewBag.ProjId })">
+                        Effort Plan
+                    </a>
+
+                    <!-- Separador -->
+                    <span class="vertical-separator"></span>
+
+                    <!-- Botón para Personnel Selection -->
+                    <a class="navbar-brand btn btn-outline-primary" href="@Url.Action("PersonnelSelection", "Projects", new { projId = ViewBag.ProjId })">
+                        Personnel Selection
+                    </a>
+                    <!-- Separador -->
+                    <span class="vertical-separator"></span>
+
+                    <!-- Botón para Personnel Effort Plan -->
+                    <a class="navbar-brand btn btn-outline-primary" href="@Url.Action("PersonnelEffortPlan", "Projects", new { projId = ViewBag.ProjId })">
+                        Personnel Effort Plan
+                    </a>
+
+                </div>
+            </nav>
+        </div>
+    }
+
+    <!-- Menú secundario de personal, se muestra en las vistas relacionadas con personal -->
+    @if (Context.Request.Path.StartsWithSegments("/Personnels"))
+    {
+        <div class="personal-details-menu">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                <div class="container-fluid">
+                    <!-- Botones del Submenú -->
+                    @if (TempData["SelectedPersonId"] != null)
+                    {
+                        TempData.Keep("SelectedPersonId"); // Mantener el valor para su uso posterior
+
+                        // Actualizar los enlaces del menú para incluir el SelectedPersonId
+                        <a class="navbar-brand btn btn-outline-primary me-2"
+                           href="@Url.Action("Calendar", "Personnels", new { id = TempData["SelectedPersonId"] })">
+                            Calendar
+                        </a>
+                        <span class="vertical-separator"></span>
+                        <a class="navbar-brand btn btn-outline-primary me-2"
+                           href="@Url.Action("Dedication", "Personnels", new { id = TempData["SelectedPersonId"] })">
+                            Dedication
+                        </a>
+                        <span class="vertical-separator"></span>
+                        <a class="navbar-brand btn btn-outline-primary me-2"
+                           href="@Url.Action("ExternalRate", "Personnels", new { id = TempData["SelectedPersonId"] })">
+                            External Rate
+                        </a>
+                        <span class="vertical-separator"></span>
+                        <a class="navbar-brand btn btn-outline-primary me-2"
+                           href="@Url.Action("Travels", "Personnels", new { id = TempData["SelectedPersonId"] })">
+                            Travels
+                        </a>
+                        <span class="vertical-separator"></span>
+                        <a class="navbar-brand btn btn-outline-primary me-2"
+                           href="@Url.Action("LoginLog", "Personnels", new { id = TempData["SelectedPersonId"] })">
+                            LoginLog
+                        </a>
+                    }
+                    else
+                    {
+                    <a class="navbar-brand btn btn-outline-primary me-2" href="@Url.Action("Calendar", "Personnels")">
+                        Calendar
+                    </a>
+                    <span class="vertical-separator"></span>
+                    <a class="navbar-brand btn btn-outline-primary me-2" href="@Url.Action("Dedication", "Personnels")">Dedication</a>
+                    <span class="vertical-separator"></span>
+                    <a class="navbar-brand btn btn-outline-primary me-2" href="@Url.Action("ExternalRate", "Personnels")">External Rate</a>
+                    <span class="vertical-separator"></span>
+                    <a class="navbar-brand btn btn-outline-primary me-2" href="@Url.Action("Travels", "Personnels")">Travels</a>
+                    <span class="vertical-separator"></span>
+                    <a class="navbar-brand btn btn-outline-primary" href="@Url.Action("LoginLog", "Personnels")">Login Log</a>
+                    }
+                </div>
+            </nav>
+        </div>
+    }
+
+    @RenderBody()
+     @* <div class="container">
+        <main role="main" class="pb-3">
+    
+    </main>
+    </div>   *@
+
+
+    <footer class="border-top footer text-muted">
+        <div class="container">
+            &copy; 2024 - TRS2.0 - <a asp-area="" asp-controller="Home" asp-action="Privacy">Contacto</a>
+        </div>
+    </footer>        
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js'></script>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
+
+<style>
+    .project-details-menu {
+        position: static;
+        top: 500px;
+        left: 0;
+        width: 100%;
+        z-index: 1040; /* Asegúrate de que el menú esté por encima de otros elementos */        
+        box-shadow: 0 2px 4px rgba(0,0,0,.1); /* Opcional: para añadir una sombra y dar sensación de profundidad */
+    }
+
+    .vertical-separator {
+        border-left: 1px solid #dee2e6;
+        height: 100%;
+        display: inline-block;
+        margin: 0 5px; /* Ajusta el margen según tus necesidades */
+    }
+
+    /* Añade un relleno al cuerpo para evitar que el contenido se esconda detrás del menú fijo */
+    body.with-fixed-menu {
+        padding-top: 0px; /* Ajusta este valor según la altura de tu menú */
+    }
+    
+
+    .details-content {
+        padding-top: 10px; /* o lo que sea necesario */
+    }
+
+    body {
+        padding-top: 0px; /* Ajusta según la altura de tu menú */
+    }
+
+    .mb-3 {
+        margin-bottom: 0rem !important;
+    }
+
+    .pb-3 {
+        padding-top: 30px; /* o lo que sea necesario */
+    }
+
+    .navbar-brand img {
+        height: 50px; /* Ajusta esto para cambiar el tamaño del logo */
+        /* Otros estilos si son necesarios */
+    }
+</style>

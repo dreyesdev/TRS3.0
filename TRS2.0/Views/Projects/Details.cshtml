@@ -1,0 +1,566 @@
+﻿@model TRS2._0.Models.DataModels.Project
+
+
+
+@{
+    ViewData["Title"] = "Details";
+    // Inicializa las sumas de las columnas
+    decimal totalEstimated = 0;
+    decimal totalDistributed = 0;
+    decimal totalCovered = 0;
+    // Asume valores predeterminados o maneja el caso de null según sea necesario
+    var startProject = Model.Start ?? DateTime.Today; // Usar la fecha actual como valor por defecto
+    var endProject = Model.End ?? DateTime.Today; // Usar la fecha actual como valor por defecto
+     var monthsList = new List<string>();
+    if (Model.Start.HasValue && Model.End.HasValue)
+    {
+        // Ahora que sabemos que startProject y endProject tienen valores, procedemos con el cálculo
+        startProject = Model.Start.Value;
+        endProject = Model.End.Value;
+
+       
+
+        int monthsCount = ((endProject.Year - startProject.Year) * 12) + endProject.Month - startProject.Month + 1;
+
+        for (int i = 0; i < monthsCount; i++)
+        {
+            string monthName = startProject.AddMonths(i).ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+            monthsList.Add($"M{i + 1} ({monthName})");
+        }
+
+        // Asegúrate de usar monthsList para llenar los selectores como se mostró anteriormente
+    }
+}
+
+<div class="container mt-3">
+    <div class="row">
+        <!-- Encapsula los detalles del proyecto en una tarjeta -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header text-center">
+                Proyect Details
+                </div>
+                    <div class="card-body">
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Acronym</dt>
+                            <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.Acronim)</dd>
+                        </div>                        
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Title</dt>
+                            <dd class="col-sm-8">@Html.DisplayFor(model => model.Title)</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Contract</dt>
+                            <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.Contract)</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Start Date</dt>
+                            <dd class="col-sm-8 d-inline-block">@(Model.Start.HasValue ? Model.Start.Value.ToString("dd-MM-yyyy") : string.Empty)</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">End Date</dt>
+                            <dd class="col-sm-8 d-inline-block">@(Model.End.HasValue ? Model.End.Value.ToString("dd-MM-yyyy") : string.Empty)</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Project Investigator</dt>
+                            <dd class="col-sm-8 d-inline-block">@ViewBag.PiFullName</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Project Manager</dt>
+                            <dd class="col-sm-8 d-inline-block">@ViewBag.PmFullName</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Type</dt>
+                            <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.Type)</dd>
+                        </div>
+                    </dl>
+                    
+                    <!-- Tarjeta para Third Parties -->
+                    <div class="card mt-4">
+                        <div style="text-align: center; background-color: black; color: white; font-size: 24px; font-weight: bold;">
+                            Third Parties
+                        </div>
+
+                        <div class="card-body">
+                            <div class="row">
+                                <!-- Cada tick en su propia columna dentro de esta fila -->
+                                <div class="col">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="upcCheck" disabled @((Model.TpsUpc == 1) ? "checked" : "")>
+                                        <label class="form-check-label" for="upcCheck">UPC</label>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="icreaCheck" disabled @((Model.TpsIcrea == 1) ? "checked" : "")>
+                                        <label class="form-check-label" for="icreaCheck">ICREA</label>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="csicCheck" disabled @((Model.TpsCsic == 1) ? "checked" : "")>
+                                        <label class="form-check-label" for="csicCheck">CSIC</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                     </div>
+            </div>
+    </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    Work Packages Details
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: center; background-color: black; color: white;">Name</th>
+                                <th style="text-align: center; background-color: black; color: white;">Estimated</th>
+                                <th style="text-align: center; background-color: black; color: white;">Distributed</th>
+                                <th style="text-align: center; background-color: black; color: white;">Covered with Personnel</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var wp in ViewBag.WpDetails)
+                            {
+                                // Calcula las sumas de las columnas
+                                totalEstimated += Convert.ToDecimal(wp.Pms);
+                                totalDistributed += Convert.ToDecimal(wp.Distributed);
+                                totalCovered += Convert.ToDecimal(wp.Covered);
+
+                                // Determina la clase para la fila según las condiciones
+                                string rowClass = "";
+                                string textStyle = "";
+                                if (Convert.ToDecimal(wp.Pms) == wp.Distributed && wp.Distributed == wp.Covered)
+                                {
+                                    rowClass = "table-success"; // Fondo verde claro
+                                    textStyle = "text-success font-weight-bold"; // Texto verde oscuro y en negrita
+                                }
+                                else if (Convert.ToDecimal(wp.Pms) == wp.Distributed && wp.Distributed != wp.Covered && Convert.ToDecimal(wp.Pms) != wp.Covered)
+                                {
+                                    rowClass = "table-warning"; // Fondo naranja claro
+                                    textStyle = "font-weight-bold"; // Todo en negrita
+                                }
+                                else if (Convert.ToDecimal(wp.Pms) != wp.Distributed && wp.Distributed != wp.Covered && Convert.ToDecimal(wp.Pms) != wp.Covered)
+                                {
+                                    rowClass = "table-warning"; // Fondo naranja claro
+                                    textStyle = "font-weight-bold"; // Todo en negrita
+                                }
+                                else
+                                {
+                                    rowClass = "table-light"; // Fondo amarillo claro
+                                                              // No se aplica una clase de texto específica aquí; se manejará individualmente
+                                }
+
+                                <tr class="@rowClass">
+                                    <td class="centered">@wp.Name</td>
+                                    <td class="centered">@wp.Pms</td>
+                                    <td class="centered">@wp.Distributed</td>
+                                    <td class="centered">@wp.Covered</td>
+                                </tr>
+                            }
+                            <!-- Fila de Total -->
+                            <tr class="table-primary">
+                                <th style="text-align: center; background-color: black; color: white;">Total</th>
+                                <td class="centered bold">@totalEstimated</td>
+                                <td class="centered bold">@totalDistributed</td>
+                                <td class="centered bold">@totalCovered</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+<hr />
+
+
+
+    <h3 class="text-center my-style">Work Packages Design</h3>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th class="text-center">Name</th>
+                <th class="text-center">Title</th>
+                <th class="text-center">Start Date</th>
+                <th class="text-center">End Date</th>
+                <th class="text-center w-8">Pms</th>
+                <th class="text-center">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var wp in Model.Wps)
+            {
+                <tr>
+                    <!-- Campos de Texto y Fecha -->
+                    <td class="text-center">
+                        <span class="editable" id="wpName_@wp.Id">@wp.Name</span>
+                        <input type="text" class="edit-field form-control" id="editWpName_@wp.Id" value="@wp.Name" style="display: none;" />
+                    </td>
+                    <td class="text-center">
+                        <span class="editable" id="wpTitle_@wp.Id">@wp.Title</span>
+                        <input type="text" class="edit-field form-control" id="editWpTitle_@wp.Id" value="@wp.Title" style="display: none;" />
+                    </td>
+                    <td class="text-center">
+                        <span class="editable" id="wpStartDate_@wp.Id">@wp.StartDate.ToShortDateString()</span>
+                        <input type="date" class="edit-field form-control" id="editWpStartDate_@wp.Id" value="@wp.StartDate.ToString("yyyy-MM-dd")" style="display: none;" />
+                    </td>
+                    <td class="text-center">
+                        <span class="editable" id="wpEndDate_@wp.Id">@wp.EndDate.ToShortDateString()</span>
+                        <input type="date" class="edit-field form-control" id="editWpEndDate_@wp.Id" value="@wp.EndDate.ToString("yyyy-MM-dd")" style="display: none;" />
+                    </td>
+                    <td class="text-center">
+                        <span class="editable" id="wpPms_@wp.Id">@wp.Pms</span>
+                        <input type="text" class="edit-field form-control" id="editWpPms_@wp.Id" value="@wp.Pms" style="display: none;" />
+                    </td>
+                    <!-- Botones -->
+                    <td class="text-center">
+                        <div class="d-flex justify-content-center">
+                            <button type="button" class="btn btn-primary edit-link custom-edit-btn me-2" onclick="editWp(@wp.Id)">Edit</button>
+                            <button type="button" class="btn btn-danger delete-link custom-delete-btn me-2" onclick="deleteWp(@wp.Id)">Delete</button>
+
+                            <button type="button" class="btn btn-success update-link custom-update-btn me-2" style="display: none;" onclick="updateWp(@wp.Id)">Update</button>
+                            <button type="button" class="btn btn-secondary cancel-link custom-cancel-btn me-2" style="display: none;" onclick="cancelEdit(@wp.Id)">Cancel</button>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+        <!-- Entradas para nuevo WP -->
+        <tfoot>
+            <tr>
+                <td><input type="text" class="form-control" id="newWpName" placeholder="Name" /></td>
+                <td><input type="text" class="form-control" id="newWpTitle" placeholder="Title" /></td>
+                <!-- StartDate Selector -->
+                <td>
+                    <select class="form-control" id="newWpStartDate">
+                        @foreach (var month in monthsList)
+                        {
+                            <option value="@month">@month</option>
+                        }
+                    </select>
+                </td>
+                <!-- EndDate Selector -->
+                <td>
+                    <select class="form-control" id="newWpEndDate">
+                        @foreach (var month in monthsList)
+                        {
+                            <option value="@month">@month</option>
+                        }
+                    </select>
+                </td>                
+                <td><input type="number" class="form-control" id="newWpPms" placeholder="Pms" /></td>
+                <td class="text-center"><button onclick="addNewWp()" class="btn btn-info custom-add-btn">Add</button></td>
+            </tr>
+        </tfoot>
+    </table>
+
+</div>
+
+<script>
+// Variables para las fechas de inicio y fin del proyecto
+    var projectStartDateString = '@(Model.Start.HasValue ? Model.Start.Value.ToString("yyyy-MM-dd") : "")';
+    var projectEndDateString = '@(Model.End.HasValue ? Model.End.Value.ToString("yyyy-MM-dd") : "")';
+
+    var projectStartDate = projectStartDateString ? new Date(projectStartDateString) : null;
+    var projectEndDate = projectEndDateString ? new Date(projectEndDateString) : null;
+
+    if (projectStartDate && projectEndDate) {
+        // Asegúrate de que este código se ejecuta solo si projectStartDate y projectEndDate son objetos Date válidos.
+        console.log(projectStartDate.getMonth()); // Ahora esto debería funcionar sin errores.
+    } else {
+        console.log("Las fechas de inicio o fin del proyecto no están definidas.");
+    }
+
+
+    function addNewWp() {
+        var startMonthIndex = document.getElementById('newWpStartDate').selectedIndex;
+        var endMonthIndex = document.getElementById('newWpEndDate').selectedIndex;
+
+        // Calcular las fechas reales basadas en los índices seleccionados
+        var calculatedStartDate = new Date(projectStartDate);
+        calculatedStartDate.setMonth(projectStartDate.getMonth() + startMonthIndex);
+
+        var calculatedEndDate = new Date(projectStartDate);
+        calculatedEndDate.setMonth(projectStartDate.getMonth() + endMonthIndex);
+
+        // Asegurarse de que la fecha de fin no sea anterior a la fecha de inicio
+        if (calculatedEndDate < calculatedStartDate) {
+            alert("La fecha de fin no puede ser anterior a la fecha de inicio.");
+            return;
+        }
+
+        // Formatear las fechas para su envío
+        var formattedStartDate = calculatedStartDate.toISOString().split('T')[0];
+        var formattedEndDate = calculatedEndDate.toISOString().split('T')[0];
+
+        var data = {
+            ProjId: @Model.ProjId,
+            Name: document.getElementById('newWpName').value,
+            Title: document.getElementById('newWpTitle').value,
+            StartDate: formattedStartDate,
+            EndDate: formattedEndDate,
+            Pms: document.getElementById('newWpPms').value
+        };
+
+        // Proceder con la solicitud AJAX como antes
+        $.ajax({
+            type: 'POST',
+            url: '@Url.Action("Create", "Wps")',
+            data: JSON.stringify(data),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            success: function (response) {
+                if (response.success) {
+                    alert("WP añadido con éxito");
+                    location.reload();
+                } else {
+                    alert("Error al añadir WP");
+                }
+            },
+            error: function () {
+                alert("Error en la solicitud AJAX");
+            }
+        });
+    }
+
+
+    function editWp(wpId) {
+        // Ocultar los elementos span y mostrar los campos de entrada
+        document.getElementById('wpName_' + wpId).style.display = 'none';
+        document.getElementById('editWpName_' + wpId).style.display = 'inline';
+
+        document.getElementById('wpTitle_' + wpId).style.display = 'none';
+        document.getElementById('editWpTitle_' + wpId).style.display = 'inline';
+
+        document.getElementById('wpStartDate_' + wpId).style.display = 'none';
+        document.getElementById('editWpStartDate_' + wpId).style.display = 'inline';
+
+        document.getElementById('wpEndDate_' + wpId).style.display = 'none';
+        document.getElementById('editWpEndDate_' + wpId).style.display = 'inline';
+
+        document.getElementById('wpPms_' + wpId).style.display = 'none';
+        document.getElementById('editWpPms_' + wpId).style.display = 'inline';
+
+        // Ocultar botón de editar y eliminar, mostrar actualizar y cancelar
+        var parentCell = document.getElementById('wpName_' + wpId).parentNode.parentNode;
+        parentCell.querySelector('.edit-link').style.display = 'none';
+        parentCell.querySelector('.delete-link').style.display = 'none';
+        parentCell.querySelector('.update-link').style.display = 'inline';
+        parentCell.querySelector('.cancel-link').style.display = 'inline';
+    }
+
+    function updateWp(wpId) {
+        // Recolectar los datos de los campos de entrada
+        var updatedData = {
+            Id: wpId,
+            Name: document.getElementById('editWpName_' + wpId).value,
+            Title: document.getElementById('editWpTitle_' + wpId).value,
+            StartDate: document.getElementById('editWpStartDate_' + wpId).value,
+            EndDate: document.getElementById('editWpEndDate_' + wpId).value,
+            Pms: document.getElementById('editWpPms_' + wpId).value
+        };
+
+        // Enviar solicitud AJAX al servidor
+        $.ajax({
+            type: 'POST',
+            url: '@Url.Action("UpdateWp", "Wps")', // Asegúrate de que la URL y el nombre del controlador sean correctos
+            contentType: 'application/json',
+            data: JSON.stringify(updatedData),
+            success: function (response) {
+                if (response.success) {
+                    alert('WP actualizado con éxito');
+                    // Aquí puedes actualizar la interfaz de usuario según sea necesario
+                    location.reload(); // Recarga la página
+                    // Por ejemplo, actualizar los elementos span con los nuevos valores y cambiar la visibilidad de los botones
+                    cancelEdit(wpId); // Llama a cancelEdit para restablecer la fila a su estado original
+                } else {
+                    alert('Error al actualizar el WP');
+                }
+            },
+            error: function () {
+                alert('Error en la solicitud AJAX');
+            }
+        });
+    }
+function deleteWp(wpId) {
+        wpId = parseInt(wpId, 10); // Convierte wpId a un número si no lo es
+        console.log("WP ID:", wpId);
+        // Enviar solicitud AJAX al servidor
+        $.ajax({
+            type: 'POST',
+            url: '/Wps/DeleteWp/' + wpId,  // Asegúrate de que la URL y el nombre del controlador sean correctos
+            success: function (response) {
+                if (response.success) {
+                    alert('WP eliminado con éxito');
+                    // Aquí puedes actualizar la interfaz de usuario según sea necesario
+                    location.reload(); // Recarga la página
+                    // Por ejemplo, eliminar la fila de la tabla
+                } else {
+                    alert('Error al eliminar el WP');
+                }
+            },
+            error: function () {
+                alert('Error en la solicitud AJAX');
+            }
+        });
+    }
+
+function cancelEdit(wpId) {
+        // Ocultar los campos de entrada y mostrar los elementos span
+        document.getElementById('wpName_' + wpId).style.display = 'inline';
+        document.getElementById('editWpName_' + wpId).style.display = 'none';
+
+        document.getElementById('wpTitle_' + wpId).style.display = 'inline';
+        document.getElementById('editWpTitle_' + wpId).style.display = 'none';
+
+        document.getElementById('wpStartDate_' + wpId).style.display = 'inline';
+        document.getElementById('editWpStartDate_' + wpId).style.display = 'none';
+
+        document.getElementById('wpEndDate_' + wpId).style.display = 'inline';
+        document.getElementById('editWpEndDate_' + wpId).style.display = 'none';
+
+        document.getElementById('wpPms_' + wpId).style.display = 'inline';
+        document.getElementById('editWpPms_' + wpId).style.display = 'none';
+
+        // Ocultar botón de actualizar y cancelar, mostrar editar y eliminar
+        var parentCell = document.getElementById('wpName_' + wpId).parentNode.parentNode;
+        parentCell.querySelector('.edit-link').style.display = 'inline';
+        parentCell.querySelector('.delete-link').style.display = 'inline';
+        parentCell.querySelector('.update-link').style.display = 'none';
+        parentCell.querySelector('.cancel-link').style.display = 'none';
+    }
+    
+
+    document.body.classList.add("with-fixed-menu");
+
+
+
+</script>
+
+<style>
+    .fixed-top-menu {
+        position: fixed;
+        top: 50px;
+        left: 0;
+        width: 100%;
+        z-index: 1040; /* Asegúrate de que el menú esté por encima de otros elementos */
+        background-color: #fff; /* O cualquier color de fondo que desees */
+        box-shadow: 0 2px 4px rgba(0,0,0,.1); /* Opcional: para añadir una sombra y dar sensación de profundidad */
+    }
+
+    .vertical-separator {
+        border-left: 1px solid #dee2e6;
+        height: 100%;
+        display: inline-block;
+        margin: 0 5px; /* Ajusta el margen según tus necesidades */
+    }
+
+    /* Añade un relleno al cuerpo para evitar que el contenido se esconda detrás del menú fijo */
+    body.with-fixed-menu {
+        padding-top: 0px; /* Ajusta este valor según la altura de tu menú */
+    }
+
+    .details-content {
+        padding-top: 80px; /* o lo que sea necesario */
+    }
+
+    body {
+        padding-top: 0px; /* Ajusta según la altura de tu menú */
+    }
+
+    .card-header {
+        font-size: 24px; /* Aumenta el tamaño del texto */
+        font-weight: bold; /* Texto en negrita */
+        text-align: center; /* Texto centrado */
+    }
+
+    .form-check-input:checked {
+        background-color: #005A9C; /* Un azul oscuro para coincidir con el tema */
+        border-color: #005A9C;
+    }
+
+    .form-check-label {
+        font-weight: bold; /* Hacer el texto más notable */
+    }
+
+    .centered {
+        text-align: center;
+    }
+
+    .bold {
+        font-weight: bold;
+    }
+
+    .table-header-black {
+        text-align: center;
+        background-color: black;
+        color: white;
+    }
+
+    .custom-delete-btn {
+        background-color: darkred; 
+        border-color: darkred; 
+    }
+
+    .custom-cancel-btn {
+        background-color:goldenrod; 
+        border-color: goldenrod; 
+    }
+
+    .custom-add-btn{
+        background-color: #005A9C; 
+        border-color: #005A9C;
+    }
+
+    .custom-update-btn{
+        background-color: #28a745; 
+        border-color: #28a745;}
+
+    .custom-edit-btn{
+        background-color: #007bff; 
+        border-color: #007bff;}
+
+    .my-style {
+        font-size: 2.5rem; /* Ajusta el tamaño de la fuente */
+        font-weight: bold;
+        color: #0056b3; /* Cambia al color que prefieras */
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.2); /* Añade una ligera sombra */
+    }
+
+    
+    .detail-item:not(:last-child) {
+        border-bottom: 1px solid #dee2e6; /* Color de la línea */
+        padding-bottom: 5px; /* Espaciado debajo del texto antes de la línea */
+        margin-bottom: 5px; /* Espaciado después de la línea */
+    }
+
+
+
+</style>
+
+
+
+

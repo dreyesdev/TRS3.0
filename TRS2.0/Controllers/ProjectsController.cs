@@ -1,0 +1,1063 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
+using TRS2._0.Models;
+using TRS2._0.Models.DataModels;
+using TRS2._0.Models.ViewModels;
+using TRS2._0.Services;
+using static TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel;
+
+namespace TRS2._0.Controllers
+{
+    public class ProjectsController : Controller
+    {
+        private readonly TRSDBContext _context;
+        private readonly WorkCalendarService _workCalendarService;
+        private readonly ILogger<ProjectsController> _logger;
+
+        public ProjectsController(TRSDBContext context, WorkCalendarService workCalendarService, ILogger<ProjectsController> logger)
+        {
+            _context = context;
+            _workCalendarService = workCalendarService;
+            _logger = logger;
+        }
+
+        // GET: Projects
+
+        [Route("Proyectos/InitialRedirect")]
+        public IActionResult InitialRedirect()
+        {
+            int currentYear = DateTime.Now.Year;
+            return RedirectToAction("Index", new { selectedYear = currentYear });
+        }
+
+        public IActionResult Index(int? selectedYear)
+        {
+            // Obtén la lista de años únicos de los proyectos
+            ViewBag.UniqueYears = _context.Projects
+                .Select(p => p.Start.Value.Year)
+                .Concat(_context.Projects.Select(p => p.End.Value.Year))
+                .Distinct()
+                .OrderBy(year => year)
+                .ToList();
+
+            IQueryable<Project> projectsQuery = _context.Projects.AsQueryable();
+
+            // Filtra los proyectos en función del año seleccionado, si se ha proporcionado un año
+            if (selectedYear.HasValue)
+            {
+                projectsQuery = projectsQuery.Where(p => p.Start.Value.Year <= selectedYear && p.End.Value.Year >= selectedYear);
+            }
+
+            var projects = projectsQuery.ToList();
+
+            return View(projects);
+        }
+
+
+        // GET: Projects/Details/5
+        public async Task<IActionResult> Details(int? id)
+        {
+            if (id == null || _context.Projects == null)
+            {
+                return NotFound();
+            }
+
+            var project = await _context.Projects
+                .Include(p => p.Wps)
+                .ThenInclude(wp => wp.Wpxpeople)
+                .FirstOrDefaultAsync(p => p.ProjId == id);
+
+            if (project == null)
+            {
+                return NotFound();
+            }
+
+            // Recuperar los nombres completos del PM y PI
+            var pm = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == project.Pm);
+            var pi = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == project.Pi);
+
+            // Preparar los datos para la vista
+            ViewBag.PmFullName = pm != null ? $"{pm.Name} {pm.Surname}" : "No asignado";
+            ViewBag.PiFullName = pi != null ? $"{pi.Name} {pi.Surname}" : "No asignado";
+            ViewBag.ProjId = id;
+
+            // Calcular los valores distribuidos y los esfuerzos cubiertos para cada WP
+            var wpDetails = project.Wps.Select(wp => new
+            {
+                wp.Id,
+                wp.Name,
+                wp.Pms,
+                Distributed = _context.Projefforts.Where(pe => pe.Wp == wp.Id).Sum(pe => pe.Value),
+                Covered = _context.Wpxpeople
+                            .Where(wxp => wxp.Wp == wp.Id)
+                            .SelectMany(wxp => wxp.Persefforts)
+                            .Sum(pe => pe.Value)
+            }).ToList();
+
+            // Añadir wpDetails al ViewBag para acceder desde la vista
+            ViewBag.WpDetails = wpDetails;
+
+            return View(project);
+        }
+
+
+
+        // GET: Projects/Create
+        public IActionResult Create()
+        {
+            return View();
+        }
+
+        // POST: Projects/Create
+        // To protect from overposting attacks, enable the specific properties you want to bind to.
+        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create([Bind("ProjId,SapCode,Acronim,Title,Contract,Start,End,TpsUpc,TpsIcrea,TpsCsic,Pi,Pm,Type,SType,St1,St2,EndReportDate,Visible")] Project project)
+        {
+            if (ModelState.IsValid)
+            {
+                _context.Add(project);
+                await _context.SaveChangesAsync();
+                return RedirectToAction(nameof(Index));
+            }
+            return View(project);
+        }
+
+        // GET: Projects/Edit/5
+        public async Task<IActionResult> Edit(int? id)
+        {
+            if (id == null || _context.Projects == null)
+            {
+                return NotFound();
+            }
+
+            var project = await _context.Projects.FindAsync(id);
+            if (project == null)
+            {
+                return NotFound();
+            }
+            return View(project);
+        }
+
+        // POST: Projects/Edit/5
+        // To protect from overposting attacks, enable the specific properties you want to bind to.
+        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, [Bind("ProjId,SapCode,Acronim,Title,Contract,Start,End,TpsUpc,TpsIcrea,TpsCsic,Pi,Pm,Type,SType,St1,St2,EndReportDate,Visible")] Project project)
+        {
+            if (id != project.ProjId)
+            {
+                return NotFound();
+            }
+
+            if (ModelState.IsValid)
+            {
+                try
+                {
+                    _context.Update(project);
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (!ProjectExists(project.ProjId))
+                    {
+                        return NotFound();
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+                return RedirectToAction(nameof(Index));
+            }
+            return View(project);
+        }
+
+        // GET: Projects/Delete/5
+        public async Task<IActionResult> Delete(int? id)
+        {
+            if (id == null || _context.Projects == null)
+            {
+                return NotFound();
+            }
+
+            var project = await _context.Projects
+                .FirstOrDefaultAsync(m => m.ProjId == id);
+            if (project == null)
+            {
+                return NotFound();
+            }
+
+            return View(project);
+        }
+
+        // POST: Projects/Delete/5
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteConfirmed(int id)
+        {
+            if (_context.Projects == null)
+            {
+                return Problem("Entity set 'TRSDBContext.Projects'  is null.");
+            }
+            var project = await _context.Projects.FindAsync(id);
+            if (project != null)
+            {
+                _context.Projects.Remove(project);
+            }
+            
+            await _context.SaveChangesAsync();
+            return RedirectToAction(nameof(Index));
+        }
+
+        private bool ProjectExists(int id)
+        {
+          return (_context.Projects?.Any(e => e.ProjId == id)).GetValueOrDefault();
+        }
+
+        [HttpGet]
+        [Route("Projects/EffortPlan/{projId}")]
+
+        public IActionResult EffortPlan(int projId)
+        {
+            var project = _context.Projects
+                .Include(p => p.Wps)
+                .FirstOrDefault(p => p.ProjId == projId);
+
+            if (project == null)
+            {
+                return NotFound();
+            }
+
+            // Comprobación aquí: si no hay WorkPackages, manejar según corresponda
+            if (project.Wps == null || !project.Wps.Any())
+            {
+                
+                // Devolver la vista actual con un modelo vacío o con mensaje                
+                var emptyModel = new EffortPlanViewModel
+                {
+                    
+                    ProjId = projId,
+                    WorkPackages = new List<WorkPackageEffort>() // Lista vacía
+                                                                 
+                };
+                ViewBag.ProjId = projId;
+                return View(emptyModel);
+            }
+
+            var startDate = project.Wps.Min(wp => wp.StartDate);
+            var endDate = project.Wps.Max(wp => wp.EndDate);
+            var effortValues = _context.Projefforts
+                .Include(e => e.WpNavigation) // Incluye la relación para asegurar que WpNavigation no sea null
+                .Where(e => e.WpNavigation.ProjId == projId)
+                .ToList();  // Obtén todos los esfuerzos para este proyecto
+
+            // Crear la estructura del modelo de vista
+            var effortPlanViewModel = new EffortPlanViewModel
+            {
+                ProjId = projId,
+                StartDate = startDate,
+                EndDate = endDate,
+                WorkPackages = project.Wps.Select(wp => new WorkPackageEffort
+                {
+                    StartDate = wp.StartDate,
+                    EndDate = wp.EndDate,
+                    WpId = wp.Id,
+                    WpName = wp.Name,
+                    MonthlyEfforts = Enumerable.Range(0, ((endDate.Year - startDate.Year) * 12) + endDate.Month - startDate.Month + 1)
+                                    .Select(offset => new { Month = new DateTime(startDate.Year, startDate.Month, 1).AddMonths(offset), Effort = 0f })
+                                    .ToDictionary(me => me.Month, me => me.Effort),
+                    TotalEffort = 0 // Inicialmente 0, calcular después si es necesario
+                }).ToList()
+            };
+
+            foreach (var effort in effortValues)
+            {
+                var wpEffort = effortPlanViewModel.WorkPackages.FirstOrDefault(wpe => wpe.WpId == effort.WpNavigation.Id);
+                if (wpEffort != null)
+                {
+                    DateTime effortMonth = new DateTime(effort.Month.Year, effort.Month.Month, 1);
+                    if (wpEffort.MonthlyEfforts.ContainsKey(effortMonth))
+                    {
+                        wpEffort.MonthlyEfforts[effortMonth] = (float)effort.Value;
+                    }
+                }
+            }
+
+            foreach (var wpEffort in effortPlanViewModel.WorkPackages)
+            {
+                // Calcula la suma de los esfuerzos mensuales
+                var sumEffort = wpEffort.MonthlyEfforts.Sum(e => e.Value);
+
+                // Redondea el resultado a 2 decimales (o al número de decimales que prefieras)
+                wpEffort.TotalEffort = (float)Math.Round(sumEffort, 2);
+            }
+            ViewBag.ProjId = projId;
+            return View(effortPlanViewModel); // Pasa el modelo a la vista
+        }
+
+
+        [HttpGet]
+        [Route("Projects/PersonnelSelection/{projId}")]
+        // Método para la selección de personal dentro del contexto de un proyecto específico
+        public async Task<IActionResult> PersonnelSelection(int projId)
+        {
+            var projectDetails = await _context.Projects.FindAsync(projId);
+            var allPersonnel = await _context.Personnel.ToListAsync();
+            // Recuperar los nombres completos del PM y PI
+            var pm = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == projectDetails.Pm);
+            var pi = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == projectDetails.Pi);
+            var projectPersonnel = await _context.Projectxpeople
+                                                .Where(px => px.ProjId == projId)
+                                                .ToListAsync();
+
+            // Primero obtenemos los WP asociados al proyecto
+            var projectWpIds = await _context.Wps
+                                             .Where(wp => wp.ProjId == projId)
+                                             .Select(wp => wp.Id)
+                                             .ToListAsync();
+
+            // Luego obtenemos las relaciones de Wpxperson para los WP del proyecto
+            var workPackagePersonnel = await _context.Wpxpeople
+                                                     .Where(wpx => projectWpIds.Contains(wpx.Wp))
+                                                     .ToListAsync();
+
+            var workPackages = await _context.Wps
+                                             .Where(wp => projectWpIds.Contains(wp.Id))
+                                             .ToListAsync();
+            ViewBag.PmFullName = pm != null ? $"{pm.Name} {pm.Surname}" : "No asignado";
+            ViewBag.PiFullName = pi != null ? $"{pi.Name} {pi.Surname}" : "No asignado";
+            ViewBag.projId = projId;
+            var viewModel = new ProjectPersonnelViewModel
+            {
+                ProjectDetails = projectDetails,
+                AllPersonnel = allPersonnel,
+                ProjectPersonnel = projectPersonnel,
+                WorkPackagePersonnel = workPackagePersonnel,
+                WorkPackages = workPackages
+            };
+
+            return View(viewModel);
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> AddPersonToProject(int projectId, int personId)
+        {
+            // Primero, verificar si la persona ya está asociada al proyecto
+            var existingAssociation = await _context.Projectxpeople
+                                                    .FirstOrDefaultAsync(px => px.ProjId == projectId && px.Person == personId);
+            if (existingAssociation != null)
+            {
+                // La persona ya está asociada al proyecto
+                return Json(new { success = false, message = "Person is already associated with the project." });
+            }
+
+            // Crear una nueva asociación de Projectxperson
+            var projectPersonAssociation = new Projectxperson
+            {
+                ProjId = projectId,
+                Person = personId
+            };
+
+            // Añadir la nueva asociación al contexto y guardar los cambios
+            _context.Projectxpeople.Add(projectPersonAssociation);
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Person added to the project successfully." });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RemovePersonFromProject(int projectId, int personId)
+        {
+            // Eliminar la persona del proyecto
+            var projectPerson = await _context.Projectxpeople
+                                              .FirstOrDefaultAsync(px => px.ProjId == projectId && px.Person == personId);
+            if (projectPerson != null)
+            {
+                _context.Projectxpeople.Remove(projectPerson);
+            }
+
+            // Eliminar la persona de todos los WP asociados
+            var wpPersonnel = _context.Wpxpeople
+                                      .Where(wpx => wpx.Person == personId && wpx.WpNavigation.ProjId == projectId);
+            _context.Wpxpeople.RemoveRange(wpPersonnel);
+
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true });
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> UpdateWorkPackageAssignments([FromBody] List<WpPersonChange> changes)
+        {
+            
+            foreach (var change in changes)
+            {
+                var wpId = (int)change.WpId;
+                var personId = (int)change.PersonId;
+                var existingAssignment = await _context.Wpxpeople
+                                                      .FirstOrDefaultAsync(wpx => wpx.Wp == wpId && wpx.Person == personId);
+
+                if (existingAssignment == null)
+                {
+                    // Crear nuevo registro
+                    var newAssignment = new Wpxperson { Wp = wpId, Person = personId };
+                    _context.Wpxpeople.Add(newAssignment);
+                }
+                else
+                {
+                    // Eliminar registro existente
+                    _context.Wpxpeople.Remove(existingAssignment);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return Json(new { success = true });
+        }
+
+
+        [HttpGet]
+        [Route("Projects/PersonnelEffortPlan/{projId}/{wpId?}")]
+        public async Task<IActionResult> PersonnelEffortPlan(int projId, int? wpId = null)
+        {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew(); // Inicia el cronómetro
+
+            ViewBag.projId = projId;
+
+            // Obtener el proyecto
+            var project = await _context.Projects.FindAsync(projId);
+
+            if (project == null)
+            {
+                return NotFound();
+            }
+            // Obtener WP del proyecto
+            var workPackages = await _context.Wps.Where(wp => wp.ProjId == projId).ToListAsync();
+
+            // Obtener relaciones entre personal y proyecto
+            var projectPersonnel = await _context.Projectxpeople.Where(px => px.ProjId == projId).ToListAsync();
+
+            // Obtener IDs de las personas involucradas en el proyecto
+            var personIds = projectPersonnel.Select(p => p.Person).Distinct().ToList();
+
+            // Obtener el rango de fechas del proyecto
+            var projectStartDate = project.Start;
+            var projectEndDate = project.EndReportDate;
+
+
+            // Asegúrate de que projectStartDate y projectEndDate no sean null
+            DateTime adjustedProjectStartDate = project.Start.HasValue
+                ? new DateTime(project.Start.Value.Year, project.Start.Value.Month, 1)
+                : DateTime.MinValue; 
+
+            // Ajustar projectEndDate para que sea el último día del mes de finalización
+            DateTime adjustedProjectEndDate = new DateTime(projectEndDate.Year, projectEndDate.Month, DateTime.DaysInMonth(projectEndDate.Year, projectEndDate.Month));
+
+
+            // Recuperar todos los registros relevantes de PersMonthEfforts usando las fechas ajustadas
+            var persMonthEfforts = await _context.PersMonthEfforts
+                .Where(pme => personIds.Contains(pme.PersonId) &&
+                              pme.Month >= adjustedProjectStartDate &&
+                              pme.Month <= adjustedProjectEndDate)
+                .ToListAsync();
+
+            // Transformar a un diccionario para facilitar el acceso
+            var pmValuesByPersonAndMonth = persMonthEfforts
+                .GroupBy(pme => pme.PersonId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.ToDictionary(
+                        pme => $"{pme.Month.Year}-{pme.Month.Month:D2}",
+                        pme => pme.Value
+                    )
+                );
+
+            // Recuperar y sumar los esfuerzos por persona y mes usando las fechas ajustadas
+            var totalEffortsByPersonAndMonth = await _context.Persefforts
+                .Include(pe => pe.WpxPersonNavigation)
+                .Where(pe => personIds.Contains(pe.WpxPersonNavigation.Person) &&
+                             pe.Month >= adjustedProjectStartDate && pe.Month <= adjustedProjectEndDate)
+                .GroupBy(pe => new { pe.WpxPersonNavigation.Person, Year = pe.Month.Year, Month = pe.Month.Month })
+                .Select(group => new {
+                    PersonId = group.Key.Person,
+                    Year = group.Key.Year,
+                    Month = group.Key.Month,
+                    TotalEffort = group.Sum(pe => pe.Value)
+                })
+                .ToListAsync();
+
+            // Transformar a un diccionario para facilitar el acceso
+            var totalEffortsByPersonAndMonthDict = totalEffortsByPersonAndMonth
+                .GroupBy(e => e.PersonId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.ToDictionary(
+                        e => $"{e.Year}-{e.Month:D2}",
+                        e => e.TotalEffort
+                    )
+                );
+                        
+
+            // Obtener relaciones entre personal y WP
+            var wpxPersons = await _context.Wpxpeople.Include(wpx => wpx.PersonNavigation)
+                                                     .Include(wpx => wpx.WpNavigation)
+                                                     .Where(wpx => workPackages.Select(wp => wp.Id).Contains(wpx.Wp))
+                                                     .ToListAsync();
+
+            // Obtener esfuerzos del personal y mapearlos
+            var persefforts = await _context.Persefforts
+                    .Include(pe => pe.WpxPersonNavigation)
+                    .Where(pe => pe.Month >= adjustedProjectStartDate && pe.Month <= adjustedProjectEndDate)
+                    .ToListAsync();
+
+            if (wpId.HasValue)
+            {
+                workPackages = workPackages.Where(wp => wp.Id == wpId.Value).ToList();
+
+                wpxPersons = wpxPersons
+                    .Where(wpx => wpx.Wp == wpId.Value)
+                    .ToList();
+            }
+
+            // Construir ViewModel
+            var viewModel = new PersonnelEffortPlanViewModel
+            {
+                Project = project,
+                WorkPackages = workPackages.Select(wp => new WorkPackageInfo
+                {
+                    WpId = wp.Id,
+                    WpName = wp.Name,
+                    StartDate = adjustedProjectStartDate,
+                    EndDate = adjustedProjectEndDate,
+                    PersonnelEfforts = wpxPersons.Where(wpx => wpx.Wp == wp.Id)
+                                         .Select(wpx => new PersonnelEffort
+                                         {
+                                             PersonId = wpx.Person,
+                                             PersonName = wpx.PersonNavigation.Name + " " + wpx.PersonNavigation.Surname,
+                                             Efforts = persefforts.Where(pe => pe.WpxPerson == wpx.Id)
+                                                                  .ToDictionary(pe => pe.Month, pe => pe.Value),
+                                             EffortId = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id)?.Code ?? 0
+                                         }).ToList()
+                }).ToList()
+            };
+            _logger.LogInformation($"Filtrado completo de datos procesado en {stopwatch.ElapsedMilliseconds} ms total");
+
+            stopwatch.Restart(); // Reinicia el cronómetro para esta iteración
+            List<PersonnelInfo> personnelInfos = new List<PersonnelInfo>();
+            var uniqueMonths = viewModel.GetMonthsForProject();
+
+            foreach (var person in projectPersonnel)
+            {
+                stopwatch.Restart(); // Reinicia el cronómetro para esta iteración
+
+                
+
+                // Calcular PM y esfuerzos totales por mes
+                // Usa los PMs recuperados en lugar de calcularlos de nuevo
+                var pmValuesPerMonth = pmValuesByPersonAndMonth.ContainsKey(person.Person)
+                                       ? pmValuesByPersonAndMonth[person.Person]
+                                       : new Dictionary<string, decimal>();
+
+                // Usa los esfuerzos sumados en lugar de calcularlos de nuevo
+                var totalEffortsPerMonth = totalEffortsByPersonAndMonthDict.ContainsKey(person.Person)
+                                           ? totalEffortsByPersonAndMonthDict[person.Person]
+                                           : new Dictionary<string, decimal>();
+
+                _logger.LogInformation($"Esfuerzos maximos/totales calculados para persona {person.Person} en {stopwatch.ElapsedMilliseconds} ms");
+
+
+                var monthStatuses = await _workCalendarService.CalculateMonthlyStatusesForPersonWithLists(person.Person, uniqueMonths, totalEffortsPerMonth, pmValuesPerMonth);
+                _logger.LogInformation($"Estados mensuales calculados para persona {person.Person} en {stopwatch.ElapsedMilliseconds} ms");
+
+                // Añade la info de la persona a la lista
+                personnelInfos.Add(new PersonnelInfo
+                {
+                    PersonId = person.Person,
+                    PersonName = "",                     
+                    MonthlyStatuses = monthStatuses
+                });
+            }
+            
+            stopwatch.Stop(); // Detiene el cronómetro
+            _logger.LogInformation($"Información de personal procesada en {stopwatch.ElapsedMilliseconds} ms total");
+
+
+            // Determina si el inicio del proyecto es el día 15
+            bool startsOn15th = project.Start?.Day == 15;
+            // Determina si el final del proyecto es el día 15
+            bool endsOn15th = project.EndReportDate.Day == 15;
+
+            ViewBag.StartsOn15th = startsOn15th;
+            ViewBag.EndsOn15th = endsOn15th;
+
+
+            ViewBag.PersonnelInfos = personnelInfos;
+
+
+            return View(viewModel);
+        }
+
+
+        [HttpPost]
+        
+
+
+        [HttpPost]
+        public async Task<IActionResult> SaveEfforts([FromBody] EffortUpdateModel model)
+        {
+            if (model == null || model.Efforts == null)
+            {
+                return Json(new { success = false, message = "No data provided." });
+            }
+
+            // La carga del proyecto se mantiene como estaba en tu implementación original
+            var project = await _context.Projects
+                .Include(p => p.Wps)
+                .FirstOrDefaultAsync(p => p.ProjId == model.ProjectId);
+
+            List<string> notifications = new List<string>();
+
+            foreach (var effortData in model.Efforts)
+            {
+                var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == effortData.PersonId);
+                var wp = await _context.Wps.FirstOrDefaultAsync(w => w.Id == effortData.WpId);
+                if (person == null || wp == null)
+                {
+                    notifications.Add("Person or Work Package not found for provided IDs.");
+                    continue;
+                }
+
+                string monthKey = effortData.Month.ToString("yyyy-MM");
+                
+
+                var wpxPerson = await _context.Wpxpeople.FirstOrDefaultAsync(x => x.Person == effortData.PersonId && x.Wp == effortData.WpId);
+                if (wpxPerson != null)
+                {
+                    var perseffort = await _context.Persefforts.FirstOrDefaultAsync(pe => pe.WpxPerson == wpxPerson.Id && pe.Month == effortData.Month);
+                    decimal currentEffort = perseffort?.Value ?? 0m;
+                    decimal newEffort = effortData.Effort;
+
+                    var totalEffortsPerMonth = await _workCalendarService.CalculateMonthlyEffortForPerson(effortData.PersonId, effortData.Month.Year, effortData.Month.Month);
+                    var maxPMPerson = await _workCalendarService.CalculateMonthlyPM(effortData.PersonId, effortData.Month.Year, effortData.Month.Month);
+                    decimal availableEffort = maxPMPerson - totalEffortsPerMonth;
+
+                    // Condición para manejar la reducción de esfuerzos
+                    if (newEffort < currentEffort)
+                    {
+                        // Permitir reducir el esfuerzo siempre y cuando no resulte en un valor negativo
+                        if (currentEffort - newEffort >= 0)
+                        {
+                            perseffort.Value = newEffort; // Actualiza directamente al nuevo esfuerzo
+                        }
+                        else
+                        {
+                            notifications.Add($"Cannot reduce effort to less than 0 for {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}.");
+                        }
+                    }
+                    if (newEffort > currentEffort && availableEffort <= 0) // Si intentamos aumentar el esfuerzo pero no hay disponibilidad
+                    {
+                        notifications.Add($"For {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}, there is no available capacity to increase efforts.");
+                        continue; // Salta al siguiente esfuerzo sin intentar guardar este cambio
+                    }
+                    else
+                    {
+                        // Tu lógica existente se mantiene aquí para manejar aumentos o esfuerzos nuevos
+                        decimal effortToSave = Math.Min(newEffort, availableEffort + currentEffort);
+
+                        // Verificar si es el mes de inicio o fin del proyecto y ajustar el maxPM si es necesario
+                        DateTime projectStartDate = (DateTime)project.Start;
+                        DateTime projectEndDate = project.EndReportDate;
+                        DateTime effortMonthStart = new DateTime(effortData.Month.Year, effortData.Month.Month, 1);
+                        DateTime effortMonthEnd = new DateTime(effortData.Month.Year, effortData.Month.Month, DateTime.DaysInMonth(effortData.Month.Year, effortData.Month.Month));
+                        decimal maxPM = decimal.MaxValue; // Por defecto, no limitar el esfuerzo
+
+                        if ((effortMonthStart < projectStartDate && effortMonthEnd >= projectStartDate) ||
+                            (effortMonthStart <= projectEndDate && effortMonthEnd > projectEndDate))
+                        {
+                            maxPM = await _workCalendarService.CalculateAdjustedMonthlyPM(effortData.PersonId, effortData.Month.Year, effortData.Month.Month, projectStartDate, projectEndDate);
+                        }
+
+                        if (newEffort > availableEffort || newEffort > maxPM)
+                        {
+                            effortToSave = Math.Min(availableEffort + currentEffort, maxPM);
+                            decimal overflow = newEffort - effortToSave;
+                            notifications.Add($"For {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}, only {effortToSave - currentEffort} was saved due to availability or project date limits. {overflow} could not be saved.");
+                        }
+
+                        if (perseffort != null)
+                        {
+                            perseffort.Value = effortToSave;
+                        }
+                        else
+                        {
+                            _context.Persefforts.Add(new Perseffort
+                            {
+                                WpxPerson = wpxPerson.Id,
+                                Month = effortData.Month,
+                                Value = effortToSave
+                            });
+                        }
+                    }
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Efforts updated successfully.", notifications = notifications });
+        }
+
+
+
+        [HttpGet]
+        [Route("Projects/GetPersonnelEffortsByPerson/{projId}/{personId}")]
+        public async Task<IActionResult> GetPersonnelEffortsByPerson(int projId, int personId)
+        {
+
+            ViewBag.projId = projId;
+
+            // Obtener las fechas de inicio y fin del proyecto especificado
+            var project = await _context.Projects
+                                        .FirstOrDefaultAsync(p => p.ProjId == projId);
+            if (project == null)
+            {
+                return NotFound("Proyecto no encontrado.");
+            }
+
+            DateTime projectStartDate = (DateTime)project.Start;
+            DateTime projectEndDate = (DateTime)project.End;
+
+
+            // Asegúrate de que projectStartDate y projectEndDate no sean null
+            DateTime adjustedProjectStartDate = project.Start.HasValue
+                ? new DateTime(project.Start.Value.Year, project.Start.Value.Month, 1)
+                : DateTime.MinValue;
+
+            // Ajustar projectEndDate para que sea el último día del mes de finalización
+            DateTime adjustedProjectEndDate = new DateTime(projectEndDate.Year, projectEndDate.Month, DateTime.DaysInMonth(projectEndDate.Year, projectEndDate.Month));
+
+            // Filtrar WPs basados en la persona, sin importar el proyecto, pero que se solapen con el periodo del proyecto raíz
+            var wpxPersons = await _context.Wpxpeople
+                                .Include(wpx => wpx.PersonNavigation)
+                                .Include(wpx => wpx.WpNavigation)
+                                    .ThenInclude(wp => wp.Proj)
+                                .Where(wpx => wpx.Person == personId &&
+                                              (wpx.WpNavigation.StartDate <= adjustedProjectEndDate && wpx.WpNavigation.EndDate >= adjustedProjectStartDate))
+                                .ToListAsync();
+
+
+            //    Obtener esfuerzos del personal y mapearlos
+            var persefforts = await _context.Persefforts
+                                .Include(pe => pe.WpxPersonNavigation)
+                                .Where(pe => pe.WpxPersonNavigation.Person == personId &&
+                                             pe.Month >= adjustedProjectStartDate && pe.Month <= adjustedProjectEndDate)
+                                .ToListAsync();
+
+            var persMonthEfforts = await _context.PersMonthEfforts
+                                    .Where(pme => pme.PersonId == personId && pme.Month >= adjustedProjectStartDate && pme.Month <= adjustedProjectEndDate)
+                                    .ToListAsync();
+
+
+
+            var pmValuesPerMonth = persMonthEfforts
+                                    .ToDictionary(
+                                        pme => $"{pme.Month.Year}-{pme.Month.Month:D2}",
+                                        pme => pme.Value
+                                    );
+                                            var effortsByMonth = await _context.Persefforts
+                                    .Include(pe => pe.WpxPersonNavigation)
+                                    .Where(pe => pe.WpxPersonNavigation.Person == personId &&
+                                                 pe.Month >= projectStartDate && pe.Month <= projectEndDate)
+                                    .GroupBy(pe => new { Year = pe.Month.Year, Month = pe.Month.Month })
+                                    .Select(group => new {
+                                        Year = group.Key.Year,
+                                        Month = group.Key.Month,
+                                        TotalEffort = group.Sum(pe => pe.Value)
+                                    })
+                                    .ToListAsync();
+
+            // Calcular el esfuerzo total por mes para la persona
+            var totalEffortsPerMonth = new Dictionary<string, decimal>();
+
+            var personnelinfo = new PersonnelInfo
+            {
+                PersonId = personId,
+                PersonName = wpxPersons.FirstOrDefault()?.PersonNavigation.Name + " " + wpxPersons.FirstOrDefault()?.PersonNavigation.Surname,
+                MonthlyStatuses = new List<MonthStatus>()
+            };
+
+            // Construir ViewModel
+            var viewModel = new PersonnelEffortPlanViewModel
+            {
+                Project = project,
+                ProjectStartDate = adjustedProjectStartDate,
+                ProjectEndDate = adjustedProjectEndDate,
+
+                ProjectsPersonnelEfforts = wpxPersons.GroupBy(wpx => wpx.WpNavigation.ProjId)
+                                                     .Select(group => new PersonnelEffortPlanViewModel.ProjectPersonnelEffort
+                                                     {
+                                                         ProjectId = group.Key,
+                                                         ProjectName = group.FirstOrDefault()?.WpNavigation?.Proj?.Acronim ?? "",
+                                                         WorkPackages = group.Select(wpx => new PersonnelEffortPlanViewModel.WorkPackageInfo
+                                                         {
+                                                             WpId = wpx.Wp,
+                                                             WpName = wpx.WpNavigation.Name,
+                                                             StartDate = wpx.WpNavigation.StartDate,
+                                                             EndDate = wpx.WpNavigation.EndDate,
+                                                             PersonnelEfforts = new List<PersonnelEffortPlanViewModel.PersonnelEffort>
+                                                             {
+                                                         new PersonnelEffortPlanViewModel.PersonnelEffort
+                                                         {
+
+                                                             PersonId = wpx.Person,
+                                                             PersonName = wpx.PersonNavigation.Name + " " + wpx.PersonNavigation.Surname,
+                                                             // Aquí filtramos los esfuerzos por las fechas del proyecto raíz
+                                                             Efforts = persefforts.Where(pe => pe.WpxPerson == wpx.Id &&
+                                                                                       pe.Month >= adjustedProjectStartDate &&
+                                                                                       pe.Month <= adjustedProjectEndDate)
+                                                                          .ToDictionary(pe => pe.Month, pe => pe.Value),
+                                                             EffortId = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id)?.Code ?? 0
+                                                         }
+                                                             }
+                                                         }).ToList()
+                                                     }).ToList()
+            };
+
+            // Calcular los PMs del mes de una sola vez si es posible
+            var uniqueMonths = viewModel.GetUniqueMonthsforPersononProject();
+
+            foreach (var month in uniqueMonths) {
+                string monthKey = $"{month.Year}-{month.Month:D2}";
+                
+                totalEffortsPerMonth[monthKey] = await _workCalendarService.CalculateMonthlyEffortForPerson(personId, month.Year, month.Month);
+            }
+
+
+            var monthStatuses = await _workCalendarService.CalculateMonthlyStatusesForPersonWithLists(personId, uniqueMonths, totalEffortsPerMonth, pmValuesPerMonth);
+
+            personnelinfo.MonthlyStatuses = monthStatuses;
+            ViewBag.TotalEffortsPerMonth = totalEffortsPerMonth;
+            ViewBag.PMValuesPerMonth = pmValuesPerMonth;
+            ViewBag.PersonnelInfo = personnelinfo;
+
+            var projectMonths = new List<string>();
+            DateTime monthstart = adjustedProjectStartDate;
+
+            while (monthstart <= adjustedProjectEndDate)
+            {
+                projectMonths.Add($"{monthstart.Year}-{monthstart.Month:D2}");
+                monthstart = monthstart.AddMonths(1);
+            }
+
+            
+            
+            ViewBag.ProjectMonths = projectMonths;
+
+            return View(viewModel);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CalculatePmForDate(int personId, DateTime date)
+        {
+            var dailyPM = await _workCalendarService.CalculateDailyPM(personId, date);
+            
+            return Json(new { success = true, pm = dailyPM });
+        }
+
+        
+
+
+    }
+
+
+}
+
+
+
+//public async Task<IActionResult> SaveEfforts([FromBody] EffortUpdateModel model)
+//{
+//    if (model == null || model.Efforts == null)
+//    {
+//        return Json(new { success = false, message = "No data provided." });
+//    }
+
+//    // Recuperar el diccionario desde HttpContext.Items al comienzo del método SaveEfforts
+//    var availableEffortsByPersonAndMonth = HttpContext.Items["AvailableEffortsByPersonAndMonth"] as Dictionary<int, Dictionary<string, decimal>>;
+
+//    if (availableEffortsByPersonAndMonth == null)
+//    {
+//        // Manejar el caso donde el diccionario no está disponible o no se ha calculado
+//        return Json(new { success = false, message = "Available efforts data is not accessible." });
+//    }
+
+//    List<string> notifications = new List<string>();
+
+//    foreach (var effortData in model.Efforts)
+//    {
+//        var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == effortData.PersonId);
+//        var wp = await _context.Wps.FirstOrDefaultAsync(w => w.Id == effortData.WpId);
+
+//        if (person != null && wp != null)
+//        {
+//            // Aquí, deberías calcular o recuperar el esfuerzo 'disponible' para esta persona en este mes.
+//            // Por simplicidad, asumiremos que tienes acceso a esta información.
+//            decimal availableEffort = /* lógica para obtener el esfuerzo disponible */;
+
+//            if (effortData.Effort > 1.00m)
+//            {
+//                effortData.Effort = 1.00m; // Asegura que no se exceda el máximo de 1.00
+//            }
+
+//            if (availableEffort <= 0)
+//            {
+//                notifications.Add($"This person ({person.Name}) has completed his effort for {effortData.Month.ToString("MMMM yyyy")}.");
+//                continue;
+//            }
+//            else if (effortData.Effort > availableEffort)
+//            {
+//                decimal originalEffort = effortData.Effort;
+//                effortData.Effort = availableEffort;
+
+//                notifications.Add($"For {person.Name} in WP {wp.Name} for {effortData.Month.ToString("MMMM yyyy")}, {availableEffort} was saved and {originalEffort - availableEffort} could not be saved due to availability.");
+//            }
+
+//            var wpxPerson = await _context.Wpxpeople.FirstOrDefaultAsync(x => x.Person == effortData.PersonId && x.Wp == effortData.WpId);
+
+//            if (wpxPerson != null)
+//            {
+//                var perseffort = await _context.Persefforts.FirstOrDefaultAsync(pe => pe.WpxPerson == wpxPerson.Id && pe.Month == effortData.Month);
+
+//                if (perseffort != null)
+//                {
+//                    // Actualizar el esfuerzo existente
+//                    perseffort.Value = effortData.Effort;
+//                }
+//                else
+//                {
+//                    // Crear un nuevo registro de esfuerzo
+//                    var newPerseffort = new Perseffort
+//                    {
+//                        WpxPerson = wpxPerson.Id,
+//                        Month = effortData.Month,
+//                        Value = effortData.Effort
+//                    };
+//                    _context.Persefforts.Add(newPerseffort);
+//                }
+//            }
+//        }
+//        else
+//        {
+//            notifications.Add($"Person or Work Package not found for provided IDs.");
+//        }
+//    }
+
+//    await _context.SaveChangesAsync();
+
+//    // Retorna tanto el éxito como las notificaciones
+//    return Json(new { success = true, message = "Efforts updated successfully.", notifications = notifications });
+//}
+
+
+
+//public async Task<IActionResult> SaveEfforts([FromBody] EffortUpdateModel model)
+//{
+//    var project = await _context.Projects
+//        .Include(p => p.Wps)
+//        .FirstOrDefaultAsync(p => p.ProjId == model.ProjectId);
+//    if (model == null || model.Efforts == null)
+//    {
+//        return Json(new { success = false, message = "No data provided." });
+//    }
+
+//    var availableEffortsByPersonAndMonth = model.AvailableEfforts;
+
+//    if (availableEffortsByPersonAndMonth == null)
+//    {
+//        return Json(new { success = false, message = "Available efforts data is not accessible." });
+//    }
+
+//    List<string> notifications = new List<string>();
+
+//    foreach (var effortData in model.Efforts)
+//    {
+//        var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == effortData.PersonId);
+//        var wp = await _context.Wps.FirstOrDefaultAsync(w => w.Id == effortData.WpId);
+//        if (person == null || wp == null)
+//        {
+//            notifications.Add("Person or Work Package not found for provided IDs.");
+//            continue;
+//        }
+
+//        string monthKey = effortData.Month.ToString("yyyy-MM");
+//        var dateParts = monthKey.Split('-');
+//        int year = int.Parse(dateParts[0]);
+//        int month = int.Parse(dateParts[1]);
+//        decimal availableEffort = availableEffortsByPersonAndMonth.TryGetValue(effortData.PersonId, out var personMonths) &&
+//                                  personMonths.TryGetValue(monthKey, out var effort) ? effort : 0;
+
+//        if (availableEffort == 0 || availableEffort < 0)
+//        {
+//            notifications.Add($"For {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}, no availability to save efforts.");
+//            continue; // Skip further processing for this effortData as there's no available effort
+//        }
+
+//        // Nuevo código para manejar la casuística especial de los meses de inicio o fin de proyecto
+//        DateTime projectStartDate = (DateTime)project.Start;
+//        DateTime projectEndDate = project.EndReportDate;
+//        DateTime effortMonthStart = new DateTime(year, month, 1);
+//        DateTime effortMonthEnd = new DateTime(year, month, DateTime.DaysInMonth(year, month));
+//        decimal maxPM = decimal.MaxValue; // Por defecto, no limitar el esfuerzo
+
+//        // Verificar si es el mes de inicio o fin del proyecto y ajustar el maxPM si es necesario
+//        if ((effortMonthStart < projectStartDate && effortMonthEnd >= projectStartDate) ||
+//            (effortMonthStart <= projectEndDate && effortMonthEnd > projectEndDate))
+//        {
+//            maxPM = await _workCalendarService.CalculateAdjustedMonthlyPM(effortData.PersonId, year, month, projectStartDate, projectEndDate);
+//        }
+
+//        // Continuar con la lógica existente para verificar y ajustar el esfuerzo a guardar
+//        var wpxPerson = await _context.Wpxpeople.FirstOrDefaultAsync(x => x.Person == effortData.PersonId && x.Wp == effortData.WpId);
+//        if (wpxPerson != null)
+//        {
+//            var perseffort = await _context.Persefforts.FirstOrDefaultAsync(pe => pe.WpxPerson == wpxPerson.Id && pe.Month == effortData.Month);
+//            decimal currentEffort = perseffort?.Value ?? 0m;
+//            decimal newEffort = effortData.Effort;
+//            decimal effortToSave = Math.Min(newEffort, availableEffort + currentEffort);
+
+//            // Si el esfuerzo a guardar excede el disponible o el maxPM, ajustar
+//            if (newEffort > availableEffort || newEffort > maxPM)
+//            {
+//                effortToSave = Math.Min(availableEffort + currentEffort, maxPM);
+//                decimal overflow = newEffort - effortToSave;
+//                notifications.Add($"For {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}, only {effortToSave - currentEffort} was saved due to availability or project date limits. {overflow} could not be saved.");
+//            }
+
+//            if (perseffort != null)
+//            {
+//                perseffort.Value = effortToSave;
+//            }
+//            else
+//            {
+//                _context.Persefforts.Add(new Perseffort
+//                {
+//                    WpxPerson = wpxPerson.Id,
+//                    Month = effortData.Month,
+//                    Value = effortToSave
+//                });
+//            }
+//        }
+//    }
+
+//    await _context.SaveChangesAsync();
+
+//    return Json(new { success = true, message = "Efforts updated successfully.", notifications = notifications });
+//}

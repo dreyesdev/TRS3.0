@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "name": "asp.net",
+  "private": true,
+  "devDependencies": {
+    "fullcalendar": "6.1.10",
+    "gulp": "4.0.2"    
+  }
+}

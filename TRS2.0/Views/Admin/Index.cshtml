@@ -1,0 +1,139 @@
+﻿@model IEnumerable<TRS2._0.Models.DataModels.DailyPMValue>
+@using Microsoft.AspNetCore.Mvc.Rendering
+@using System.Globalization
+@{
+    ViewData["Title"] = "Herramientas Administrativas";
+}
+
+<h2>Herramientas Administrativas</h2>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <form id="generateYearlyPmValuesForm">
+                <div class="form-group">
+                    <label for="yearSelector">Año:</label>
+                    <select id="yearSelector" name="year" class="form-control">
+                        @for (var year = DateTime.Now.Year - 20; year <= DateTime.Now.Year + 20; year++)
+                        {
+                            <option value="@year">@year</option>
+                        }
+                    </select>
+                </div>
+                <!-- Botón para generar los valores PM del año seleccionado -->
+                <button type="button" class="btn btn-secondary" onclick="generateYearlyPMValues()">Generar Año</button>
+            </form>
+            <hr />
+            <form id="generatePmValuesForm">
+                <div class="form-group">
+                    <label for="monthSelector">Mes:</label>
+                    <select id="monthSelector" name="month" class="form-control">
+                        @for (var month = 1; month <= 12; month++)
+                        {
+                            <option value="@month">@DateTimeFormatInfo.CurrentInfo.GetMonthName(month)</option>
+                        }
+                    </select>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="generatePMValues()">Generar Mes</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div class="form-group">
+            <label for="personSelector">Persona:</label>
+            <select id="personSelector" class="form-control">
+                @foreach (var person in ViewBag.People)
+                {
+                    <option value="@person.Value">@person.Text</option>
+                }
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="dateSelector">Fecha:</label>
+            <input type="date" id="dateSelector" class="form-control">
+        </div>
+        <button id="calculateDailyPM" class="btn btn-primary">Diario</button>
+        <span id="dailyPMResult"></span>
+        <button id="calculateMonthlyPM" class="btn btn-primary">Mensual</button>
+        <span id="monthlyPMResult"></span>
+    </div>
+</div>
+
+<div id="dailyPmValuesContainer">
+    @{
+        await Html.RenderPartialAsync("_DailyPMValuesList", Model);
+    }
+</div>
+@section Scripts {
+    <script>
+        function generatePMValues() {
+            var year = $('#yearSelector').val();
+            var month = $('#monthSelector').val();
+            $.ajax({
+                url: '@Url.Action("GeneratePMValues", "Admin")',
+                type: 'POST',
+                data: { year: year, month: month },
+                success: function (response) {
+                    if (response.success) {
+                        alert('Valores PM generados con éxito.');
+                        location.reload();
+                        // Puedes optar por recargar la página o actualizar una tabla de valores PM si es necesario
+                    } else {
+                        alert('Error al generar valores PM: ' + response.message);
+                    }
+                },
+                error: function (xhr, status, error) {
+                    alert('Error al generar valores PM: ' + error);
+                }
+            });
+        }
+
+        function updateDailyPMValues() {
+            $.ajax({
+                url: '@Url.Action("DailyPMValuesList", "Admin")',
+                success: function (data) {
+                    $('#dailyPmValuesContainer').html(data);
+                }
+            });
+        }
+
+        $('#calculateDailyPM').click(function () {
+            var personId = $('#personSelector').val();
+            var date = $('#dateSelector').val();
+            $.post('@Url.Action("CalculateDailyPM", "Admin")', { personId: personId, date: date }, function (data) {
+                $('#dailyPMResult').text(data);
+            });
+        });
+
+        $('#calculateMonthlyPM').click(function () {
+            var personId = $('#personSelector').val();
+            var date = $('#dateSelector').val();
+            $.post('@Url.Action("CalculateMonthlyPM", "Admin")', { personId: personId, date: date }, function (data) {
+                $('#monthlyPMResult').text(data);
+            });
+        });
+
+        function generateYearlyPMValues() {
+            var year = $('#yearSelector').val();
+            $.ajax({
+                url: '@Url.Action("GenerateYearlyPMValues", "Admin")',
+                type: 'POST',
+                data: { year: year },
+                success: function (response) {
+                    if (response.success) {
+                        alert('Valores PM anuales generados con éxito.');
+                        location.reload(); // Actualizar la tabla de valores PM
+                    } else {
+                        alert('Error al generar valores PM anuales: ' + response.message);
+                    }
+                },
+                error: function (xhr, status, error) {
+                    alert('Error al generar valores PM anuales: ' + error);
+                }
+            });
+        }
+    </script>
+}

@@ -1,0 +1,445 @@
+﻿@model TRS2._0.Models.ViewModels.ProjectPersonnelViewModel
+
+@{
+    ViewData["Title"] = "Personnel Selection";
+    // Ordena WorkPackages para que "Travels" esté al final, independientemente de mayúsculas/minúsculas.
+    var orderedWorkPackages = Model.WorkPackages
+        .OrderBy(wp => wp.Name.Equals("travels", StringComparison.OrdinalIgnoreCase))
+        .ThenBy(wp => wp.Name)
+        .ToList();
+}
+
+<div class="container mt-3">
+    <div class="row">
+        <!-- Encapsula los detalles del proyecto en una tarjeta -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header text-center">
+                    Proyect Details
+                </div>
+                <div class="card-body">
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Acronym</dt>
+                            <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.ProjectDetails.Acronim)</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Title</dt>
+                            <dd class="col-sm-8">@Html.DisplayFor(model => model.ProjectDetails.Title)</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Contract</dt>
+                            <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.ProjectDetails.Contract)</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Start Date</dt>
+                            <dd class="col-sm-8 d-inline-block">@(Model.ProjectDetails.Start.HasValue ? Model.ProjectDetails.Start.Value.ToString("dd-MM-yyyy") : string.Empty)</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">End Date</dt>
+                            <dd class="col-sm-8 d-inline-block">@(Model.ProjectDetails.End.HasValue ? Model.ProjectDetails.End.Value.ToString("dd-MM-yyyy") : string.Empty)</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Project Investigator</dt>
+                            <dd class="col-sm-8 d-inline-block">@ViewBag.PiFullName</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Project Manager</dt>
+                            <dd class="col-sm-8 d-inline-block">@ViewBag.PmFullName</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Type</dt>
+                            <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.ProjectDetails.Type)</dd>
+                        </div>
+                    </dl>
+
+                    <!-- Tarjeta para Third Parties -->
+                    <div class="card mt-4">
+                        <div style="text-align: center; background-color: black; color: white; font-size: 24px; font-weight: bold;">
+                            Third Parties
+                        </div>
+
+                        <div class="card-body">
+                            <div class="row">
+                                <!-- Cada tick en su propia columna dentro de esta fila -->
+                                <div class="col">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="upcCheck" disabled @((Model.ProjectDetails.TpsUpc == 1) ? "checked" : "")>
+                                        <label class="form-check-label" for="upcCheck">UPC</label>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="icreaCheck" disabled @((Model.ProjectDetails.TpsIcrea == 1) ? "checked" : "")>
+                                        <label class="form-check-label" for="icreaCheck">ICREA</label>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="csicCheck" disabled @((Model.ProjectDetails.TpsCsic == 1) ? "checked" : "")>
+                                        <label class="form-check-label" for="csicCheck">CSIC</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+        </div>
+        </div>
+    
+
+            <div class="col-md-6">
+            <!-- Selección de Personal -->
+            <div class="card mb-3">
+                <div class="card-header text-center">
+                    Person Selection
+                </div>
+                <div class="card-body">
+                    <select id="personnelSelect" class="form-control mb-2">
+                        <option value="">Please select a person from the list below:</option>
+                        @foreach (var person in Model.AllPersonnel.OrderBy(p => p.Surname).ThenBy(p => p.Name))
+                        {
+                            <option value="@person.Id">@person.Surname, @person.Name</option>
+                        }
+                    </select>
+
+                <!-- Barra de búsqueda -->
+                <p class="mb-1">Or start typing here the name of the person:</p> <!-- Reducí el margen inferior -->
+                    <input type="text" id="searchTerm" class="form-control mb-2" placeholder="Start typing..." onkeyup="filterPersonnel()" />
+                    <div id="searchResults" style="max-height: 200px; overflow-y: auto;"></div> <!-- Estilo para scroll vertical -->
+                <!-- Resultados de búsqueda -->
+                <div id="searchResults"></div>
+            </div>
+            <hr />
+            <!-- Columna de detalles del personal -->
+                <div class="card mt-3">
+                    <div class="card-header text-center">
+                        Person Details
+                    </div>
+                <div id="personDetails" class="card-body">
+                    <!-- Aquí se cargarán los detalles del personal -->
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+    <hr>
+<!-- Código para la sección de asignación de personal a paquetes de trabajo -->
+    
+</div>
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th class="sticky-header">People involved in @Model.ProjectDetails.Acronim project</th>
+                            @foreach (var wp in orderedWorkPackages)
+                            {
+                                <th class="sticky-header">@wp.Name</th> <!-- Encabezados de WP -->
+                            }
+                            <th class="sticky-header">
+                                <button id="updateAllButton" class="btn btn-success" onclick="updateAll()">Update All</button> <!-- Botón Update All -->
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var person in Model.ProjectPersonnel.Select(px => px.PersonNavigation))
+                        {
+                            <tr>
+                                <td>@person.Name @person.Surname</td>
+                                @foreach (var wp in orderedWorkPackages)
+                                {
+                                    bool isAssigned = Model.WorkPackagePersonnel.Any(wpx => wpx.Wp == wp.Id && wpx.Person == person.Id);
+                                    <td>
+                                        <input class="wp-checkbox" type="checkbox"
+                                        @(isAssigned ? "checked" : "")
+                                               data-checked-original="@(isAssigned ? "true" : "false")"
+                                               data-wp-id="@wp.Id"
+                                               data-person-id="@person.Id" />
+                                    </td>
+                                }
+                                <td>
+                                    <button onclick="removeFromProject(@person.Id)" class="btn btn-danger">Remove</button> <!-- Botón Remove -->
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+    @section Scripts {
+        <script>
+            document.getElementById('personnelSelect').addEventListener('change', function () {
+                var personId = this.value;
+                fetchPersonDetails(personId);
+            });
+
+                function filterPersonnel() {
+                    var searchTerm = document.getElementById('searchTerm').value;
+
+                    $.ajax({
+                        url: '@Url.Action("GetFilteredPersonnel", "Personnels")',
+                        data: { searchTerm: searchTerm },
+                        success: function (data) {
+                            var resultsDiv = document.getElementById('searchResults');
+                            resultsDiv.innerHTML = ''; // Limpiar resultados anteriores
+
+                            // Asume que el servidor ya limita los resultados a 10
+                            data.forEach(function (person, index) {
+                                if (index < 10) { // Esta comprobación es redundante si el servidor limita los resultados
+                                    var personDiv = document.createElement('div');
+                                    personDiv.className = 'person-result';
+                                    personDiv.textContent = person.name + ' ' + person.surname;
+                                    personDiv.setAttribute('data-person-id', person.id);
+
+                                    personDiv.onclick = function () {
+                                        // Marcar el resultado seleccionado como activo y limpiar los demás
+                                        document.querySelectorAll('.person-result').forEach(function (el) {
+                                            el.classList.remove('active');
+                                        });
+                                        this.classList.add('active');
+
+                                        fetchPersonDetails(person.id);
+                                    };
+
+                                    resultsDiv.appendChild(personDiv);
+                                }
+                            });
+                        }
+                    });
+                    document.getElementById('searchResults').style.display = 'block';
+                }
+
+                function fetchPersonDetails(personId) {
+                    $.ajax({
+                        url: '@Url.Action("GetPersonDetails", "Personnels")',
+                        data: { id: personId },
+                        success: function (response) {
+                            var detailsDiv = document.getElementById('personDetails');
+                            detailsDiv.innerHTML = '';
+                            if (response.success) {
+                                var data = response.data;
+                                detailsDiv.innerHTML = `<div class="card-body">
+                                    <h5 class="card-title text-center" style="font-size: 1.5em;">${data.fullName || ''}</h5>
+                                    <p><span class="card-detail-label">Affiliation:</span> ${data.affiliation || ''}</p>
+                                    <p><span class="card-detail-label">Department:</span> ${data.departmentName || ''}</p>
+                                    <p><span class="card-detail-label">Group:</span> ${data.personnelGroupName || ''}</p>
+                                    <p><span class="card-detail-label">Group Leader:</span> ${data.responsiblePerson || ''}</p>
+                                    <p><span class="card-detail-label">Category:</span> ${data.category || ''}</p>
+                                    <p><span class="card-detail-label">Contract Start:</span> ${data.startDate || ''}</p>
+                                    <p><span class="card-detail-label">Contract End:</span> ${data.endDate || ''}</p>
+                                                    <div class="text-align: center">
+                                        <button onclick="addToProject(${personId})" class="btn btn-primary" style="margin-right: 50px;">Add to Project</button>
+                                        <!-- El botón de Eliminar se añadirá aquí, condicionalmente -->
+                                    </div>
+                                </div>`;
+                            } else {
+                                detailsDiv.innerHTML = '<p>Person details not found.</p>';
+                            }
+                        }
+                    });
+                }
+
+
+            function addToProject(personId) {
+                var projectId = @Model.ProjectDetails.ProjId;
+                $.ajax({
+                    url: '@Url.Action("AddPersonToProject", "Projects")', // Asegúrate de que este endpoint y el nombre del controlador son correctos
+                    type: 'POST',
+                    data: { projectId: projectId, personId: personId },
+                    success: function (response) {
+                        if (response.success) {
+                            // Aquí puedes agregar una notificación o actualizar la vista como necesites
+                            alert("Person added to the project successfully.");
+                            location.reload();
+                        } else {
+                            alert("There was a problem adding the person to the project.");
+                        }
+                    }
+                });
+            }
+
+            function removeFromProject(personId) {
+                var projectId = @Model.ProjectDetails.ProjId;
+                if (confirm("Are you sure you want to remove this person from the project?")) {
+                    $.ajax({
+                        url: '@Url.Action("RemovePersonFromProject", "Projects")', // Cambia el nombre del controlador y la acción según tu configuración
+                        type: 'POST',
+                        data: { projectId: projectId, personId: personId },
+                        success: function (response) {
+                            if (response.success) {
+                                alert("Person removed from the project successfully.");
+                                location.reload();
+                            } else {
+                                alert("There was a problem removing the person from the project.");
+                            }
+                        }
+                    });
+                }
+            }
+
+            function updateAll() {
+                var changes = [];
+                document.querySelectorAll('.wp-checkbox').forEach(function (checkbox) {
+                    var originalState = checkbox.getAttribute('data-checked-original') === 'true';
+                    if (checkbox.checked !== originalState) {
+                        changes.push({
+                            WpId: parseInt(checkbox.getAttribute('data-wp-id')),
+                            PersonId: parseInt(checkbox.getAttribute('data-person-id'))
+                        });
+                    }
+                });
+
+                // Envía esta lista al controlador
+                $.ajax({
+                    url: '@Url.Action("UpdateWorkPackageAssignments", "Projects")',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(changes),
+                    success: function (response) {
+                        // Procesar la respuesta
+                        if (response.success) {
+                            alert("Work package assignments updated successfully.");
+                            location.reload();
+                        } else {
+                            alert("There was a problem updating the assignments.");
+                        }
+                    },
+                    error: function (error) {
+                        // Manejar el error
+                        alert("An error occurred while updating the assignments.");
+                    }
+                });
+            }
+
+                document.addEventListener('click', function (event) {
+                    var searchResults = document.getElementById('searchResults');
+                    var searchTerm = document.getElementById('searchTerm');
+                    if (!searchResults.contains(event.target) && !searchTerm.contains(event.target)) {
+                        searchResults.style.display = 'none'; // Contraer la lista
+                    }
+                });
+
+                document.getElementById('searchResults').addEventListener('click', function (event) {
+                    if (event.target && event.target.matches('div.person-result')) {
+                        var personName = event.target.textContent;
+                        var personnelSelect = document.getElementById('personnelSelect');
+                        // Actualiza el selector con el nombre de la persona seleccionada
+                        personnelSelect.value = '';
+                        personnelSelect.options[personnelSelect.options.length] = new Option(personName, event.target.getAttribute('data-person-id'), true, true);
+                        // Contraer la lista después de seleccionar una persona
+                        document.getElementById('searchResults').style.display = 'none';
+                        // Opcional: Llama a fetchPersonDetails si necesitas cargar detalles en la tarjeta de detalles
+                        fetchPersonDetails(event.target.getAttribute('data-person-id'));
+                    }
+                });
+
+                
+        </script>
+    }
+
+    <style>
+        .person-result {
+            cursor: pointer;
+            padding: 5px;
+        }
+
+            .person-result:hover {
+                background-color: #eee;
+            }
+
+            .person-result.active {
+                background-color: #4c87c6;
+            }
+
+        .card-detail-label {
+            font-weight: bold;
+        }
+
+        .card-title {
+            font-weight: bold;
+        }
+
+        .card-header {
+            background-color: #005A9C; /* Azul oscuro, ajusta el código de color según tu logo */
+            color: #FFFFFF; /* Blanco */
+            text-align: center;
+            font-weight: bold;
+            /* Otros estilos que desees mantener, como el padding, etc. */
+        }
+
+
+        .wp-checkbox {
+            width: 25px; /* Tamaño del checkbox */
+            height: 25px; /* Tamaño del checkbox */
+            cursor: pointer; /* Cambia el cursor a mano al pasar sobre el checkbox */
+            margin: auto; /* Centra el checkbox en la celda */
+        }
+
+        
+
+        .table th {
+            background-color: var(--blue-dark); /* Color de fondo para los encabezados */
+            color: white; /* Color del texto para los encabezados */
+            text-align: center;
+        }
+
+        .table td{
+            text-align: center;
+        }
+
+        .table th, .table td {
+            white-space: nowrap; /* Evita el salto de línea en las celdas */
+            vertical-align: middle; /* Alinea el contenido verticalmente */
+            text-align: center; /* Centra el contenido */
+        }
+
+            .detail-item:not(:last-child) {
+                border-bottom: 1px solid #dee2e6; /* Color de la línea */
+                padding-bottom: 5px; /* Espaciado debajo del texto antes de la línea */
+                margin-bottom: 5px; /* Espaciado después de la línea */
+            }
+
+    .custom-table-container {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+
+    .table-responsive {
+        max-height: 800px; /* Ajusta esto según la altura deseada */
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .sticky-header {
+        position: sticky;
+        top: 0;
+        background-color: #fff; /* Fondo blanco o el color de fondo de tu tabla */
+        z-index: 1; /* Asegura que el encabezado se mantenga sobre el contenido desplazable */
+    }
+
+    .card-header {
+        font-size: 24px; /* Aumenta el tamaño del texto */
+        font-weight: bold; /* Texto en negrita */
+        text-align: center; /* Texto centrado */
+    }
+    </style>

@@ -1,0 +1,123 @@
+﻿@model TRS2._0.Models.DataModels.Project
+
+@{
+    ViewData["Title"] = "Delete";
+}
+
+<h1>Delete</h1>
+
+<h3>Are you sure you want to delete this?</h3>
+<div>
+    <h4>Project</h4>
+    <hr />
+    <dl class="row">
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.SapCode)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.SapCode)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.Acronim)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.Acronim)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.Title)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.Title)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.Contract)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.Contract)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.Start)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.Start)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.End)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.End)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.TpsUpc)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.TpsUpc)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.TpsIcrea)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.TpsIcrea)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.TpsCsic)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.TpsCsic)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.Pi)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.Pi)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.Pm)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.Pm)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.Type)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.Type)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.SType)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.SType)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.St1)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.St1)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.St2)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.St2)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.EndReportDate)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.EndReportDate)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.Visible)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.Visible)
+        </dd>
+    </dl>
+    
+    <form asp-action="Delete">
+        <input type="hidden" asp-for="ProjId" />
+        <input type="submit" value="Delete" class="btn btn-danger" /> |
+        <a asp-action="Index">Back to List</a>
+    </form>
+</div>
