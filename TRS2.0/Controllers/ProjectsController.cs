@@ -455,7 +455,7 @@ namespace TRS2._0.Controllers
             var projectEndDate = project.EndReportDate;
 
 
-            // Asegúrate de que projectStartDate y projectEndDate no sean null
+            // Asegurar de que projectStartDate y projectEndDate no sean null
             DateTime adjustedProjectStartDate = project.Start.HasValue
                 ? new DateTime(project.Start.Value.Year, project.Start.Value.Month, 1)
                 : DateTime.MinValue; 
@@ -592,15 +592,6 @@ namespace TRS2._0.Controllers
             _logger.LogInformation($"Información de personal procesada en {stopwatch.ElapsedMilliseconds} ms total");
 
 
-            // Determina si el inicio del proyecto es el día 15
-            bool startsOn15th = project.Start?.Day == 15;
-            // Determina si el final del proyecto es el día 15
-            bool endsOn15th = project.EndReportDate.Day == 15;
-
-            ViewBag.StartsOn15th = startsOn15th;
-            ViewBag.EndsOn15th = endsOn15th;
-
-
             ViewBag.PersonnelInfos = personnelInfos;
 
 
@@ -620,7 +611,7 @@ namespace TRS2._0.Controllers
                 return Json(new { success = false, message = "No data provided." });
             }
 
-            // La carga del proyecto se mantiene como estaba en tu implementación original
+            
             var project = await _context.Projects
                 .Include(p => p.Wps)
                 .FirstOrDefaultAsync(p => p.ProjId == model.ProjectId);
@@ -671,7 +662,7 @@ namespace TRS2._0.Controllers
                     }
                     else
                     {
-                        // Tu lógica existente se mantiene aquí para manejar aumentos o esfuerzos nuevos
+                        
                         decimal effortToSave = Math.Min(newEffort, availableEffort + currentEffort);
 
                         // Verificar si es el mes de inicio o fin del proyecto y ajustar el maxPM si es necesario
@@ -883,181 +874,3 @@ namespace TRS2._0.Controllers
 
 
 
-//public async Task<IActionResult> SaveEfforts([FromBody] EffortUpdateModel model)
-//{
-//    if (model == null || model.Efforts == null)
-//    {
-//        return Json(new { success = false, message = "No data provided." });
-//    }
-
-//    // Recuperar el diccionario desde HttpContext.Items al comienzo del método SaveEfforts
-//    var availableEffortsByPersonAndMonth = HttpContext.Items["AvailableEffortsByPersonAndMonth"] as Dictionary<int, Dictionary<string, decimal>>;
-
-//    if (availableEffortsByPersonAndMonth == null)
-//    {
-//        // Manejar el caso donde el diccionario no está disponible o no se ha calculado
-//        return Json(new { success = false, message = "Available efforts data is not accessible." });
-//    }
-
-//    List<string> notifications = new List<string>();
-
-//    foreach (var effortData in model.Efforts)
-//    {
-//        var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == effortData.PersonId);
-//        var wp = await _context.Wps.FirstOrDefaultAsync(w => w.Id == effortData.WpId);
-
-//        if (person != null && wp != null)
-//        {
-//            // Aquí, deberías calcular o recuperar el esfuerzo 'disponible' para esta persona en este mes.
-//            // Por simplicidad, asumiremos que tienes acceso a esta información.
-//            decimal availableEffort = /* lógica para obtener el esfuerzo disponible */;
-
-//            if (effortData.Effort > 1.00m)
-//            {
-//                effortData.Effort = 1.00m; // Asegura que no se exceda el máximo de 1.00
-//            }
-
-//            if (availableEffort <= 0)
-//            {
-//                notifications.Add($"This person ({person.Name}) has completed his effort for {effortData.Month.ToString("MMMM yyyy")}.");
-//                continue;
-//            }
-//            else if (effortData.Effort > availableEffort)
-//            {
-//                decimal originalEffort = effortData.Effort;
-//                effortData.Effort = availableEffort;
-
-//                notifications.Add($"For {person.Name} in WP {wp.Name} for {effortData.Month.ToString("MMMM yyyy")}, {availableEffort} was saved and {originalEffort - availableEffort} could not be saved due to availability.");
-//            }
-
-//            var wpxPerson = await _context.Wpxpeople.FirstOrDefaultAsync(x => x.Person == effortData.PersonId && x.Wp == effortData.WpId);
-
-//            if (wpxPerson != null)
-//            {
-//                var perseffort = await _context.Persefforts.FirstOrDefaultAsync(pe => pe.WpxPerson == wpxPerson.Id && pe.Month == effortData.Month);
-
-//                if (perseffort != null)
-//                {
-//                    // Actualizar el esfuerzo existente
-//                    perseffort.Value = effortData.Effort;
-//                }
-//                else
-//                {
-//                    // Crear un nuevo registro de esfuerzo
-//                    var newPerseffort = new Perseffort
-//                    {
-//                        WpxPerson = wpxPerson.Id,
-//                        Month = effortData.Month,
-//                        Value = effortData.Effort
-//                    };
-//                    _context.Persefforts.Add(newPerseffort);
-//                }
-//            }
-//        }
-//        else
-//        {
-//            notifications.Add($"Person or Work Package not found for provided IDs.");
-//        }
-//    }
-
-//    await _context.SaveChangesAsync();
-
-//    // Retorna tanto el éxito como las notificaciones
-//    return Json(new { success = true, message = "Efforts updated successfully.", notifications = notifications });
-//}
-
-
-
-//public async Task<IActionResult> SaveEfforts([FromBody] EffortUpdateModel model)
-//{
-//    var project = await _context.Projects
-//        .Include(p => p.Wps)
-//        .FirstOrDefaultAsync(p => p.ProjId == model.ProjectId);
-//    if (model == null || model.Efforts == null)
-//    {
-//        return Json(new { success = false, message = "No data provided." });
-//    }
-
-//    var availableEffortsByPersonAndMonth = model.AvailableEfforts;
-
-//    if (availableEffortsByPersonAndMonth == null)
-//    {
-//        return Json(new { success = false, message = "Available efforts data is not accessible." });
-//    }
-
-//    List<string> notifications = new List<string>();
-
-//    foreach (var effortData in model.Efforts)
-//    {
-//        var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == effortData.PersonId);
-//        var wp = await _context.Wps.FirstOrDefaultAsync(w => w.Id == effortData.WpId);
-//        if (person == null || wp == null)
-//        {
-//            notifications.Add("Person or Work Package not found for provided IDs.");
-//            continue;
-//        }
-
-//        string monthKey = effortData.Month.ToString("yyyy-MM");
-//        var dateParts = monthKey.Split('-');
-//        int year = int.Parse(dateParts[0]);
-//        int month = int.Parse(dateParts[1]);
-//        decimal availableEffort = availableEffortsByPersonAndMonth.TryGetValue(effortData.PersonId, out var personMonths) &&
-//                                  personMonths.TryGetValue(monthKey, out var effort) ? effort : 0;
-
-//        if (availableEffort == 0 || availableEffort < 0)
-//        {
-//            notifications.Add($"For {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}, no availability to save efforts.");
-//            continue; // Skip further processing for this effortData as there's no available effort
-//        }
-
-//        // Nuevo código para manejar la casuística especial de los meses de inicio o fin de proyecto
-//        DateTime projectStartDate = (DateTime)project.Start;
-//        DateTime projectEndDate = project.EndReportDate;
-//        DateTime effortMonthStart = new DateTime(year, month, 1);
-//        DateTime effortMonthEnd = new DateTime(year, month, DateTime.DaysInMonth(year, month));
-//        decimal maxPM = decimal.MaxValue; // Por defecto, no limitar el esfuerzo
-
-//        // Verificar si es el mes de inicio o fin del proyecto y ajustar el maxPM si es necesario
-//        if ((effortMonthStart < projectStartDate && effortMonthEnd >= projectStartDate) ||
-//            (effortMonthStart <= projectEndDate && effortMonthEnd > projectEndDate))
-//        {
-//            maxPM = await _workCalendarService.CalculateAdjustedMonthlyPM(effortData.PersonId, year, month, projectStartDate, projectEndDate);
-//        }
-
-//        // Continuar con la lógica existente para verificar y ajustar el esfuerzo a guardar
-//        var wpxPerson = await _context.Wpxpeople.FirstOrDefaultAsync(x => x.Person == effortData.PersonId && x.Wp == effortData.WpId);
-//        if (wpxPerson != null)
-//        {
-//            var perseffort = await _context.Persefforts.FirstOrDefaultAsync(pe => pe.WpxPerson == wpxPerson.Id && pe.Month == effortData.Month);
-//            decimal currentEffort = perseffort?.Value ?? 0m;
-//            decimal newEffort = effortData.Effort;
-//            decimal effortToSave = Math.Min(newEffort, availableEffort + currentEffort);
-
-//            // Si el esfuerzo a guardar excede el disponible o el maxPM, ajustar
-//            if (newEffort > availableEffort || newEffort > maxPM)
-//            {
-//                effortToSave = Math.Min(availableEffort + currentEffort, maxPM);
-//                decimal overflow = newEffort - effortToSave;
-//                notifications.Add($"For {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}, only {effortToSave - currentEffort} was saved due to availability or project date limits. {overflow} could not be saved.");
-//            }
-
-//            if (perseffort != null)
-//            {
-//                perseffort.Value = effortToSave;
-//            }
-//            else
-//            {
-//                _context.Persefforts.Add(new Perseffort
-//                {
-//                    WpxPerson = wpxPerson.Id,
-//                    Month = effortData.Month,
-//                    Value = effortToSave
-//                });
-//            }
-//        }
-//    }
-
-//    await _context.SaveChangesAsync();
-
-//    return Json(new { success = true, message = "Efforts updated successfully.", notifications = notifications });
-//}
