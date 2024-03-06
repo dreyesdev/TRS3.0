@@ -8,27 +8,9 @@
     decimal totalCovered = 0;
     // Asume valores predeterminados o maneja el caso de null según sea necesario
     var startProject = Model.Project.Start ?? DateTime.Today; // Usar la fecha actual como valor por defecto
-    var endProject = Model.Project.EndReportDate; // Usar la fecha actual como valor por defecto
-    var monthsList = new List<string>();
-    if (Model.Project.Start.HasValue)
-    {
-        // Ahora que sabemos que startProject y endProject tienen valores, procedemos con el cálculo
-        startProject = Model.Project.Start.Value;
-        endProject = Model.Project.EndReportDate;
-
-
-
-        int monthsCount = ((endProject.Year - startProject.Year) * 12) + endProject.Month - startProject.Month + 1;
-
-        for (int i = 0; i < monthsCount; i++)
-        {
-            string monthName = startProject.AddMonths(i).ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
-            monthsList.Add($"M{i + 1} ({monthName})");
-        }
-
-        // Asegúrate de usar monthsList para llenar los selectores como se mostró anteriormente
-    }
+    var endProject = Model.Project.EndReportDate; // Usar la fecha actual como valor por defecto    
     int index = 1; // Inicializa el contador
+    
 }
 
 
@@ -247,7 +229,7 @@
         <script>
         function loadReportPeriodForm() {
             $.ajax({
-                url: '@Url.Action("ReportPeriodForm", "Projects")',
+                url: '@Url.Action("ReportPeriodForm", "Projects", new { projId = ViewBag.projId })',
                 type: 'GET',
                 success: function (result) {
                     $('#reportPeriodsSection').html(result);
@@ -270,8 +252,7 @@
                     type: 'POST',
                     data: { id: periodId },
                     success: function (result) {
-                        // Recarga la sección de la vista parcial o elimina la fila de la tabla directamente
-                        loadReportPeriodForm(); // Esto es solo un ejemplo, ajusta según tus necesidades
+                        location.reload(); // Recarga la página para actualizar la tabla
                     }
                 });
             }

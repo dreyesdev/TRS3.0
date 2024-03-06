@@ -21,8 +21,24 @@
                 }
                 <tr>
                     <td>Nuevo</td>
-                    <td><input type="date" name="newStartDate" /></td>
-                    <td><input type="date" name="newEndDate" /></td>
+                    <!-- StartDate Selector -->
+                    <td>
+                        <select class="form-control" id="newStartDate">
+                            @foreach (var month in Model.MonthsList)
+                            {
+                                <option value="@month">@month</option>
+                            }
+                        </select>
+                    </td>
+                    <!-- EndDate Selector -->
+                    <td>
+                        <select class="form-control" id="newEndDate">
+                            @foreach (var month in Model.MonthsList)
+                            {
+                                <option value="@month">@month</option>
+                            }
+                        </select>
+                    </td>
                     <td><button class="btn btn-primary" onclick="addPeriodByDate()">Add</button></td>
                 </tr>
             </tbody>

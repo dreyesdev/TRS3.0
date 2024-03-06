@@ -15,6 +15,28 @@ namespace TRS2._0.Models.ViewModels
 
         public List<Wp> WorkPackages { get; set; } = new List<Wp>();
 
+        // Añade la propiedad MonthsList
+        public List<string> MonthsList { get; set; } = new List<string>();
 
+        // Método para calcular MonthsList basado en las fechas de inicio y fin del proyecto
+        public void CalculateMonthsList()
+        {
+            if (Project != null && Project.Start.HasValue)
+            {
+                // Ahora que sabemos que startProject y endProject tienen valores, procedemos con el cálculo
+                DateTime startProject = Project.Start.Value;
+                DateTime endProject = Project.EndReportDate;
+
+
+
+                int monthsCount = ((endProject.Year - startProject.Year) * 12) + endProject.Month - startProject.Month + 1;
+
+                for (int i = 0; i < monthsCount; i++)
+                {
+                    string monthName = startProject.AddMonths(i).ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+                    MonthsList.Add($"M{i + 1} ({monthName})");
+                }
+            }
+        }
     }
 }

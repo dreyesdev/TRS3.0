@@ -954,6 +954,7 @@ namespace TRS2._0.Controllers
                             .Sum(pe => pe.Value)
             }).ToList();
 
+            
             // Añadir wpDetails al ViewBag para acceder desde la vista
             ViewBag.WpDetails = wpDetails;
 
@@ -990,7 +991,7 @@ namespace TRS2._0.Controllers
 
             // Si necesitas pasar el ID del proyecto a tu vista parcial para usarlo en tus formularios AJAX, puedes hacerlo de varias maneras,
             // una opción es usando ViewBag o ViewData
-            ViewBag.ProjId = projId;
+            ViewBag.ProjId = projId;            
 
             // Retorna la vista parcial junto con el modelo de vista preparado
             return PartialView("_ReportPeriodForm", viewModel);
