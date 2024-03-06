@@ -193,6 +193,7 @@
                             <th style="text-align: center; background-color: black; color: white;">Reporting Period</th>
                             <th style="text-align: center; background-color: black; color: white;">Period Date</th>
                             <th style="text-align: center; background-color: black; color: white;">Period in Months</th>
+                            <th style="text-align: center; background-color: black; color: white;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -214,14 +215,20 @@
                 </table>
             </div>
         </div>
+        <hr />
     }else{
         <div class="alert alert-warning" role="alert">
             No report periods have been added yet.
         </div>
     }
-        <div id="reportPeriodsSection"></div>
-        <button type="button" class="btn btn-primary" onclick="loadReportPeriodForm()">Add Reporting Periods</button>
-        <button type="button" class="btn btn-secondary" id="cancelReportPeriodBtn" onclick="cancelReportPeriodForm()" style="display:none;">Cancel</button>
+        <div class="text-center my-3">
+            <!-- Aumenta el margen y centra los botones -->
+            <div id="reportPeriodsSection"></div>
+            <!-- Inicialmente visible, este botón se ocultará mediante JavaScript una vez pulsado -->
+            <button type="button" class="btn btn-primary" id="addReportPeriodBtn" onclick="loadReportPeriodForm()">Add Reporting Periods</button>
+            <!-- Este botón estará oculto inicialmente y se mostrará solo después de que se presione "Add Reporting Periods" -->
+            <button type="button" class="btn btn-secondary" id="cancelReportPeriodBtn" onclick="cancelReportPeriodForm()" style="display:none;">Cancel</button>
+        </div>
 </div>
 
 
@@ -242,7 +249,7 @@
         function cancelReportPeriodForm() {
             $('#reportPeriodsSection').html(''); // Limpia la sección de la vista parcial
             $('#cancelReportPeriodBtn').hide(); // Oculta el botón de cancelar
-            $('#addReportPeriodBtn').show(); // Muestra el botón de añadir
+            $('#addReportPeriodBtn').show(); // Muestra nuevamente el botón de "Add Reporting Periods"
         }
 
         function deleteReportPeriod(periodId) {

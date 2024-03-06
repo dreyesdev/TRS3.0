@@ -1,78 +1,109 @@
 ﻿<div class="row">
+    <!-- Seleccionar por fecha específica -->
     <div class="col-md-6">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Nº</th>
-                    <th>Fecha Inicio</th>
-                    <th>Fecha Fin</th>
-                    <th>Delete</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var period in Model.ReportPeriods)
-                {
-                    <tr>
-                        <td>@period.Id</td>
-                        <td>@period.StartDate.ToString("dd-MM-yyyy")</td>
-                        <td>@period.EndDate.ToString("dd-MM-yyyy")</td>
-                        <td><button class="btn btn-danger">Delete</button></td>
-                    </tr>
-                }
-                <tr>
-                    <td>Nuevo</td>
-                    <!-- StartDate Selector -->
-                    <td>
-                        <select class="form-control" id="newStartDate">
-                            @foreach (var month in Model.MonthsList)
-                            {
-                                <option value="@month">@month</option>
-                            }
-                        </select>
-                    </td>
-                    <!-- EndDate Selector -->
-                    <td>
-                        <select class="form-control" id="newEndDate">
-                            @foreach (var month in Model.MonthsList)
-                            {
-                                <option value="@month">@month</option>
-                            }
-                        </select>
-                    </td>
-                    <td><button class="btn btn-primary" onclick="addPeriodByDate()">Add</button></td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title card-title-custom">Add period by specific dates</h5>
+                <div class="form-row align-items-center">
+                    <div class="col-auto">
+                        <label for="specificStartDate" class="sr-only">Start Date</label>
+                        <input type="date" class="form-control mb-2" id="specificStartDate" name="specificStartDate">
+                    </div>
+                    <div class="col-auto">
+                        <label for="specificEndDate" class="sr-only">End Date</label>
+                        <input type="date" class="form-control mb-2" id="specificEndDate" name="specificEndDate">
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-primary mb-2" onclick="addPeriodBySpecificDate()">Add by Date</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- Seleccionar por mes -->
     <div class="col-md-6">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Periodo (Meses)</th>
-                    <th>Mes Inicio</th>
-                    <th>Mes Fin</th>
-                    <th>Add</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Nuevo</td>
-                    <td><input type="number" name="startMonth" min="1" /></td>
-                    <td><input type="number" name="endMonth" min="1" /></td>
-                    <td><button class="btn btn-primary" onclick="addPeriodByMonth()">Add</button></td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title card-title-custom">Add period by month selection</h5>
+                <div class="form-row align-items-center">
+                    <div class="col-auto">
+                        <label for="startMonthSelector" class="sr-only">Start Month</label>
+                        <select class="form-control mb-2" id="startMonthSelector">
+                            @foreach (var month in Model.MonthsList)
+                            {
+                                <option value="@month">@month</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label for="endMonthSelector" class="sr-only">End Month</label>
+                        <select class="form-control mb-2" id="endMonthSelector">
+                            @foreach (var month in Model.MonthsList)
+                            {
+                                <option value="@month">@month</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-primary mb-2" onclick="addPeriodByMonthSelection()">Add by Month</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <script>
-    function addPeriodByDate() {
-        // Lógica para añadir periodo por fecha
+    function addPeriodBySpecificDate() {
+        var startDate = $('#specificStartDate').val();
+        var endDate = $('#specificEndDate').val();
+        var projId = '@Model.Project.ProjId'; // Asume que el ID del proyecto está incluido en tu ViewModel
+        // AJAX call to add period by specific date
+        $.ajax({
+            url: '/Projects/AddReportPeriodByDate', // Asegúrate de crear esta acción en tu controlador
+            method: 'POST',
+            data: {
+                projId: projId,
+                startDate: startDate,
+                endDate: endDate
+            },
+            success: function () {
+                location.reload(); // Recarga la página para reflejar los cambios
+            }
+        });
     }
 
-    function addPeriodByMonth() {
-        // Lógica para añadir periodo por mes
+    function addPeriodByMonthSelection() {
+        var startMonth = $('#startMonthSelector').val();
+        var endMonth = $('#endMonthSelector').val();
+        var projId = '@Model.Project.ProjId';
+        // Similar AJAX call for adding period by month selection
+        $.ajax({
+            url: '/Projects/AddReportPeriodByMonth', // Asegúrate de crear esta acción en tu controlador
+            method: 'POST',
+            data: {
+                projId: projId,
+                startMonth: startMonth,
+                endMonth: endMonth
+            },
+            success: function () {
+                location.reload(); // Recarga la página
+            }
+        });
     }
 </script>
+
+<style>
+    .card-title-custom {
+        text-transform: uppercase; /* Convierte el texto en mayúsculas */
+        text-align: center; /* Centra el texto */
+        /* Puedes usar colores de Bootstrap como bg-primary, o definir un color específico: */
+        background-color: #007bff; /* Color azul de Bootstrap 'primary' como ejemplo */
+        color: white; /* Color del texto */
+        padding: 10px 0; /* Añade un poco de relleno para que se vea mejor */
+    }
+</style>
+
+
 
