@@ -14,7 +14,7 @@
             <button id="saveAllButton" class="btn btn-primary btn-sm">Save All</button>
         </div>
     </h2>    
-    <div class="table-responsive">
+    <div class="table-responsive main-effort-plan-table">
         @if (Model.WorkPackages.Any())
         {
             <div class="scrollable-table-container">
@@ -28,7 +28,11 @@
                         <th>WP</th>
                             @foreach (var month in Model.GetMonthsForProject())
                         {
-                            <th>@month.ToString("MMM yyyy") (M @Model.GetMonthIndex(month))</th>
+                            <th>
+                                    <div style="border-bottom: 1px solid white; margin-bottom: 2px; margin-top: 8px; text-align: center">@month.ToString("MMM").Substring(0, 1).ToUpper()@month.ToString("MMM").Substring(1).ToLower()</div>
+                                    <div style="text-align: center">@month.ToString("yyyy")</div>
+                                    <div style="text-align: center">(M @Model.GetMonthIndex(month))</div>
+                                </th>
                         }
                     </tr>
                 </thead>
@@ -179,7 +183,83 @@ else
 {
     <p>No active work packages for this project.</p>
 }
-    </div>
+    </div> 
+    <hr>
+    @if (ViewBag.SelectedWpId != null && ViewBag.EffortSumByMonth != null && ViewBag.FilteredProjectEfforts != null)
+    {
+        var selectedWpId = ViewBag.SelectedWpId;
+        var effortSumByMonth = ViewBag.EffortSumByMonth as Dictionary<DateTime, decimal>;
+        var filteredProjectEfforts = ViewBag.FilteredProjectEfforts as List<Projeffort>;
+        var months = effortSumByMonth.Keys.OrderBy(d => d).ToList();
+        var wpName = Model.WorkPackages.FirstOrDefault(wp => wp.WpId == selectedWpId)?.WpName;
+        <div class="table-responsive effort-balance-table-container">
+            <table class="table table-striped table-dark effort-balance-table">
+                <thead class="thead-dark">
+                    <tr>
+                        <th><div style="vertical-align: middle">Effort vs Plan Balance</div></th>
+                        @foreach (var month in months)
+                        {
+                            <th>
+                                <div style="border-bottom: 1px solid white; margin-bottom: 2px; margin-top: 8px; text-align: center">@month.ToString("MMM").Substring(0, 1).ToUpper()@month.ToString("MMM").Substring(1).ToLower()</div>
+                                <div style="text-align: center">@month.ToString("yyyy")</div>
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+
+                    <tr>
+                        <td>@wpName - Total</td>
+                        @foreach (var month in months)
+                        {
+                            <td>@(effortSumByMonth.ContainsKey(month) ? effortSumByMonth[month].ToString("0.00") : "0.00")</td>
+                        }
+                    </tr>
+
+
+                    <tr>
+                        <td>@wpName - Cumulative</td>
+                        @{
+                            decimal cumulativeTotal = 0;
+                        }
+                        @foreach (var month in months)
+                        {
+                            cumulativeTotal += effortSumByMonth.ContainsKey(month) ? effortSumByMonth[month] : 0;
+                            <td>@cumulativeTotal.ToString("0.00")</td>
+                        }
+                    </tr>
+
+
+                    <tr>
+                        <td>@wpName - Balance</td>
+                        @foreach (var month in months)
+                        {
+                            var planEffort = filteredProjectEfforts.FirstOrDefault(pe => pe.Month == month)?.Value ?? 0;
+                            var realEffort = effortSumByMonth.ContainsKey(month) ? effortSumByMonth[month] : 0;
+                            var balance = realEffort - planEffort ;
+                            <td style="@(balance < 0 ? "color: yellow;" : "")">@balance.ToString("0.00")</td>
+                        }
+                    </tr>
+
+
+                    <tr>
+                        <td>@wpName - Cumulative Balance</td>
+                        @{
+                            decimal cumulativeBalance = 0;
+                        }
+                        @foreach (var month in months)
+                        {
+                            var planEffort = filteredProjectEfforts.FirstOrDefault(pe => pe.Month == month)?.Value ?? 0;
+                            var realEffort = effortSumByMonth.ContainsKey(month) ? effortSumByMonth[month] : 0;
+                            var balance = realEffort - planEffort ;
+                            cumulativeBalance += balance;
+                            <td style="@(cumulativeBalance < 0 ? "color: yellow;" : "")">@cumulativeBalance.ToString("0.00")</td>
+                        }
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    }
 </div>
 
 @section Scripts {
@@ -268,19 +348,19 @@ else
 }
 
 <style>
-    .input-effort {
+    .main-effort-plan-table .input-effort {
         width: 100%; /* Asegura que el input ocupe toda la celda */
         min-width: 60px; /* Ajusta el mínimo ancho para mostrar tres caracteres */
         text-align: center; /* Centra el texto */
     }
 
-    .effort-cell {
-        min-width: 60px; /* Igual al mínimo ancho del input */
-        padding: 0; /* Elimina el relleno para permitir que el input llene la celda */
+    .main-effort-plan-table .effort-cell {
+        min-width: 80px; /* Igual al mínimo ancho del input */
+        
         text-align: center; /* Centra el texto */
     }
 
-    .person-name-column {
+    .main-effort-plan-table .person-name-column {
         font-weight: bold;
         width: 250px; /* Ajusta este valor según tus necesidades */
         white-space: nowrap; /* Evita que el texto se envuelva a la siguiente línea */
@@ -289,19 +369,19 @@ else
 
     }
 
-    .scrollable-table-container {
+    .main-effort-plan-table .scrollable-table-container {
         overflow-y: auto;
         max-height: 800px; /* Aumenta este valor para mostrar más filas */
     }
 
-    .table thead th {
+    .main-effort-plan-table .table thead th {
         position: sticky;
         top: 0;        
         z-index: 10;
     }
 
     /* Estilo para la cabecera de la primera y segunda columna */
-    .table th:first-child, .table th:nth-child(2) {
+    .main-effort-plan-table .table th:first-child, .main-effort-plan-table .table th:nth-child(2) {
         position: sticky;
         left: 0; /* Para la primera columna */
         z-index: 11; /* Asegurarse de que está por encima del resto */
@@ -310,13 +390,13 @@ else
         vertical-align: middle;
     }
 
-    .table th:nth-child(2) {
+    .main-effort-plan-table .table th:nth-child(2) {
         left: 250px; /* Ajusta este valor al ancho de tu primera columna */
         z-index: 11;
     }
 
     /* Estilos para las celdas de cuerpo en la primera y segunda columna */
-    .table td:first-child, .table td:nth-child(2) {
+    .main-effort-plan-table .table td:first-child, .main-effort-plan-table .table td:nth-child(2) {
         position: sticky;
         left: 0; /* Para la primera columna */
         background-color: white; /* Fondo blanco para las celdas del cuerpo */
@@ -325,24 +405,24 @@ else
         vertical-align: middle;
     }
 
-    .table td:nth-child(2) {
+    .main-effort-plan-table .table td:nth-child(2) {
         left: 250px; /* Ajusta este valor al ancho de tu primera columna */
         z-index: 10;
     }
 
     /* Ajustes para el ancho de las columnas fijas */
-    .table th:first-child, .table td:first-child {
+    .main-effort-plan-table .table th:first-child, .main-effort-plan-table .table td:first-child {
         min-width: 250px; /* o el ancho que necesites */
         max-width: 250px;
     }
 
-    .table th:nth-child(2), .table td:nth-child(2) {
+    .main-effort-plan-table .table th:nth-child(2), .main-effort-plan-table .table td:nth-child(2) {
         min-width: 100px; /* o el ancho que necesites */
         max-width: 100px;
     }
 
     /* Ajustar bordes para celdas adyacentes */
-    .table td:nth-child(3), .table th:nth-child(3) {
+    .main-effort-plan-table .table td:nth-child(3), .main-effort-plan-table .table th:nth-child(3) {
         border-left: 2px solid #dee2e6; /* Asegúrate de que el color del borde coincida con el estilo de tu tabla */
     }
 
@@ -351,12 +431,38 @@ else
         font-weight: bold;
     }
 
-    .bg-dark-gray {
+    .main-effort-plan-table .bg-dark-gray {
         background-color: #6c757d !important; /* Gris oscuro, puedes ajustar el color según tus necesidades */
         min-width: 60px; /* Ajusta el mínimo ancho para mostrar tres caracteres */
         text-align: center; /* Centra el texto */
     }
 
+    .effort-balance-table-container .table-dark,
+    .effort-balance-table-container .table-dark th,
+    .effort-balance-table-container .table-dark td,
+    .effort-balance-table-container .table-dark thead th {
+        
+        color: white; /* Texto en color blanco */
+    }
+
+    /* Asegúrate de que los estilos de encabezado específicamente sean aplicados */
+    .effort-balance-table-container .thead-dark th {
+        background-color: black; /* Fondo oscuro para encabezados */
+        color: white; /* Texto en color blanco */
+    }
+
+    .effort-balance-table-container .table td:first-child,
+    .effort-balance-table-container .table th:first-child {
+        white-space: nowrap; /* Evita saltos de línea */
+        overflow: hidden; /* Oculta el texto que excede el ancho de la celda */
+        text-overflow: ellipsis; /* Añade puntos suspensivos si el texto es demasiado largo */
+        text-align: center; /* Centra el texto horizontalmente */
+        font-weight: bold; /* Texto en negrita */
+    }
+
+    .container-fluid {
+        margin-top: 10px; /* Ajusta este valor según necesites */
+    }
 </style>
 
         @functions {

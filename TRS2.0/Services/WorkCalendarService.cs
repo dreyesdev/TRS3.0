@@ -458,7 +458,7 @@ public class WorkCalendarService
             {
                 LiqId = g.Key.LiqId,
                 ProjId = g.Key.ProjId,
-                Dedication = g.Average(ldp => ldp.Dedication), // Asumiendo que quieres la dedicación promedio
+                Dedication = g.Average(ldp => ldp.Dedication), 
                 StartDate = g.Min(ldp => ldp.Day),
                 EndDate = g.Max(ldp => ldp.Day),
                 Project = g.Select(ldp => ldp.Project).FirstOrDefault() // Asume que todos los registros tienen el mismo proyecto

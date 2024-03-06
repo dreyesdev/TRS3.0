@@ -1,0 +1,62 @@
+﻿<div class="row">
+    <div class="col-md-6">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Nº</th>
+                    <th>Fecha Inicio</th>
+                    <th>Fecha Fin</th>
+                    <th>Delete</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var period in Model.ReportPeriods)
+                {
+                    <tr>
+                        <td>@period.Id</td>
+                        <td>@period.StartDate.ToString("dd-MM-yyyy")</td>
+                        <td>@period.EndDate.ToString("dd-MM-yyyy")</td>
+                        <td><button class="btn btn-danger">Delete</button></td>
+                    </tr>
+                }
+                <tr>
+                    <td>Nuevo</td>
+                    <td><input type="date" name="newStartDate" /></td>
+                    <td><input type="date" name="newEndDate" /></td>
+                    <td><button class="btn btn-primary" onclick="addPeriodByDate()">Add</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="col-md-6">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Periodo (Meses)</th>
+                    <th>Mes Inicio</th>
+                    <th>Mes Fin</th>
+                    <th>Add</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Nuevo</td>
+                    <td><input type="number" name="startMonth" min="1" /></td>
+                    <td><input type="number" name="endMonth" min="1" /></td>
+                    <td><button class="btn btn-primary" onclick="addPeriodByMonth()">Add</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function addPeriodByDate() {
+        // Lógica para añadir periodo por fecha
+    }
+
+    function addPeriodByMonth() {
+        // Lógica para añadir periodo por mes
+    }
+</script>
+

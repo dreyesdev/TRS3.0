@@ -432,7 +432,7 @@ namespace TRS2._0.Controllers
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew(); // Inicia el cronómetro
 
-            ViewBag.projId = projId;
+            ViewBag.projId = projId;            
 
             // Obtener el proyecto
             var project = await _context.Projects.FindAsync(projId);
@@ -527,7 +527,47 @@ namespace TRS2._0.Controllers
                 wpxPersons = wpxPersons
                     .Where(wpx => wpx.Wp == wpId.Value)
                     .ToList();
+
+                // Obtiene los IDs de WpxPerson para el WP seleccionado
+                var wpxPersonIds = wpxPersons.Select(wpx => wpx.Id).ToList();
+
+                // Filtra Persefforts por los IDs de WpxPerson seleccionados
+                var filteredPersefforts = persefforts
+                    .Where(pe => wpxPersonIds.Contains(pe.WpxPerson))
+                    .ToList();
+
+                // Suma los esfuerzos por mes
+                var effortSumByMonth = filteredPersefforts
+                    .GroupBy(pe => new { Year = pe.Month.Year, Month = pe.Month.Month })
+                    .Select(group => new
+                    {
+                        Year = group.Key.Year,
+                        Month = group.Key.Month,
+                        TotalEffort = group.Sum(pe => pe.Value)
+                    })
+                    .OrderBy(x => x.Year).ThenBy(x => x.Month) // Asegura un orden cronológico
+                    .ToList();
+
+                // Opcional: Convertir a un diccionario o cualquier otra estructura que prefieras para la vista
+                var effortSumByMonthDict = effortSumByMonth.ToDictionary(
+                    k => new DateTime(k.Year, k.Month, 1), // Clave como fecha
+                    v => v.TotalEffort
+                );
+
+                var filteredProjectEfforts = await _context.Projefforts
+                    .Where(pe => pe.Wp == wpId.Value)
+                    .ToListAsync();
+
+                // Pasa los esfuerzos sumados a la vista
+
+                ViewBag.FilteredProjectEfforts = filteredProjectEfforts;
+                ViewBag.EffortSumByMonth = effortSumByMonthDict;
+
+                ViewBag.SelectedWpId = wpId.Value;
             }
+
+            
+
 
             // Construir ViewModel
             var viewModel = new PersonnelEffortPlanViewModel
@@ -854,6 +894,106 @@ namespace TRS2._0.Controllers
             ViewBag.ProjectMonths = projectMonths;
 
             return View(viewModel);
+        }
+
+        [HttpGet]
+        [Route("Projects/ProjectReport/{projId}")]
+
+        public async Task<IActionResult> ProjectReport(int projId)
+        {
+
+            ViewBag.projId = projId;
+
+            // Obtener las fechas de inicio y fin del proyecto especificado
+            var project = await _context.Projects
+                                        .FirstOrDefaultAsync(p => p.ProjId == projId);
+            if (project == null)
+            {
+                return NotFound("Proyecto no encontrado.");
+            }
+
+            DateTime projectStartDate = (DateTime)project.Start;
+            DateTime projectEndDate = (DateTime)project.End;
+
+            // Asegúrate de que projectStartDate y projectEndDate no sean null
+            DateTime adjustedProjectStartDate = project.Start.HasValue
+                ? new DateTime(project.Start.Value.Year, project.Start.Value.Month, 1)
+                : DateTime.MinValue;
+
+            // Ajustar projectEndDate para que sea el último día del mes de finalización
+            DateTime adjustedProjectEndDate = new DateTime(projectEndDate.Year, projectEndDate.Month, DateTime.DaysInMonth(projectEndDate.Year, projectEndDate.Month));
+
+            // Obtener WP del proyecto
+            var workPackages = await _context.Wps.Where(wp => wp.ProjId == projId).ToListAsync();
+
+            // Obtener relaciones entre personal y proyecto
+            var projectPersonnel = await _context.Projectxpeople.Where(px => px.ProjId == projId).ToListAsync();
+
+            // Obtener IDs de las personas involucradas en el proyecto
+            var personIds = projectPersonnel.Select(p => p.Person).Distinct().ToList();
+
+            // Recuperar los nombres completos del PM y PI
+            var pm = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == project.Pm);
+            var pi = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == project.Pi);
+
+            // Preparar los datos para la vista
+            ViewBag.PmFullName = pm != null ? $"{pm.Name} {pm.Surname}" : "No asignado";
+            ViewBag.PiFullName = pi != null ? $"{pi.Name} {pi.Surname}" : "No asignado";
+            
+
+            // Calcular los valores distribuidos y los esfuerzos cubiertos para cada WP
+            var wpDetails = project.Wps.Select(wp => new
+            {
+                wp.Id,
+                wp.Name,
+                wp.Pms,
+                Distributed = _context.Projefforts.Where(pe => pe.Wp == wp.Id).Sum(pe => pe.Value),
+                Covered = _context.Wpxpeople
+                            .Where(wxp => wxp.Wp == wp.Id)
+                            .SelectMany(wxp => wxp.Persefforts)
+                            .Sum(pe => pe.Value)
+            }).ToList();
+
+            // Añadir wpDetails al ViewBag para acceder desde la vista
+            ViewBag.WpDetails = wpDetails;
+
+            var reportPeriods = _context.ReportPeriods
+                .Where(rp => rp.ProjId == projId && rp.StartDate >= adjustedProjectStartDate && rp.EndDate <= adjustedProjectEndDate )
+                .ToList();
+
+            var viewmodel = new ReportPeriodViewModel
+            {
+                Project = project,
+                WorkPackages = workPackages,
+                ProjectPersonnel = projectPersonnel,
+                ReportPeriods = reportPeriods
+            };
+
+
+            return View(viewmodel);
+        }
+
+        [HttpGet]
+        public IActionResult ReportPeriodForm(int projId)
+        {
+            // Asumiendo que tienes un modelo de vista que espera una lista de ReportPeriods y quizás otros datos relacionados
+            var viewModel = new ReportPeriodViewModel();
+
+            // Suponiendo que tienes un DbSet<ReportPeriod> en tu contexto llamado ReportPeriods
+            viewModel.ReportPeriods = _context.ReportPeriods
+                                              .Where(rp => rp.ProjId == projId)
+                                              .ToList();
+
+            // Aquí puedes agregar cualquier otra lógica necesaria para preparar tu modelo de vista,
+            // por ejemplo, cargar información del proyecto si es necesario
+            viewModel.Project = _context.Projects.FirstOrDefault(p => p.ProjId == projId);
+
+            // Si necesitas pasar el ID del proyecto a tu vista parcial para usarlo en tus formularios AJAX, puedes hacerlo de varias maneras,
+            // una opción es usando ViewBag o ViewData
+            ViewBag.ProjId = projId;
+
+            // Retorna la vista parcial junto con el modelo de vista preparado
+            return PartialView("_ReportPeriodForm", viewModel);
         }
 
         [HttpPost]

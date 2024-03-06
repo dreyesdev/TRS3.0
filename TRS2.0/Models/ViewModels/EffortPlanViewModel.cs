@@ -8,7 +8,7 @@ namespace TRS2._0.Models.ViewModels
         public int ProjId { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
-        public List<WorkPackageEffort> WorkPackages { get; set; } // Una nueva clase para representar los WPs        
+        public List<WorkPackageEffort> WorkPackages { get; set; }   
         public EffortPlanViewModel()
         {
             WorkPackages = new List<WorkPackageEffort>();

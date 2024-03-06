@@ -343,29 +343,20 @@ else
                 if (activeInputsCount === 0) return; // Prevenir división por cero.
 
                 var effortPerMonth = effortTarget / activeInputsCount;
+                // La suma inicial de esfuerzos distribuidos se establece en 0.
                 var sumDistributedEffort = 0;
 
-                // Distribuir el esfuerzo inicialmente a todos los inputs
                 activeInputs.forEach((input, index) => {
-                    input.value = effortPerMonth.toFixed(2);
-                    sumDistributedEffort += parseFloat(input.value);
+                    if (index < activeInputsCount - 1) {
+                        input.value = effortPerMonth.toFixed(2);
+                        // Acumula el esfuerzo distribuido para los primeros N-1 inputs.
+                        sumDistributedEffort += parseFloat(input.value);
+                    }
                 });
 
-                // Calcular el exceso después del redondeo
-                var excessEffort = effortTarget - sumDistributedEffort;
-
-                // Repartir el exceso entre las últimas 5 casillas o las disponibles si son menos de 5
-                var excessDistributionCount = Math.min(5, activeInputsCount);
-                for (let i = 0; i < excessDistributionCount; i++) {
-                    let index = activeInputsCount - 1 - i; // Empezar desde el último input hacia atrás
-                    let currentInputEffort = parseFloat(activeInputs[index].value);
-                    let adjustedEffort = currentInputEffort + (excessEffort / excessDistributionCount);
-
-                    // Asegurarse de que el esfuerzo ajustado no supere 1
-                    adjustedEffort = Math.min(adjustedEffort, 1).toFixed(2);
-
-                    activeInputs[index].value = adjustedEffort;
-                }
+                // El último input ajusta la diferencia para que el total sea exactamente igual al Effort Target.
+                var lastInputEffort = effortTarget - sumDistributedEffort;
+                activeInputs[activeInputsCount - 1].value = lastInputEffort.toFixed(2);
             });
         });
 
@@ -385,7 +376,7 @@ else
             // Luego, iterar sobre cada wpid único para aplicar la distribución lineal
             uniqueWpIds.forEach(wpid => {
                 let inputs = document.querySelectorAll(`.input-effort[data-wpid="${wpid}"]`);
-                let effortTarget = parseFloat(inputs[0].getAttribute('data-wptarget'));
+                let effortTarget = parseFloat(inputs[0].getAttribute('data-wptarget')); // Asegúrate de convertir a número
                 let activeInputs = Array.from(inputs).filter(input => input.parentElement.classList.contains('effort-cell'));
                 let activeInputsCount = activeInputs.length;
 
@@ -394,27 +385,17 @@ else
                 let effortPerMonth = effortTarget / activeInputsCount;
                 let sumDistributedEffort = 0;
 
-                // Distribuye el esfuerzo inicialmente a todos los inputs
+                // Distribuye el esfuerzo a todos menos el último input, acumulando el total distribuido
                 activeInputs.forEach((input, index) => {
-                    input.value = effortPerMonth.toFixed(2);
-                    sumDistributedEffort += parseFloat(input.value);
+                    if (index < activeInputsCount - 1) {
+                        input.value = effortPerMonth.toFixed(2);
+                        sumDistributedEffort += parseFloat(input.value);
+                    }
                 });
 
-                // Calcular el exceso después del redondeo
-                var excessEffort = effortTarget - sumDistributedEffort;
-
-                // Repartir el exceso entre las últimas 5 casillas o las disponibles si son menos de 5
-                var excessDistributionCount = Math.min(5, activeInputsCount);
-                for (let i = 0; i < excessDistributionCount; i++) {
-                    let index = activeInputsCount - 1 - i; // Empezar desde el último input hacia atrás
-                    let currentInputEffort = parseFloat(activeInputs[index].value);
-                    let adjustedEffort = currentInputEffort + (excessEffort / excessDistributionCount);
-
-                    // Asegurarse de que el esfuerzo ajustado no supere 1
-                    adjustedEffort = Math.min(adjustedEffort, 1);
-
-                    activeInputs[index].value = adjustedEffort.toFixed(2);
-                }
+                // Ajusta el último input para compensar cualquier diferencia
+                let lastInputEffort = effortTarget - sumDistributedEffort;
+                activeInputs[activeInputsCount - 1].value = lastInputEffort.toFixed(2);
             });
         });
 

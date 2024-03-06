@@ -1,0 +1,75 @@
+﻿@model TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel
+@using TRS2._0.Models.DataModels
+
+@if (ViewBag.SelectedWpId != null && ViewBag.EffortSumByMonth != null && ViewBag.FilteredProjectEfforts != null)
+{
+    var selectedWpId = ViewBag.SelectedWpId;
+    var effortSumByMonth = ViewBag.EffortSumByMonth as Dictionary<DateTime, decimal>;
+    var filteredProjectEfforts = ViewBag.FilteredProjectEfforts as List<Projeffort>;
+    var months = effortSumByMonth.Keys.OrderBy(d => d).ToList();
+    var wpName = Model.WorkPackages.FirstOrDefault(wp => wp.WpId == selectedWpId)?.WpName;
+    <div class="unique-effort-balance-table">
+        <table class="table table-striped table-dark effort-balance-table">
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    @foreach (var month in months)
+                    {
+                        <th>@month.ToString("MMM yyyy")</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+
+                <tr>
+                    <td>@wpName - Total</td>
+                    @foreach (var month in months)
+                    {
+                        <td>@(effortSumByMonth.ContainsKey(month) ? effortSumByMonth[month].ToString("0.00") : "0.00")</td>
+                    }
+                </tr>
+
+
+                <tr>
+                    <td>@wpName - Cumulative</td>
+                    @{
+                        decimal cumulativeTotal = 0;
+                    }
+                    @foreach (var month in months)
+                    {
+                        cumulativeTotal += effortSumByMonth.ContainsKey(month) ? effortSumByMonth[month] : 0;
+                        <td>@cumulativeTotal.ToString("0.00")</td>
+                    }
+                </tr>
+
+
+                <tr>
+                    <td>@wpName - Balance</td>
+                    @foreach (var month in months)
+                    {
+                        var planEffort = filteredProjectEfforts.FirstOrDefault(pe => pe.Month == month)?.Value ?? 0;
+                        var realEffort = effortSumByMonth.ContainsKey(month) ? effortSumByMonth[month] : 0;
+                        var balance = realEffort - planEffort ;
+                        <td>@balance.ToString("0.00")</td>
+                    }
+                </tr>
+
+
+                <tr>
+                    <td>@wpName - Cumulative Balance</td>
+                    @{
+                        decimal cumulativeBalance = 0;
+                    }
+                    @foreach (var month in months)
+                    {
+                        var planEffort = filteredProjectEfforts.FirstOrDefault(pe => pe.Month == month)?.Value ?? 0;
+                        var realEffort = effortSumByMonth.ContainsKey(month) ? effortSumByMonth[month] : 0;
+                        var balance = realEffort - planEffort;
+                        cumulativeBalance += balance;
+                        <td>@cumulativeBalance.ToString("0.00")</td>
+                    }
+                </tr>
+            </tbody>
+        </table>
+    </div>
+}

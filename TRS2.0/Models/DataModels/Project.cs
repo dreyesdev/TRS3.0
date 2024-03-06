@@ -73,4 +73,7 @@ public partial class Project
 
     [InverseProperty("Project")]
     public virtual ICollection<Liqdayxproject> Liqdayxprojects { get; set; } = new List<Liqdayxproject>();
+
+    [InverseProperty("Project")]
+    public virtual ICollection<ReportPeriod> ReportPeriods { get; set; } = new List<ReportPeriod>();
 }

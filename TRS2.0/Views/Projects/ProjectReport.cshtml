@@ -1,0 +1,282 @@
+﻿@model TRS2._0.Models.ViewModels.ReportPeriodViewModel
+
+@{
+    ViewData["Title"] = "ProjectReport";
+    // Inicializa las sumas de las columnas
+    decimal totalEstimated = 0;
+    decimal totalDistributed = 0;
+    decimal totalCovered = 0;
+    // Asume valores predeterminados o maneja el caso de null según sea necesario
+    var startProject = Model.Project.Start ?? DateTime.Today; // Usar la fecha actual como valor por defecto
+    var endProject = Model.Project.EndReportDate; // Usar la fecha actual como valor por defecto
+    var monthsList = new List<string>();
+    if (Model.Project.Start.HasValue)
+    {
+        // Ahora que sabemos que startProject y endProject tienen valores, procedemos con el cálculo
+        startProject = Model.Project.Start.Value;
+        endProject = Model.Project.EndReportDate;
+
+
+
+        int monthsCount = ((endProject.Year - startProject.Year) * 12) + endProject.Month - startProject.Month + 1;
+
+        for (int i = 0; i < monthsCount; i++)
+        {
+            string monthName = startProject.AddMonths(i).ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+            monthsList.Add($"M{i + 1} ({monthName})");
+        }
+
+        // Asegúrate de usar monthsList para llenar los selectores como se mostró anteriormente
+    }
+    int index = 1; // Inicializa el contador
+}
+
+
+
+
+
+<div class="container mt-3">
+    <div class="row">
+        <!-- Encapsula los detalles del proyecto en una tarjeta -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header text-center">
+                    Proyect Details
+                </div>
+                <div class="card-body">
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Acronym</dt>
+                            <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.Project.Acronim)</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Title</dt>
+                            <dd class="col-sm-8">@Html.DisplayFor(model => model.Project.Title)</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Contract</dt>
+                            <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.Project.Contract)</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Start Date</dt>
+                            <dd class="col-sm-8 d-inline-block">@(Model.Project.Start.HasValue ? Model.Project.Start.Value.ToString("dd-MM-yyyy") : string.Empty)</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">End Date</dt>
+                            <dd class="col-sm-8 d-inline-block">@(Model.Project.EndReportDate.ToString("dd-MM-yyyy"))</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Project Investigator</dt>
+                            <dd class="col-sm-8 d-inline-block">@ViewBag.PiFullName</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Project Manager</dt>
+                            <dd class="col-sm-8 d-inline-block">@ViewBag.PmFullName</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Type</dt>
+                            <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.Project.Type)</dd>
+                        </div>
+                    </dl>
+
+                    <!-- Tarjeta para Third Parties -->
+                    <div class="card mt-4">
+                        <div style="text-align: center; background-color: black; color: white; font-size: 24px; font-weight: bold;">
+                            Third Parties
+                        </div>
+
+                        <div class="card-body">
+                            <div class="row">
+                                <!-- Cada tick en su propia columna dentro de esta fila -->
+                                <div class="col">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="upcCheck" disabled @((Model.Project.TpsUpc == 1) ? "checked" : "")>
+                                        <label class="form-check-label" for="upcCheck">UPC</label>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="icreaCheck" disabled @((Model.Project.TpsIcrea == 1) ? "checked" : "")>
+                                        <label class="form-check-label" for="icreaCheck">ICREA</label>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="csicCheck" disabled @((Model.Project.TpsCsic == 1) ? "checked" : "")>
+                                        <label class="form-check-label" for="csicCheck">CSIC</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    Work Packages Details
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: center; background-color: black; color: white;">Name</th>
+                                <th style="text-align: center; background-color: black; color: white;">Estimated</th>
+                                <th style="text-align: center; background-color: black; color: white;">Distributed</th>
+                                <th style="text-align: center; background-color: black; color: white;">Covered with Personnel</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var wp in ViewBag.WpDetails)
+                            {
+                                // Calcula las sumas de las columnas
+                                totalEstimated += Convert.ToDecimal(wp.Pms);
+                                totalDistributed += Convert.ToDecimal(wp.Distributed);
+                                totalCovered += Convert.ToDecimal(wp.Covered);
+
+                                // Determina la clase para la fila según las condiciones
+                                string rowClass = "";
+                                string textStyle = "";
+                                if (Convert.ToDecimal(wp.Pms) == wp.Distributed && wp.Distributed == wp.Covered)
+                                {
+                                    rowClass = "table-success"; // Fondo verde claro
+                                    textStyle = "text-success font-weight-bold"; // Texto verde oscuro y en negrita
+                                }
+                                else if (Convert.ToDecimal(wp.Pms) == wp.Distributed && wp.Distributed != wp.Covered && Convert.ToDecimal(wp.Pms) != wp.Covered)
+                                {
+                                    rowClass = "table-warning"; // Fondo naranja claro
+                                    textStyle = "font-weight-bold"; // Todo en negrita
+                                }
+                                else if (Convert.ToDecimal(wp.Pms) != wp.Distributed && wp.Distributed != wp.Covered && Convert.ToDecimal(wp.Pms) != wp.Covered)
+                                {
+                                    rowClass = "table-warning"; // Fondo naranja claro
+                                    textStyle = "font-weight-bold"; // Todo en negrita
+                                }
+                                else
+                                {
+                                    rowClass = "table-light"; // Fondo amarillo claro
+                                                              // No se aplica una clase de texto específica aquí; se manejará individualmente
+                                }
+
+                                <tr class="@rowClass">
+                                    <td class="centered">@wp.Name</td>
+                                    <td class="centered">@wp.Pms</td>
+                                    <td class="centered">@wp.Distributed</td>
+                                    <td class="centered">@wp.Covered</td>
+                                </tr>
+                            }
+                            <!-- Fila de Total -->
+                            <tr class="table-primary">
+                                <th style="text-align: center; background-color: black; color: white;">Total</th>
+                                <td class="centered bold">@totalEstimated</td>
+                                <td class="centered bold">@totalDistributed</td>
+                                <td class="centered bold">@totalCovered</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+    <hr />
+<div class="container mt-3">
+    @if (Model.ReportPeriods.Any())
+    {
+        <div class="card mt-4">
+            <div class="card-header" style="text-align: center; background-color: black; color: white;">
+                Report Periods Details
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th style="text-align: center; background-color: black; color: white;">Reporting Period</th>
+                            <th style="text-align: center; background-color: black; color: white;">Period Date</th>
+                            <th style="text-align: center; background-color: black; color: white;">Period in Months</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var reportPeriod in Model.ReportPeriods)
+                        {
+                            int startMonth = ((reportPeriod.StartDate.Year - Model.Project.Start.Value.Year) * 12) + reportPeriod.StartDate.Month - Model.Project.Start.Value.Month + 1;
+                            int endMonth = ((reportPeriod.EndDate.Year - Model.Project.Start.Value.Year) * 12) + reportPeriod.EndDate.Month - Model.Project.Start.Value.Month + 1;
+                            <tr>
+                                <td style="text-align: center;">P @index</td>
+                                <td style="text-align: center;">@reportPeriod.StartDate.ToString("dd-MM-yyyy") / @reportPeriod.EndDate.ToString("dd-MM-yyyy")</td>
+                                <td style="text-align: center;">M @startMonth / M @endMonth</td>
+                                    <td style="text-align: center;">
+                                        <button type="button" class="btn btn-danger" onclick="deleteReportPeriod(@reportPeriod.Id)">Delete</button>
+                                    </td>
+                            </tr>
+                                index++;
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }else{
+        <div class="alert alert-warning" role="alert">
+            No report periods have been added yet.
+        </div>
+    }
+        <div id="reportPeriodsSection"></div>
+        <button type="button" class="btn btn-primary" onclick="loadReportPeriodForm()">Add Reporting Periods</button>
+        <button type="button" class="btn btn-secondary" id="cancelReportPeriodBtn" onclick="cancelReportPeriodForm()" style="display:none;">Cancel</button>
+</div>
+
+
+   
+        <script>
+        function loadReportPeriodForm() {
+            $.ajax({
+                url: '@Url.Action("ReportPeriodForm", "Projects")',
+                type: 'GET',
+                success: function (result) {
+                    $('#reportPeriodsSection').html(result);
+                    $('#addReportPeriodBtn').hide(); // Oculta el botón de añadir
+                    $('#cancelReportPeriodBtn').show(); // Muestra el botón de cancelar
+                }
+            });
+        }
+
+        function cancelReportPeriodForm() {
+            $('#reportPeriodsSection').html(''); // Limpia la sección de la vista parcial
+            $('#cancelReportPeriodBtn').hide(); // Oculta el botón de cancelar
+            $('#addReportPeriodBtn').show(); // Muestra el botón de añadir
+        }
+
+        function deleteReportPeriod(periodId) {
+            if (confirm("Are you sure you want to delete this report period?")) {
+                $.ajax({
+                    url: '@Url.Action("DeleteReportPeriod", "Projects")', // Asegúrate de crear este método en tu controlador
+                    type: 'POST',
+                    data: { id: periodId },
+                    success: function (result) {
+                        // Recarga la sección de la vista parcial o elimina la fila de la tabla directamente
+                        loadReportPeriodForm(); // Esto es solo un ejemplo, ajusta según tus necesidades
+                    }
+                });
+            }
+        }
+
+
+        </script>
+    
