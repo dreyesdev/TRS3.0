@@ -252,18 +252,19 @@
             $('#addReportPeriodBtn').show(); // Muestra nuevamente el botón de "Add Reporting Periods"
         }
 
-        function deleteReportPeriod(periodId) {
-            if (confirm("Are you sure you want to delete this report period?")) {
-                $.ajax({
-                    url: '@Url.Action("DeleteReportPeriod", "Projects")', // Asegúrate de crear este método en tu controlador
-                    type: 'POST',
-                    data: { id: periodId },
-                    success: function (result) {
-                        location.reload(); // Recarga la página para actualizar la tabla
+        function deleteReportPeriod(id) {
+            if (confirm('Are you sure you want to delete this period?')) {
+                $.post('/Projects/DeleteReportPeriod', { id: id }, function (data) {
+                    if (data.success) {
+                        alert('Report period deleted successfully.');
+                        // Actualizar la vista o recargar la página aquí si es necesario
+                    } else {
+                        alert(data.message || 'An error occurred.');
                     }
                 });
             }
         }
+
 
 
         </script>

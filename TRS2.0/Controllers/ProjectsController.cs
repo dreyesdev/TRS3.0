@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -10,6 +11,7 @@ using TRS2._0.Models;
 using TRS2._0.Models.DataModels;
 using TRS2._0.Models.ViewModels;
 using TRS2._0.Services;
+using System.Text.RegularExpressions;
 using static TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel;
 
 namespace TRS2._0.Controllers
@@ -1007,8 +1009,114 @@ namespace TRS2._0.Controllers
             return Json(new { success = true, pm = dailyPM });
         }
 
-        
 
+        [HttpPost]
+        public async Task<IActionResult> AddReportPeriodByDate(int projId, DateTime startDate, DateTime endDate)
+        {
+            // Validación: Asegurarse de que startDate y endDate están dentro del rango del proyecto
+            var project = await _context.Projects.FindAsync(projId);
+            if (project == null)
+            {
+                return Json(new { success = false, message = "Project not found." });
+            }
+            if (startDate < project.Start || endDate > project.End)
+            {
+                return Json(new { success = false, message = "Start or end date is out of the project date range." });
+            }
+            
+            if (startDate > endDate)
+            {
+                return Json(new { success = false, message = "Start date must be before end date." });
+            }
+
+            var reportPeriod = new ReportPeriod
+            {
+                ProjId = projId,
+                StartDate = startDate,
+                EndDate = endDate
+            };
+
+            _context.ReportPeriods.Add(reportPeriod);
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> AddReportPeriodByMonth(int projId, string startMonth, string endMonth)
+        {
+            try
+            {
+                // Asumiendo que startMonth y endMonth siguen el patrón "Mx (MonthName Year)"
+                var monthYearPattern = new Regex(@"M\d+ \((\w+) (\d{4})\)"); // Ajusta el patrón de ser necesario
+
+                var startMatch = monthYearPattern.Match(startMonth);
+                var endMatch = monthYearPattern.Match(endMonth);
+
+                if (!startMatch.Success || !endMatch.Success)
+                {
+                    return Json(new { success = false, message = "Invalid month format." });
+                }
+
+                var cultureInfo = new CultureInfo("es-ES"); // Ajusta según sea necesario
+                var startMonthName = startMatch.Groups[1].Value;
+                var startYear = int.Parse(startMatch.Groups[2].Value);
+                var endMonthName = endMatch.Groups[1].Value;
+                var endYear = int.Parse(endMatch.Groups[2].Value);
+
+                var startDate = DateTime.ParseExact($"01 {startMonthName} {startYear}", "dd MMMM yyyy", cultureInfo);
+                var endDate = DateTime.ParseExact($"01 {endMonthName} {endYear}", "dd MMMM yyyy", cultureInfo);
+
+                // Ajustar endDate para que sea el último día del mes seleccionado
+                endDate = new DateTime(endDate.Year, endDate.Month, DateTime.DaysInMonth(endDate.Year, endDate.Month));
+
+                // Validación: Asegurarse de que startDate y endDate están dentro del rango del proyecto
+                var project = await _context.Projects.FindAsync(projId);
+                if (project == null)
+                {
+                    return Json(new { success = false, message = "Project not found." });
+                }
+                if (startDate < project.Start || endDate > project.End)
+                {
+                    return Json(new { success = false, message = "Start or end date is out of the project date range." });
+                }
+                if (startDate > endDate)
+                {
+                    return Json(new { success = false, message = "Start date must be before end date." });
+                }
+                // Crear y añadir el nuevo ReportPeriod
+                var reportPeriod = new ReportPeriod
+                {
+                    ProjId = projId,
+                    StartDate = startDate,
+                    EndDate = endDate
+                };
+
+                _context.ReportPeriods.Add(reportPeriod);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Report period added successfully." });
+            }
+            catch (Exception ex)
+            {
+                // Manejo de errores (p.ej., formato de fecha incorrecto)
+                return Json(new { success = false, message = $"An error occurred: {ex.Message}" });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteReportPeriod(int id)
+        {
+            var reportPeriod = await _context.ReportPeriods.FindAsync(id);
+            if (reportPeriod != null)
+            {
+                _context.ReportPeriods.Remove(reportPeriod);
+                await _context.SaveChangesAsync();
+                return Json(new { success = true });
+            }
+
+            return Json(new { success = false, message = "Period not found." });
+        }
 
     }
 
