@@ -187,7 +187,7 @@
                 Report Periods Details
             </div>
             <div class="card-body">
-                <table class="table">
+                    <table class="table table-hover">
                     <thead>
                         <tr>
                             <th style="text-align: center; background-color: black; color: white;">Reporting Period</th>
@@ -202,12 +202,12 @@
                             int startMonth = ((reportPeriod.StartDate.Year - Model.Project.Start.Value.Year) * 12) + reportPeriod.StartDate.Month - Model.Project.Start.Value.Month + 1;
                             int endMonth = ((reportPeriod.EndDate.Year - Model.Project.Start.Value.Year) * 12) + reportPeriod.EndDate.Month - Model.Project.Start.Value.Month + 1;
                             <tr>
-                                <td style="text-align: center;">P @index</td>
+                                <td class="periodo" data-periodo-id="@reportPeriod.Id" style="text-align: center;" data-index="@index">P @index</td>
                                 <td style="text-align: center;">@reportPeriod.StartDate.ToString("dd-MM-yyyy") / @reportPeriod.EndDate.ToString("dd-MM-yyyy")</td>
                                 <td style="text-align: center;">M @startMonth / M @endMonth</td>
-                                    <td style="text-align: center;">
-                                        <button type="button" class="btn btn-danger" onclick="deleteReportPeriod(@reportPeriod.Id)">Delete</button>
-                                    </td>
+                                <td style="text-align: center;">
+                                    <button type="button" class="btn btn-danger" onclick="deleteReportPeriod(@reportPeriod.Id)">Delete</button>
+                                </td>
                             </tr>
                                 index++;
                         }
@@ -230,6 +230,7 @@
             <button type="button" class="btn btn-secondary" id="cancelReportPeriodBtn" onclick="cancelReportPeriodForm()" style="display:none;">Cancel</button>
         </div>
 </div>
+<div id="detallesPeriodoContainer" style="display:none;"></div>
 
 
    
@@ -258,6 +259,7 @@
                     if (data.success) {
                         alert('Report period deleted successfully.');
                         // Actualizar la vista o recargar la página aquí si es necesario
+                        location.reload();
                     } else {
                         alert(data.message || 'An error occurred.');
                     }
@@ -265,7 +267,35 @@
             }
         }
 
-
+        $(document).on('click', '.periodo', function () {
+            var periodoId = $(this).data('periodo-id');
+            var projectId = @ViewBag.projId; // Asume que el ID del proyecto está disponible en la vista
+            $.ajax({
+                url: '/Projects/PeriodDetails', // URL a tu acción del controlador que devuelve la vista parcial
+                data: { id: periodoId, projectId: projectId },
+                success: function (data) {
+                    $('#detallesPeriodoContainer').html(data); // Asegúrate de tener un contenedor para los detalles
+                    $('#detallesPeriodoContainer').show();
+                }
+            });
+        });
 
         </script>
-    
+
+
+    <style>
+        .periodo {
+            cursor: pointer; /* Cambia el cursor a una mano para indicar que es clicable */
+            color: blue; /* Cambia el color del texto a azul */
+            text-decoration: none; /* Asegura que inicialmente no esté subrayado */
+        }
+
+            .periodo:hover {
+                text-decoration: underline; /* Subraya el texto al pasar el ratón por encima */
+            }
+
+        .table-hover tbody tr:hover {
+            background-color: #f5f5f5; /* Cambia este color según tus preferencias */
+        }
+    </style>
+

@@ -1,0 +1,21 @@
+﻿@model TRS2._0.Models.ViewModels.PeriodDetailsViewModel
+
+<table>
+    <thead>
+        <tr>
+            @foreach (var month in Model.Months)
+            {
+                <th>@month</th>
+            }
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var person in Model.Persons)
+        {
+            <tr>
+                <td>@(person.Name + " " + person.Surname)</td>
+                <!-- Rellenar las celdas correspondientes a la participación de la persona en los WP -->
+            </tr>
+        }
+    </tbody>
+</table>

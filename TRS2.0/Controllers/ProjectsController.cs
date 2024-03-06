@@ -1058,7 +1058,7 @@ namespace TRS2._0.Controllers
                     return Json(new { success = false, message = "Invalid month format." });
                 }
 
-                var cultureInfo = new CultureInfo("es-ES"); // Ajusta según sea necesario
+                var cultureInfo = CultureInfo.InvariantCulture;
                 var startMonthName = startMatch.Groups[1].Value;
                 var startYear = int.Parse(startMatch.Groups[2].Value);
                 var endMonthName = endMatch.Groups[1].Value;
@@ -1117,6 +1117,47 @@ namespace TRS2._0.Controllers
 
             return Json(new { success = false, message = "Period not found." });
         }
+
+
+        public async Task<IActionResult> PeriodDetails(int id, int projectId)
+        {
+            var reportPeriod = await _context.ReportPeriods.FindAsync(id);
+            if (reportPeriod == null)
+            {
+                return NotFound();
+            }
+
+            // Obtener los WP que caen dentro del rango del periodo seleccionado y que pertenecen al proyecto
+            var workPackages = _context.Wps
+                                        .Where(wp => wp.ProjId == projectId &&
+                                                     wp.StartDate <= reportPeriod.EndDate &&
+                                                     wp.EndDate >= reportPeriod.StartDate)
+                                        .ToList();
+
+            // Obtener las personas asociadas a esos WP
+            var personIds = workPackages.SelectMany(wp => wp.Wpxpeople)
+                                        .Select(wpxp => wpxp.Person)
+                                        .Distinct();
+
+            var persons = _context.Personnel
+                                  .Where(p => personIds.Contains(p.Id))
+                                  .ToList();
+
+            // Crear un modelo para la vista que incluya todos los datos necesarios
+            var model = new PeriodDetailsViewModel
+            {
+                ReportPeriod = reportPeriod,
+                WorkPackages = workPackages,
+                Persons = persons,
+                // Calcula y añade los meses del periodo aquí
+            };
+
+            // Calcular los meses dentro del periodo seleccionado
+            model.CalculateMonths(reportPeriod.StartDate, reportPeriod.EndDate);
+
+            return PartialView("_DetallesPeriodo", model);
+        }
+
 
     }
 
