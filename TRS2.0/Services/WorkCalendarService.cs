@@ -486,7 +486,7 @@ public class WorkCalendarService
         var dailyWorkHours = new Dictionary<DateTime, decimal>();
         DateTime startDate = new DateTime(year, month, 1);
         int daysInMonth = DateTime.DaysInMonth(year, month);
-        decimal monthlyDedication = await CalculateMonthlyPM(personId, year, month); // Asume que esta función ya existe
+        decimal monthlyDedication = await CalculateMonthlyPM(personId, year, month); 
 
         // Obtener todas las afiliaciones para la persona en el mes dado
         var affiliations = await _context.AffxPersons
