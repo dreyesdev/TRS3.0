@@ -1129,10 +1129,14 @@ namespace TRS2._0.Controllers
 
             // Obtener los WP que caen dentro del rango del periodo seleccionado y que pertenecen al proyecto
             var workPackages = _context.Wps
-                                        .Where(wp => wp.ProjId == projectId &&
-                                                     wp.StartDate <= reportPeriod.EndDate &&
-                                                     wp.EndDate >= reportPeriod.StartDate)
-                                        .ToList();
+                            .Include(wp => wp.Wpxpeople)
+                                .ThenInclude(wpxp => wpxp.PersonNavigation)
+                            .Where(wp => wp.ProjId == projectId &&
+                                         wp.StartDate <= reportPeriod.EndDate &&
+                                         wp.EndDate >= reportPeriod.StartDate)
+                            .ToList();
+
+
 
             // Obtener las personas asociadas a esos WP
             var personIds = workPackages.SelectMany(wp => wp.Wpxpeople)
