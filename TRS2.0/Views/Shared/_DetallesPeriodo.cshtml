@@ -1,16 +1,15 @@
 ﻿@model TRS2._0.Models.ViewModels.PeriodDetailsViewModel
 
-<div class="table-responsive">
+<div class="table-responsive mx-3 mb-4">
     <table class="table table-bordered table-striped table-hover">
         <thead class="thead-dark">
             <tr>
-                <th></th>
+                <th class="nombre-columna"></th>
                 @foreach (var monthDetail in Model.MonthDetails)
                 {
-                    <th>
-                        @monthDetail.Key <!-- Muestra el índice del mes -->
-                        <br>
-                        @monthDetail.Value <!-- Muestra el nombre del mes y el año -->
+                    <th> 
+                        <div style="border-bottom: 1px solid white; margin-bottom: 2px; margin-top: 8px; text-align: center">@monthDetail.Key</div>
+                        <div style="text-align: center">@monthDetail.Value</div>
                     </th>
                 }
             </tr>
@@ -28,3 +27,11 @@
 
 </div>
 
+<style>
+
+    .nombre-columna {
+        min-width: 200px; /* Ajusta según necesites */
+    }
+
+
+</style>
