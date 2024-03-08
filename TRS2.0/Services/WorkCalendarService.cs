@@ -149,6 +149,48 @@ public class WorkCalendarService
         return Math.Round(totalEffort, 2);
     }
 
+    public async Task<decimal> CalculateMonthlyEffortForPersonInProyect(int personId, int year, int month, int projectId)
+    {
+        // Obtener todos los esfuerzos asociados a la persona que están dentro del rango de fechas especificado
+        var efforts = await _context.Persefforts
+            .Include(pe => pe.WpxPersonNavigation)
+            .Where(pe => pe.WpxPersonNavigation.Person == personId &&
+                                    pe.Month.Year == year &&
+                                                            pe.Month.Month == month &&
+                                                                                    pe.WpxPersonNavigation.WpNavigation.ProjId == projectId)
+            .ToListAsync();
+
+        // Sumar los valores de esfuerzo para el mes dado
+        decimal totalEffort = efforts.Sum(e => e.Value);
+
+        return Math.Round(totalEffort, 2);
+    }
+
+    public async Task<Dictionary<DateTime, decimal>> GetDeclaredHoursPerMonthForPerson(int personId, DateTime specificMonth)
+    {
+        // Obtener el primer y último día del mes específico
+        var firstDayOfMonth = new DateTime(specificMonth.Year, specificMonth.Month, 1);
+        var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
+
+        // Filtrar Timesheets por ID de persona y rango de fechas
+        var hoursPerMonth = await _context.Timesheets
+            .Where(ts => ts.WpxPersonNavigation.Person == personId &&
+                         ts.Day >= firstDayOfMonth &&
+                         ts.Day <= lastDayOfMonth)
+            .GroupBy(ts => new
+            {
+                Year = ts.Day.Year,
+                Month = ts.Day.Month
+            })
+            .Select(g => new
+            {
+                Month = new DateTime(g.Key.Year, g.Key.Month, 1),
+                TotalHours = g.Sum(ts => ts.Hours)
+            })
+            .ToDictionaryAsync(g => g.Month, g => g.TotalHours);
+
+        return hoursPerMonth;
+    }
     public async Task<bool> IsOutOfContract(int personId, int year, int month)
     {
         var startDate = new DateTime(year, month, 1);

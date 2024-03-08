@@ -7,7 +7,7 @@ namespace TRS2._0.Models.ViewModels
     {
         public ReportPeriod ReportPeriod { get; set; }
         public List<Wp> WorkPackages { get; set; }
-        public List<Personnel> Persons { get; set; }
+        public List<PersonnelDetails> Persons { get; set; }
         public Dictionary<string, string> MonthDetails { get; set; } = new Dictionary<string, string>();
 
         public void CalculateMonths(DateTime startDate, DateTime endDate)
@@ -23,6 +23,15 @@ namespace TRS2._0.Models.ViewModels
             }
         }
 
+        public class PersonnelDetails
+        {
+            public Personnel Personnel { get; set; }
+            
+            public decimal TotalEffort { get; set; }
 
+            public Dictionary<DateTime, decimal> DeclaredHours { get; set; }
+
+
+        }
     }
 }
