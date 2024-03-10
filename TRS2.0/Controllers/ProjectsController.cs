@@ -1121,6 +1121,7 @@ namespace TRS2._0.Controllers
 
         public async Task<IActionResult> PeriodDetails(int id, int projectId)
         {
+            try { 
             var reportPeriod = await _context.ReportPeriods.FindAsync(id);
             if (reportPeriod == null)
             {
@@ -1129,38 +1130,71 @@ namespace TRS2._0.Controllers
 
             // Obtener los WP que caen dentro del rango del periodo seleccionado y que pertenecen al proyecto
             var workPackages = _context.Wps
-                            .Include(wp => wp.Wpxpeople)
-                                .ThenInclude(wpxp => wpxp.PersonNavigation)
-                            .Where(wp => wp.ProjId == projectId &&
-                                         wp.StartDate <= reportPeriod.EndDate &&
-                                         wp.EndDate >= reportPeriod.StartDate)
-                            .ToList();
+                                        .Include(wp => wp.Wpxpeople)
+                                            .ThenInclude(wpxp => wpxp.PersonNavigation)
+                                        .Where(wp => wp.ProjId == projectId &&
+                                                     wp.StartDate <= reportPeriod.EndDate &&
+                                                     wp.EndDate >= reportPeriod.StartDate)
+                                        .ToList();
 
+            // Obtener las personas asociadas a esos WP y crear PersonnelDetails para cada una
+            var personDetailsList = new List<PeriodDetailsViewModel.PersonnelDetails>();
 
+            foreach (var personId in workPackages.SelectMany(wp => wp.Wpxpeople).Select(wpxp => wpxp.Person).Distinct())
+            {
+                var person = _context.Personnel.Find(personId);
+                if (person != null)
+                {
+                    var personnelDetails = new PeriodDetailsViewModel.PersonnelDetails
+                    {
+                        Personnel = person,
+                        DeclaredHours = await _workCalendarService.GetDeclaredHoursPerMonthForPerson(personId, reportPeriod.StartDate),
+                        TotalHours = await _workCalendarService.CalculateTotalHoursForPerson(personId, reportPeriod.StartDate, reportPeriod.EndDate, projectId),
+                        HoursinProyect = new Dictionary<DateTime, decimal>(), // Este se llenará en el siguiente paso
+                    };
 
-            // Obtener las personas asociadas a esos WP
-            var personIds = workPackages.SelectMany(wp => wp.Wpxpeople)
-                                        .Select(wpxp => wpxp.Person)
-                                        .Distinct();
+                        // Calcular HoursInProject para cada mes en el periodo del reporte
+                     foreach (var monthKey in personnelDetails.TotalHours.Keys)
+                     {
+                            // Asegúrate de que esta llamada devuelva los esfuerzos correctamente por cada mes.
+                            var monthlyEffort = await _workCalendarService.CalculateMonthlyEffortForPersonInProject(personId, monthKey, monthKey.AddMonths(1).AddDays(-1), projectId);
 
-            var persons = _context.Personnel
-                                  .Where(p => personIds.Contains(p.Id))
-                                  .ToList();
+                            // Comprueba si monthlyEffort contiene la clave para el mes actual antes de acceder a ella
+                            if (monthlyEffort.ContainsKey(monthKey))
+                            {
+                                personnelDetails.HoursinProyect.Add(monthKey, (personnelDetails.TotalHours[monthKey] * monthlyEffort[monthKey]));
+                            }
+                            else
+                            {
+                                // Maneja el caso en el que no hay un esfuerzo registrado para el mes, por ejemplo, agregando 0 o alguna otra lógica predeterminada.
+                                personnelDetails.HoursinProyect.Add(monthKey, 0);
+                            }
+                     }
+
+                }
+            }
 
             // Crear un modelo para la vista que incluya todos los datos necesarios
             var model = new PeriodDetailsViewModel
             {
                 ReportPeriod = reportPeriod,
                 WorkPackages = workPackages,
-                Persons = persons,
-                // Calcula y añade los meses del periodo aquí
+                Persons = personDetailsList,
             };
 
             // Calcular los meses dentro del periodo seleccionado
             model.CalculateMonths(reportPeriod.StartDate, reportPeriod.EndDate);
 
             return PartialView("_DetallesPeriodo", model);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return StatusCode(500, "Internal Server Error. Please try again later.");
+            }
+
         }
+
 
 
     }

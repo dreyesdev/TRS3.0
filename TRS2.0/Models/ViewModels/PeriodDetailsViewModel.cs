@@ -31,7 +31,9 @@ namespace TRS2._0.Models.ViewModels
 
             public Dictionary<DateTime, decimal> DeclaredHours { get; set; }
 
+            public Dictionary<DateTime, decimal> HoursinProyect { get; set; }
 
+            public Dictionary<DateTime, decimal> TotalHours { get; set; }
         }
     }
 }

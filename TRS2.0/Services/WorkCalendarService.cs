@@ -149,22 +149,29 @@ public class WorkCalendarService
         return Math.Round(totalEffort, 2);
     }
 
-    public async Task<decimal> CalculateMonthlyEffortForPersonInProyect(int personId, int year, int month, int projectId)
+    public async Task<Dictionary<DateTime, decimal>> CalculateMonthlyEffortForPersonInProject(int personId, DateTime startDate, DateTime endDate, int projectId)
     {
-        // Obtener todos los esfuerzos asociados a la persona que están dentro del rango de fechas especificado
+        // Asegurarse de que la fecha de fin sea al menos el último momento del mes indicado
+        endDate = new DateTime(endDate.Year, endDate.Month, DateTime.DaysInMonth(endDate.Year, endDate.Month));
+
+        // Obtener todos los esfuerzos asociados a la persona dentro del rango de fechas y proyecto especificado
         var efforts = await _context.Persefforts
             .Include(pe => pe.WpxPersonNavigation)
             .Where(pe => pe.WpxPersonNavigation.Person == personId &&
-                                    pe.Month.Year == year &&
-                                                            pe.Month.Month == month &&
-                                                                                    pe.WpxPersonNavigation.WpNavigation.ProjId == projectId)
+                         pe.WpxPersonNavigation.WpNavigation.ProjId == projectId &&
+                         pe.Month >= startDate && pe.Month <= endDate)
             .ToListAsync();
 
-        // Sumar los valores de esfuerzo para el mes dado
-        decimal totalEffort = efforts.Sum(e => e.Value);
+        // Agrupar los esfuerzos por mes y sumarlos
+        var monthlyEfforts = efforts
+            .GroupBy(pe => new DateTime(pe.Month.Year, pe.Month.Month, 1))
+            .Select(g => new { Month = g.Key, TotalEffort = g.Sum(e => e.Value) })
+            .ToDictionary(g => g.Month, g => Math.Round(g.TotalEffort, 2));
 
-        return Math.Round(totalEffort, 2);
+        return monthlyEfforts;
     }
+
+
 
     public async Task<Dictionary<DateTime, decimal>> GetDeclaredHoursPerMonthForPerson(int personId, DateTime specificMonth)
     {
@@ -190,6 +197,56 @@ public class WorkCalendarService
             .ToDictionaryAsync(g => g.Month, g => g.TotalHours);
 
         return hoursPerMonth;
+    }
+
+    public async Task<Dictionary<DateTime, decimal>> CalculateTotalHoursForPerson(int personId, DateTime startDate, DateTime endDate, int projectId)
+    {
+        Dictionary<DateTime, decimal> totalHoursPerMonth = new Dictionary<DateTime, decimal>();
+
+        // Asegurarse de que startDate es el primer día del mes y endDate es el último día del mes
+        startDate = new DateTime(startDate.Year, startDate.Month, 1);
+        endDate = new DateTime(endDate.Year, endDate.Month, DateTime.DaysInMonth(endDate.Year, endDate.Month));
+
+        while (startDate <= endDate)
+        {
+            int workingDays = await CalculateWorkingDays(startDate.Year, startDate.Month);
+
+            // Obtiene las afiliaciones de la persona para el mes y año en curso
+            var affiliations = await _context.AffxPersons
+                .Where(a => a.PersonId == personId &&
+                            a.Start <= startDate &&
+                            a.End >= startDate)
+                .Include(a => a.Affiliation)
+                .ToListAsync();
+
+            decimal hoursForMonth = 0;
+            foreach (var affiliation in affiliations)
+            {
+                // Aquí asumimos que AffHours tiene las horas por afiliación por mes
+                var affHours = await _context.AffHours
+                    .Where(ah => ah.AffId == affiliation.AffId &&
+                                 ah.StartDate <= startDate &&
+                                 ah.EndDate >= startDate)
+                    .Select(ah => ah.Hours)
+                    .FirstOrDefaultAsync();
+
+                // Calcula las horas totales basadas en los días laborables y las horas por afiliación
+                hoursForMonth += affHours * workingDays;
+            }
+
+            if (affiliations.Count > 0)
+            {
+                // Divide entre el número de afiliaciones para obtener un promedio si la persona tiene múltiples afiliaciones
+                hoursForMonth /= affiliations.Count;
+            }
+
+            totalHoursPerMonth.Add(new DateTime(startDate.Year, startDate.Month, 1), hoursForMonth);
+
+            // Avanza al siguiente mes
+            startDate = startDate.AddMonths(1);
+        }
+
+        return totalHoursPerMonth;
     }
     public async Task<bool> IsOutOfContract(int personId, int year, int month)
     {

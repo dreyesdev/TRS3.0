@@ -4,10 +4,10 @@
     <table class="table table-bordered table-striped table-hover">
         <thead class="thead-dark">
             <tr>
-                <th class="nombre-columna"></th>
+                <th class="nombre-columna">Nombre</th>
                 @foreach (var monthDetail in Model.MonthDetails)
                 {
-                    <th> 
+                    <th>
                         <div style="border-bottom: 1px solid white; margin-bottom: 2px; margin-top: 8px; text-align: center">@monthDetail.Key</div>
                         <div style="text-align: center">@monthDetail.Value</div>
                     </th>
@@ -18,14 +18,22 @@
             @foreach (var person in Model.Persons)
             {
                 <tr>
-                    <td>@(person.Name + " " + person.Surname)</td>
-                    <!-- Rellenar las celdas correspondientes a la participación de la persona en los WP -->
+                    <td>@(person.Personnel.Name + " " + person.Personnel.Surname)</td>
+                    @foreach (var monthDetail in Model.MonthDetails)
+                    {
+                        // Buscar las horas declaradas y máximas para el mes actual
+                        decimal declaredHours = person.DeclaredHours.ContainsKey(DateTime.Parse(monthDetail.Value)) ? person.DeclaredHours[DateTime.Parse(monthDetail.Value)] : 0;
+                        decimal totalHours = person.TotalHours.ContainsKey(DateTime.Parse(monthDetail.Value)) ? person.TotalHours[DateTime.Parse(monthDetail.Value)] : 0;
+                        // Calcular el porcentaje de las horas declaradas sobre las totales
+                        string hoursText = totalHours > 0 ? $"{declaredHours} / {totalHours}" : "0 / 0";
+                        <td style="text-align: center">@hoursText</td>
+                    }
                 </tr>
             }
         </tbody>
     </table>
-
 </div>
+
 
 <style>
 
