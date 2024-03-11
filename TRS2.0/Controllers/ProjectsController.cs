@@ -1121,58 +1121,53 @@ namespace TRS2._0.Controllers
 
         public async Task<IActionResult> PeriodDetails(int id, int projectId)
         {
-            try { 
-            var reportPeriod = await _context.ReportPeriods.FindAsync(id);
-            if (reportPeriod == null)
+            try
             {
-                return NotFound();
-            }
+                var reportPeriod = await _context.ReportPeriods.FindAsync(id);
+                if (reportPeriod == null) return NotFound();
 
-            // Obtener los WP que caen dentro del rango del periodo seleccionado y que pertenecen al proyecto
-            var workPackages = _context.Wps
-                                        .Include(wp => wp.Wpxpeople)
-                                            .ThenInclude(wpxp => wpxp.PersonNavigation)
-                                        .Where(wp => wp.ProjId == projectId &&
-                                                     wp.StartDate <= reportPeriod.EndDate &&
-                                                     wp.EndDate >= reportPeriod.StartDate)
-                                        .ToList();
+                var workPackages = _context.Wps
+                    .Include(wp => wp.Wpxpeople)
+                        .ThenInclude(wpxp => wpxp.PersonNavigation)
+                    .Where(wp => wp.ProjId == projectId &&
+                                 wp.StartDate <= reportPeriod.EndDate &&
+                                 wp.EndDate >= reportPeriod.StartDate)
+                    .ToList();
 
-            // Obtener las personas asociadas a esos WP y crear PersonnelDetails para cada una
-            var personDetailsList = new List<PeriodDetailsViewModel.PersonnelDetails>();
+                if (!workPackages.Any()) return NotFound("No work packages found for the given period and project.");
 
-            foreach (var personId in workPackages.SelectMany(wp => wp.Wpxpeople).Select(wpxp => wpxp.Person).Distinct())
-            {
-                var person = _context.Personnel.Find(personId);
-                if (person != null)
+                var personDetailsList = new List<PeriodDetailsViewModel.PersonnelDetails>();
+
+                foreach (var personId in workPackages.SelectMany(wp => wp.Wpxpeople).Select(wpxp => wpxp.Person).Distinct())
                 {
+                    var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == personId);
+                    if (person == null) continue;
+
                     var personnelDetails = new PeriodDetailsViewModel.PersonnelDetails
                     {
                         Personnel = person,
+                        // Asegúrate de que estas llamadas sean correctas y devuelvan datos válidos
                         DeclaredHours = await _workCalendarService.GetDeclaredHoursPerMonthForPerson(personId, reportPeriod.StartDate),
                         TotalHours = await _workCalendarService.CalculateTotalHoursForPerson(personId, reportPeriod.StartDate, reportPeriod.EndDate, projectId),
-                        HoursinProyect = new Dictionary<DateTime, decimal>(), // Este se llenará en el siguiente paso
+                        HoursinProyect = new Dictionary<DateTime, decimal>()
                     };
 
-                        // Calcular HoursInProject para cada mes en el periodo del reporte
-                     foreach (var monthKey in personnelDetails.TotalHours.Keys)
-                     {
-                            // Asegúrate de que esta llamada devuelva los esfuerzos correctamente por cada mes.
-                            var monthlyEffort = await _workCalendarService.CalculateMonthlyEffortForPersonInProject(personId, monthKey, monthKey.AddMonths(1).AddDays(-1), projectId);
+                    foreach (var monthKey in personnelDetails.TotalHours.Keys)
+                    {
+                        var monthlyEffort = await _workCalendarService.CalculateMonthlyEffortForPersonInProject(personId, monthKey, monthKey.AddMonths(1).AddDays(-1), projectId);
+                        if (monthlyEffort.ContainsKey(monthKey))
+                        {
+                            personnelDetails.HoursinProyect.Add(monthKey, personnelDetails.TotalHours[monthKey] * monthlyEffort[monthKey]);
+                        }
+                        else
+                        {
+                            personnelDetails.HoursinProyect.Add(monthKey, 0);
+                        }
+                    }
 
-                            // Comprueba si monthlyEffort contiene la clave para el mes actual antes de acceder a ella
-                            if (monthlyEffort.ContainsKey(monthKey))
-                            {
-                                personnelDetails.HoursinProyect.Add(monthKey, (personnelDetails.TotalHours[monthKey] * monthlyEffort[monthKey]));
-                            }
-                            else
-                            {
-                                // Maneja el caso en el que no hay un esfuerzo registrado para el mes, por ejemplo, agregando 0 o alguna otra lógica predeterminada.
-                                personnelDetails.HoursinProyect.Add(monthKey, 0);
-                            }
-                     }
-
+                    personDetailsList.Add(personnelDetails);
                 }
-            }
+            
 
             // Crear un modelo para la vista que incluya todos los datos necesarios
             var model = new PeriodDetailsViewModel
