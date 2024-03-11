@@ -8,6 +8,7 @@ using TRS2._0.Models.DataModels;
 using Newtonsoft.Json.Linq;
 using TRS2._0.Models.ViewModels;
 using static TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel;
+using System.Diagnostics;
 namespace TRS2._0.Services;
 
 public class WorkCalendarService
@@ -173,17 +174,15 @@ public class WorkCalendarService
 
 
 
-    public async Task<Dictionary<DateTime, decimal>> GetDeclaredHoursPerMonthForPerson(int personId, DateTime specificMonth)
+    public async Task<Dictionary<DateTime, decimal>> GetDeclaredHoursPerMonthForPerson(int personId, DateTime startDate, DateTime endDate)
     {
-        // Obtener el primer y último día del mes específico
-        var firstDayOfMonth = new DateTime(specificMonth.Year, specificMonth.Month, 1);
-        var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
+        // Asegúrate de que endDate es el último momento del mes para incluir todos los días del mes
+        endDate = new DateTime(endDate.Year, endDate.Month, DateTime.DaysInMonth(endDate.Year, endDate.Month));
 
-        // Filtrar Timesheets por ID de persona y rango de fechas
         var hoursPerMonth = await _context.Timesheets
             .Where(ts => ts.WpxPersonNavigation.Person == personId &&
-                         ts.Day >= firstDayOfMonth &&
-                         ts.Day <= lastDayOfMonth)
+                         ts.Day >= startDate &&
+                         ts.Day <= endDate)
             .GroupBy(ts => new
             {
                 Year = ts.Day.Year,
@@ -191,63 +190,76 @@ public class WorkCalendarService
             })
             .Select(g => new
             {
-                Month = new DateTime(g.Key.Year, g.Key.Month, 1),
-                TotalHours = g.Sum(ts => ts.Hours)
+                Month = new DateTime(g.Key.Year, g.Key.Month, 1), // Usa el primer día del mes como clave
+                TotalHours = g.Sum(ts => ts.Hours) // Suma las horas declaradas
             })
             .ToDictionaryAsync(g => g.Month, g => g.TotalHours);
 
         return hoursPerMonth;
     }
 
+
     public async Task<Dictionary<DateTime, decimal>> CalculateTotalHoursForPerson(int personId, DateTime startDate, DateTime endDate, int projectId)
     {
-        Dictionary<DateTime, decimal> totalHoursPerMonth = new Dictionary<DateTime, decimal>();
+        var totalExecutionStopwatch = Stopwatch.StartNew();
 
-        // Asegurarse de que startDate es el primer día del mes y endDate es el último día del mes
+        var totalHoursPerMonth = new Dictionary<DateTime, decimal>();
+
+        var affiliationsStopwatch = Stopwatch.StartNew();
+        var affiliations = await _context.AffxPersons
+            .Where(a => a.PersonId == personId && !(a.End < startDate || a.Start > endDate))
+            .Include(a => a.Affiliation)
+            .ToListAsync();
+        affiliationsStopwatch.Stop();
+        Console.WriteLine($"Affiliations fetch took: {affiliationsStopwatch.ElapsedMilliseconds} ms");
+
+        var affHoursStopwatch = Stopwatch.StartNew();
+        var affHoursList = await _context.AffHours
+            .Where(ah => affiliations.Select(a => a.AffId).Contains(ah.AffId) &&
+                         ah.EndDate >= startDate &&
+                         ah.StartDate <= endDate)
+            .ToListAsync();
+        affHoursStopwatch.Stop();
+        Console.WriteLine($"AffHours fetch took: {affHoursStopwatch.ElapsedMilliseconds} ms");
+
         startDate = new DateTime(startDate.Year, startDate.Month, 1);
         endDate = new DateTime(endDate.Year, endDate.Month, DateTime.DaysInMonth(endDate.Year, endDate.Month));
 
+        var monthlyCalculationStopwatch = new Stopwatch();
+
         while (startDate <= endDate)
         {
-            int workingDays = await CalculateWorkingDays(startDate.Year, startDate.Month);
-
-            // Obtiene las afiliaciones de la persona para el mes y año en curso
-            var affiliations = await _context.AffxPersons
-                .Where(a => a.PersonId == personId &&
-                            a.Start <= startDate &&
-                            a.End >= startDate)
-                .Include(a => a.Affiliation)
-                .ToListAsync();
+            monthlyCalculationStopwatch.Start();
+            int workingDays = await CalculateWorkingDays(startDate.Year, startDate.Month); // Consider caching this if possible
+            monthlyCalculationStopwatch.Stop();
+            Console.WriteLine($"CalculateWorkingDays for {startDate.ToString("yyyy-MM")} took: {monthlyCalculationStopwatch.ElapsedMilliseconds} ms");
+            monthlyCalculationStopwatch.Reset();
 
             decimal hoursForMonth = 0;
             foreach (var affiliation in affiliations)
             {
-                // Aquí asumimos que AffHours tiene las horas por afiliación por mes
-                var affHours = await _context.AffHours
-                    .Where(ah => ah.AffId == affiliation.AffId &&
-                                 ah.StartDate <= startDate &&
-                                 ah.EndDate >= startDate)
-                    .Select(ah => ah.Hours)
-                    .FirstOrDefaultAsync();
+                var affHours = affHoursList.FirstOrDefault(ah => ah.AffId == affiliation.AffId && ah.StartDate <= startDate && ah.EndDate >= startDate)?.Hours ?? 0;
 
-                // Calcula las horas totales basadas en los días laborables y las horas por afiliación
                 hoursForMonth += affHours * workingDays;
             }
 
-            if (affiliations.Count > 0)
+            if (affiliations.Any())
             {
-                // Divide entre el número de afiliaciones para obtener un promedio si la persona tiene múltiples afiliaciones
                 hoursForMonth /= affiliations.Count;
             }
 
-            totalHoursPerMonth.Add(new DateTime(startDate.Year, startDate.Month, 1), hoursForMonth);
+            totalHoursPerMonth.Add(startDate, hoursForMonth);
 
-            // Avanza al siguiente mes
             startDate = startDate.AddMonths(1);
         }
 
+        totalExecutionStopwatch.Stop();
+        Console.WriteLine($"Total execution time of CalculateTotalHoursForPerson: {totalExecutionStopwatch.ElapsedMilliseconds} ms");
+
         return totalHoursPerMonth;
     }
+
+
     public async Task<bool> IsOutOfContract(int personId, int year, int month)
     {
         var startDate = new DateTime(year, month, 1);

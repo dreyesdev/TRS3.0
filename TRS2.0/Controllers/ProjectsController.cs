@@ -13,6 +13,7 @@ using TRS2._0.Models.ViewModels;
 using TRS2._0.Services;
 using System.Text.RegularExpressions;
 using static TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel;
+using System.Diagnostics;
 
 namespace TRS2._0.Controllers
 {
@@ -1121,11 +1122,18 @@ namespace TRS2._0.Controllers
 
         public async Task<IActionResult> PeriodDetails(int id, int projectId)
         {
+            var totalStopwatch = Stopwatch.StartNew(); // Cronómetro total de la función
+
             try
             {
+                var reportPeriodStopwatch = Stopwatch.StartNew(); // Cronómetro para buscar el periodo de reporte
                 var reportPeriod = await _context.ReportPeriods.FindAsync(id);
+                reportPeriodStopwatch.Stop();
+                Console.WriteLine($"Finding report period took {reportPeriodStopwatch.ElapsedMilliseconds} ms");
+
                 if (reportPeriod == null) return NotFound();
 
+                var workPackagesStopwatch = Stopwatch.StartNew(); // Cronómetro para obtener los WorkPackages
                 var workPackages = _context.Wps
                     .Include(wp => wp.Wpxpeople)
                         .ThenInclude(wpxp => wpxp.PersonNavigation)
@@ -1133,61 +1141,72 @@ namespace TRS2._0.Controllers
                                  wp.StartDate <= reportPeriod.EndDate &&
                                  wp.EndDate >= reportPeriod.StartDate)
                     .ToList();
+                workPackagesStopwatch.Stop();
+                Console.WriteLine($"Fetching work packages took {workPackagesStopwatch.ElapsedMilliseconds} ms");
 
                 if (!workPackages.Any()) return NotFound("No work packages found for the given period and project.");
 
                 var personDetailsList = new List<PeriodDetailsViewModel.PersonnelDetails>();
+                var personsProcessingStopwatch = Stopwatch.StartNew(); // Cronómetro para procesar las personas
+                var declaredHoursStopwatch = new Stopwatch();
+                var totalHoursStopwatch = new Stopwatch();
+
 
                 foreach (var personId in workPackages.SelectMany(wp => wp.Wpxpeople).Select(wpxp => wpxp.Person).Distinct())
                 {
+                    var personFetchStopwatch = Stopwatch.StartNew(); // Cronómetro para buscar la persona
                     var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == personId);
+                    personFetchStopwatch.Stop();
+                    Console.WriteLine($"Fetching person {personId} took {personFetchStopwatch.ElapsedMilliseconds} ms");
+                    
                     if (person == null) continue;
+
+                    declaredHoursStopwatch.Start();
+                    var declaredHoursResult = await _workCalendarService.GetDeclaredHoursPerMonthForPerson(personId, reportPeriod.StartDate, reportPeriod.EndDate);
+                    declaredHoursStopwatch.Stop();
+                    Console.WriteLine($"Getting declared hours for person {personId} took {declaredHoursStopwatch.ElapsedMilliseconds} ms");
+                    declaredHoursStopwatch.Reset();
+
+                    totalHoursStopwatch.Start();
+                    var totalHoursResult = await _workCalendarService.CalculateTotalHoursForPerson(personId, reportPeriod.StartDate, reportPeriod.EndDate, projectId);
+                    totalHoursStopwatch.Stop();
+                    Console.WriteLine($"Calculating total hours for person {personId} took {totalHoursStopwatch.ElapsedMilliseconds} ms");
+                    totalHoursStopwatch.Reset();
 
                     var personnelDetails = new PeriodDetailsViewModel.PersonnelDetails
                     {
                         Personnel = person,
-                        // Asegúrate de que estas llamadas sean correctas y devuelvan datos válidos
-                        DeclaredHours = await _workCalendarService.GetDeclaredHoursPerMonthForPerson(personId, reportPeriod.StartDate),
-                        TotalHours = await _workCalendarService.CalculateTotalHoursForPerson(personId, reportPeriod.StartDate, reportPeriod.EndDate, projectId),
-                        HoursinProyect = new Dictionary<DateTime, decimal>()
+                        DeclaredHours = declaredHoursResult,
+                        TotalHours = totalHoursResult,
+                        HoursinProyect = new Dictionary<DateTime, decimal>() // Este se llenará en el siguiente paso
                     };
 
-                    foreach (var monthKey in personnelDetails.TotalHours.Keys)
-                    {
-                        var monthlyEffort = await _workCalendarService.CalculateMonthlyEffortForPersonInProject(personId, monthKey, monthKey.AddMonths(1).AddDays(-1), projectId);
-                        if (monthlyEffort.ContainsKey(monthKey))
-                        {
-                            personnelDetails.HoursinProyect.Add(monthKey, personnelDetails.TotalHours[monthKey] * monthlyEffort[monthKey]);
-                        }
-                        else
-                        {
-                            personnelDetails.HoursinProyect.Add(monthKey, 0);
-                        }
-                    }
-
+                    // Considera agregar cronómetros específicos para estas llamadas asíncronas si es necesario
                     personDetailsList.Add(personnelDetails);
                 }
-            
+                personsProcessingStopwatch.Stop();
+                Console.WriteLine($"Processing persons took {personsProcessingStopwatch.ElapsedMilliseconds} ms");
 
-            // Crear un modelo para la vista que incluya todos los datos necesarios
-            var model = new PeriodDetailsViewModel
-            {
-                ReportPeriod = reportPeriod,
-                WorkPackages = workPackages,
-                Persons = personDetailsList,
-            };
+                var model = new PeriodDetailsViewModel
+                {
+                    ReportPeriod = reportPeriod,
+                    WorkPackages = workPackages,
+                    Persons = personDetailsList,
+                };
 
-            // Calcular los meses dentro del periodo seleccionado
-            model.CalculateMonths(reportPeriod.StartDate, reportPeriod.EndDate);
+                // No es necesario cronometrar esto ya que debería ser rápido, pero puedes agregarlo si es de interés
+                model.CalculateMonths(reportPeriod.StartDate, reportPeriod.EndDate);
 
-            return PartialView("_DetallesPeriodo", model);
+                totalStopwatch.Stop();
+                Console.WriteLine($"Total execution time of PeriodDetails was {totalStopwatch.ElapsedMilliseconds} ms");
+
+                return PartialView("_DetallesPeriodo", model);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"An error occurred: {ex.Message}");
                 return StatusCode(500, "Internal Server Error. Please try again later.");
             }
-
         }
 
 
