@@ -780,6 +780,20 @@ public class WorkCalendarService
         return workingDaysPerMonth;
     }
 
+    public async Task<List<DateTime>> GenerateMonthList(DateTime startDate, DateTime endDate)
+    {
+        var months = new List<DateTime>();
+        DateTime currentMonth = new DateTime(startDate.Year, startDate.Month, 1);
+
+        while (currentMonth <= endDate)
+        {
+            months.Add(currentMonth);
+            currentMonth = currentMonth.AddMonths(1);
+        }
+
+        return months;
+    }
+
 
 
 

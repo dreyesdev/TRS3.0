@@ -1150,6 +1150,40 @@ namespace TRS2._0.Controllers
                 // Obtener IDs de las personas involucradas en el proyecto
                 var personIds = projectPersonnel.Select(p => p.Person).Distinct().ToList();
 
+
+                var wpxPersonIds = workPackages.SelectMany(wp => wp.Wpxpeople)
+                                .Select(wpxp => wpxp.Id)
+                                .Distinct()
+                                .ToList();
+
+                var totalEffortInProjectByPersonAndMonth = await _context.Persefforts
+                        .Where(pe => wpxPersonIds.Contains(pe.WpxPerson) &&
+                                     pe.Month >= reportPeriod.StartDate &&
+                                     pe.Month <= reportPeriod.EndDate)
+                        .Include(pe => pe.WpxPersonNavigation)
+                        .GroupBy(pe => new { pe.WpxPersonNavigation.Person, pe.Month.Year, pe.Month.Month })
+                        .Select(group => new
+                        {
+                            PersonId = group.Key.Person,
+                            Year = group.Key.Year,
+                            Month = group.Key.Month,
+                            TotalEffort = group.Sum(pe => pe.Value)
+                        })
+                        .ToListAsync();
+
+                // Transformar los resultados en un diccionario que mapea el ID de la persona a otro diccionario,
+                // el cual a su vez mapea una clave de año-mes al esfuerzo total.
+                var totalEffortInProjectByPersonAndMonthDict = totalEffortInProjectByPersonAndMonth
+                    .GroupBy(e => e.PersonId)
+                    .ToDictionary(
+                        group => group.Key, // PersonId
+                        group => group.ToDictionary(
+                            e => new DateTime(e.Year, e.Month, 1), // Clave de tipo DateTime representando el primer día del mes
+                            e => e.TotalEffort
+                        )
+                    );
+
+
                 // Recuperar todos los registros relevantes de PersMonthEfforts usando las fechas ajustadas
                 var persMonthEfforts = await _context.PersMonthEfforts
                     .Where(pme => personIds.Contains(pme.PersonId) &&
@@ -1192,7 +1226,16 @@ namespace TRS2._0.Controllers
                             e => e.TotalEffort
                         )
                     );
+                
 
+                var lockStatuses = await _context.ProjectMonthLocks
+                    .Where(l => personIds.Contains(l.PersonId) &&
+                                l.ProjectId == projectId &&
+                                l.Year >= reportPeriod.StartDate.Year &&
+                                l.Month >= reportPeriod.StartDate.Month &&
+                                l.Year <= reportPeriod.EndDate.Year &&
+                                l.Month <= reportPeriod.EndDate.Month)
+                    .ToListAsync();
 
                 if (!workPackages.Any()) return NotFound("No work packages found for the given period and project.");
 
@@ -1201,11 +1244,11 @@ namespace TRS2._0.Controllers
                 var declaredHoursStopwatch = new Stopwatch();
                 var totalHoursStopwatch = new Stopwatch();
                 var workingDaysPerMonth = await _workCalendarService.GetWorkingDaysFromDbForRange(reportPeriod.StartDate, reportPeriod.EndDate);
+                var months = await _workCalendarService.GenerateMonthList(reportPeriod.StartDate, reportPeriod.EndDate);
 
                 foreach (var personId in workPackages.SelectMany(wp => wp.Wpxpeople).Select(wpxp => wpxp.Person).Distinct())
                 {
-                    // Diccionario que mapea ID de persona a un diccionario de año-mes a un par de bools (Out of Contract, Overloaded)
-                    Dictionary<int, Dictionary<string, (bool OutOfContract, bool Overloaded)>> personStatusByMonth = new Dictionary<int, Dictionary<string, (bool, bool)>>();
+                    
 
                     var personFetchStopwatch = Stopwatch.StartNew(); // Cronómetro para buscar la persona
                     var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == personId);
@@ -1213,6 +1256,15 @@ namespace TRS2._0.Controllers
                     Console.WriteLine($"Fetching person {personId} took {personFetchStopwatch.ElapsedMilliseconds} ms");
                     
                     if (person == null) continue;
+
+
+                    var personLockStatusByMonth = new Dictionary<string, bool>();
+
+                    foreach (var lockStatus in lockStatuses.Where(l => l.PersonId == personId))
+                    {
+                        string yearMonthKey = $"{lockStatus.Year}-{lockStatus.Month:D2}";
+                        personLockStatusByMonth[yearMonthKey] = lockStatus.IsLocked;
+                    }
 
                     declaredHoursStopwatch.Start();
                     var declaredHoursResult = await _workCalendarService.GetDeclaredHoursPerMonthForPerson(personId, reportPeriod.StartDate, reportPeriod.EndDate);
@@ -1226,13 +1278,94 @@ namespace TRS2._0.Controllers
                     Console.WriteLine($"Calculating total hours for person {personId} took {totalHoursStopwatch.ElapsedMilliseconds} ms");
                     totalHoursStopwatch.Reset();
 
+                    var outOfContractStatus = await _workCalendarService.IsOutOfContractForMonths(personId, months);
+
+                    var personStatusByMonth = new Dictionary<string, (bool OutOfContract, bool Overloaded)>();
+                    var hoursInProject = new Dictionary<DateTime, decimal>();
+                    var completionPercentage = new Dictionary<DateTime, decimal>();
+                    var totalEffortInProyect = new Dictionary<DateTime, decimal>();
+
+                    foreach (var month in months)
+                    {
+                        string yearMonthKey = $"{month.Year}-{month.Month:D2}";
+                        bool outOfContract = outOfContractStatus.GetValueOrDefault(month, false);
+
+                        // Obtiene el valor porcentual de esfuerzo total para el mes de totalEffortsByPersonAndMonthDict
+                        totalEffortsByPersonAndMonthDict.TryGetValue(personId, out var effortsDict);
+                        decimal totalEffortPercent = effortsDict?.GetValueOrDefault(yearMonthKey, 0) ?? 0;
+
+                        
+                        decimal pmMax = pmValuesByPersonAndMonth.TryGetValue(personId, out var pmValues) ? pmValues.GetValueOrDefault(yearMonthKey, 0) : 0;
+                        
+                        bool overloaded = totalEffortPercent > pmMax;
+
+                        personStatusByMonth[yearMonthKey] = (outOfContract, overloaded);
+
+                        
+                        if (totalEffortsByPersonAndMonthDict.TryGetValue(personId, out var effortsForPerson))
+                        {
+                            if (!effortsForPerson.TryGetValue(yearMonthKey, out totalEffortPercent))
+                            {
+                                totalEffortPercent = 0; // Si no hay esfuerzo registrado, se considera 0%
+                            }
+                        }
+                        else
+                        {
+                            totalEffortPercent = 0; // Si no hay datos para esta persona, se considera 0%
+                        }
+                        var dateKey = new DateTime(month.Year, month.Month, 1);
+                        // Buscar las horas totales declaradas para este mes
+                        decimal totalHoursForMonth;
+                        if (!totalHoursResult.TryGetValue(month, out totalHoursForMonth))
+                        {
+                            totalHoursForMonth = 0; // Si no hay horas totales registradas, se considera 0
+                        }
+                        // Para TotalEffortInProject, verifica si hay esfuerzo registrado para el mes
+                        decimal totalEffortForMonth = 0;
+                        if (totalEffortInProjectByPersonAndMonthDict.TryGetValue(personId, out var effortByMonth))
+                        {
+                            if (!effortByMonth.TryGetValue(dateKey, out totalEffortForMonth))
+                            {
+                                // Si no hay esfuerzo registrado para este mes, totalEffortForMonth ya es 0
+                            }
+                        }
+                        // Asigna el esfuerzo encontrado o el valor predeterminado (0) para este mes
+                        totalEffortInProyect[dateKey] = totalEffortForMonth;
+
+                        // Calcular HoursInProject como el producto del esfuerzo total por las horas totales
+                        var hoursInProjectForMonth = totalHoursForMonth * totalEffortForMonth; 
+                                                                                              
+                        var roundedHoursInProjectForMonth = Math.Round(hoursInProjectForMonth * 2, MidpointRounding.AwayFromZero) / 2;
+
+                        hoursInProject[month] = roundedHoursInProjectForMonth;
+
+                        
+
+                        
+
+                        // Buscar las horas declaradas para este mes, si no existen, usar 0
+                        declaredHoursResult.TryGetValue(month, out var declaredHoursForMonth);
+                        // Calcular el porcentaje completado, asegurándose de no dividir por cero
+                        decimal percentCompleted = hoursInProjectForMonth > 0
+                            ? Math.Round((declaredHoursForMonth / roundedHoursInProjectForMonth) * 100, 2) // Redondea al segundo decimal
+                            : 0;
+                        completionPercentage[month] = percentCompleted;
+                    }
+
+
+
                     var personnelDetails = new PeriodDetailsViewModel.PersonnelDetails
                     {
                         Personnel = person,
+                        // Asumiendo que las siguientes propiedades ya están correctamente calculadas y asignadas
                         DeclaredHours = declaredHoursResult,
                         TotalHours = totalHoursResult,
-                        HoursinProyect = new Dictionary<DateTime, decimal>() // Este se llenará en el siguiente paso
-                    };
+                        // Inicializa y asigna el nuevo diccionario
+                        PersonStatusByMonth = personStatusByMonth,
+                        HoursinProyect = hoursInProject,
+                        TotalEffortinProyect = totalEffortInProyect,
+                        CompletionPercentage = completionPercentage
+                };
 
                     // Considera agregar cronómetros específicos para estas llamadas asíncronas si es necesario
                     personDetailsList.Add(personnelDetails);
@@ -1246,8 +1379,7 @@ namespace TRS2._0.Controllers
                     WorkPackages = workPackages,
                     Persons = personDetailsList,
                 };
-
-                // No es necesario cronometrar esto ya que debería ser rápido, pero puedes agregarlo si es de interés
+                
                 model.CalculateMonths(reportPeriod.StartDate, reportPeriod.EndDate);
 
                 totalStopwatch.Stop();

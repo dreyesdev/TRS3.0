@@ -27,7 +27,7 @@ namespace TRS2._0.Models.ViewModels
         {
             public Personnel Personnel { get; set; }
             
-            public decimal TotalEffort { get; set; }
+            public Dictionary<DateTime, decimal> TotalEffortinProyect { get; set; }
 
             public Dictionary<DateTime, decimal> DeclaredHours { get; set; }
 
@@ -36,7 +36,11 @@ namespace TRS2._0.Models.ViewModels
             public Dictionary<DateTime, decimal> TotalHours { get; set; }
 
             // Diccionario que mapea ID de persona a un diccionario de año-mes a un par de bools (Out of Contract, Overloaded)
-            public Dictionary<int, Dictionary<string, (bool OutOfContract, bool Overloaded)>> PersonStatusByMonth {get; set;}
+            public Dictionary<string, (bool OutOfContract, bool Overloaded)> PersonStatusByMonth {get; set;}
+
+            public Dictionary<string, bool> LockStatusByMonth { get; set; }
+
+            public Dictionary<DateTime, decimal> CompletionPercentage { get; set; }
 
         }
     }

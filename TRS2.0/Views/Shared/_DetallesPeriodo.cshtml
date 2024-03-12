@@ -21,18 +21,33 @@
                     <td>@(person.Personnel.Name + " " + person.Personnel.Surname)</td>
                     @foreach (var monthDetail in Model.MonthDetails)
                     {
-                        // Buscar las horas declaradas y máximas para el mes actual
-                        decimal declaredHours = person.DeclaredHours.ContainsKey(DateTime.Parse(monthDetail.Value)) ? person.DeclaredHours[DateTime.Parse(monthDetail.Value)] : 0;
-                        decimal totalHours = person.TotalHours.ContainsKey(DateTime.Parse(monthDetail.Value)) ? person.TotalHours[DateTime.Parse(monthDetail.Value)] : 0;
-                        // Calcular el porcentaje de las horas declaradas sobre las totales
-                        string hoursText = totalHours > 0 ? $"{declaredHours} / {totalHours}" : "0 / 0";
-                        <td style="text-align: center">@hoursText</td>
+                        var monthDate = DateTime.Parse(monthDetail.Value);
+                        decimal declaredHours = person.DeclaredHours.ContainsKey(monthDate) ? person.DeclaredHours[monthDate] : 0;
+                        decimal hoursInProject = person.HoursinProyect.ContainsKey(monthDate) ? person.HoursinProyect[monthDate] : 0;
+                        decimal completionPercentage = person.CompletionPercentage.ContainsKey(monthDate) ? person.CompletionPercentage[monthDate] : 0;
+
+                        var statusKey = $"{monthDate.Year}-{monthDate.Month:D2}";
+                        var status = person.PersonStatusByMonth.ContainsKey(statusKey) ? person.PersonStatusByMonth[statusKey] : (OutOfContract: false, Overloaded: false);
+                        var backgroundColor = status.OutOfContract ? "#FF8C00" : (status.Overloaded ? "#FFFF00" : "");
+
+                        <td style="background-color: @backgroundColor; padding: 4px; vertical-align: top;">
+                            <div class="d-block" style="margin-bottom: 4px;">
+                                <span class="font-weight-bold">@declaredHours | @hoursInProject</span>
+                            </div>
+                            <div class="progress" style="height: 10px;">
+                                <div class="progress-bar" role="progressbar" style="width: @completionPercentage%; background-color: #28a745 !important;" aria-valuenow="@completionPercentage" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <div class="text-center" style="font-size: 0.75rem;">@completionPercentage%</div>
+                        </td>
                     }
                 </tr>
             }
+
         </tbody>
     </table>
 </div>
+
+
 
 
 <style>
