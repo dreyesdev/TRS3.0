@@ -1144,16 +1144,69 @@ namespace TRS2._0.Controllers
                 workPackagesStopwatch.Stop();
                 Console.WriteLine($"Fetching work packages took {workPackagesStopwatch.ElapsedMilliseconds} ms");
 
+                // Obtener relaciones entre personal y proyecto
+                var projectPersonnel = await _context.Projectxpeople.Where(px => px.ProjId == projectId).ToListAsync();
+
+                // Obtener IDs de las personas involucradas en el proyecto
+                var personIds = projectPersonnel.Select(p => p.Person).Distinct().ToList();
+
+                // Recuperar todos los registros relevantes de PersMonthEfforts usando las fechas ajustadas
+                var persMonthEfforts = await _context.PersMonthEfforts
+                    .Where(pme => personIds.Contains(pme.PersonId) &&
+                                  pme.Month >= reportPeriod.StartDate &&
+                                  pme.Month <= reportPeriod.EndDate)
+                    .ToListAsync();
+
+                // Transformar a un diccionario para facilitar el acceso
+                var pmValuesByPersonAndMonth = persMonthEfforts
+                    .GroupBy(pme => pme.PersonId)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => group.ToDictionary(
+                            pme => $"{pme.Month.Year}-{pme.Month.Month:D2}",
+                            pme => pme.Value
+                        )
+                    );
+
+                // Recuperar y sumar los esfuerzos por persona y mes usando las fechas ajustadas
+                var totalEffortsByPersonAndMonth = await _context.Persefforts
+                    .Include(pe => pe.WpxPersonNavigation)
+                    .Where(pe => personIds.Contains(pe.WpxPersonNavigation.Person) &&
+                                 pe.Month >= reportPeriod.StartDate && pe.Month <= reportPeriod.EndDate)
+                    .GroupBy(pe => new { pe.WpxPersonNavigation.Person, Year = pe.Month.Year, Month = pe.Month.Month })
+                    .Select(group => new {
+                        PersonId = group.Key.Person,
+                        Year = group.Key.Year,
+                        Month = group.Key.Month,
+                        TotalEffort = group.Sum(pe => pe.Value)
+                    })
+                    .ToListAsync();
+
+                // Transformar a un diccionario para facilitar el acceso
+                var totalEffortsByPersonAndMonthDict = totalEffortsByPersonAndMonth
+                    .GroupBy(e => e.PersonId)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => group.ToDictionary(
+                            e => $"{e.Year}-{e.Month:D2}",
+                            e => e.TotalEffort
+                        )
+                    );
+
+
                 if (!workPackages.Any()) return NotFound("No work packages found for the given period and project.");
 
                 var personDetailsList = new List<PeriodDetailsViewModel.PersonnelDetails>();
                 var personsProcessingStopwatch = Stopwatch.StartNew(); // Cronómetro para procesar las personas
                 var declaredHoursStopwatch = new Stopwatch();
                 var totalHoursStopwatch = new Stopwatch();
-
+                var workingDaysPerMonth = await _workCalendarService.GetWorkingDaysFromDbForRange(reportPeriod.StartDate, reportPeriod.EndDate);
 
                 foreach (var personId in workPackages.SelectMany(wp => wp.Wpxpeople).Select(wpxp => wpxp.Person).Distinct())
                 {
+                    // Diccionario que mapea ID de persona a un diccionario de año-mes a un par de bools (Out of Contract, Overloaded)
+                    Dictionary<int, Dictionary<string, (bool OutOfContract, bool Overloaded)>> personStatusByMonth = new Dictionary<int, Dictionary<string, (bool, bool)>>();
+
                     var personFetchStopwatch = Stopwatch.StartNew(); // Cronómetro para buscar la persona
                     var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == personId);
                     personFetchStopwatch.Stop();
@@ -1168,7 +1221,7 @@ namespace TRS2._0.Controllers
                     declaredHoursStopwatch.Reset();
 
                     totalHoursStopwatch.Start();
-                    var totalHoursResult = await _workCalendarService.CalculateTotalHoursForPerson(personId, reportPeriod.StartDate, reportPeriod.EndDate, projectId);
+                    var totalHoursResult = await _workCalendarService.CalculateTotalHoursForPerson(personId, reportPeriod.StartDate, reportPeriod.EndDate, projectId, workingDaysPerMonth);
                     totalHoursStopwatch.Stop();
                     Console.WriteLine($"Calculating total hours for person {personId} took {totalHoursStopwatch.ElapsedMilliseconds} ms");
                     totalHoursStopwatch.Reset();

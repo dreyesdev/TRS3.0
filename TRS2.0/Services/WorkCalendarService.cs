@@ -199,7 +199,7 @@ public class WorkCalendarService
     }
 
 
-    public async Task<Dictionary<DateTime, decimal>> CalculateTotalHoursForPerson(int personId, DateTime startDate, DateTime endDate, int projectId)
+    public async Task<Dictionary<DateTime, decimal>> CalculateTotalHoursForPerson(int personId, DateTime startDate, DateTime endDate, int projectId, Dictionary<DateTime, int> workingDaysPerMonth)
     {
         var totalExecutionStopwatch = Stopwatch.StartNew();
 
@@ -229,26 +229,23 @@ public class WorkCalendarService
 
         while (startDate <= endDate)
         {
-            monthlyCalculationStopwatch.Start();
-            int workingDays = await CalculateWorkingDays(startDate.Year, startDate.Month); // Consider caching this if possible
-            monthlyCalculationStopwatch.Stop();
-            Console.WriteLine($"CalculateWorkingDays for {startDate.ToString("yyyy-MM")} took: {monthlyCalculationStopwatch.ElapsedMilliseconds} ms");
-            monthlyCalculationStopwatch.Reset();
-
             decimal hoursForMonth = 0;
-            foreach (var affiliation in affiliations)
+            if (workingDaysPerMonth.TryGetValue(new DateTime(startDate.Year, startDate.Month, 1), out int workingDays))
             {
-                var affHours = affHoursList.FirstOrDefault(ah => ah.AffId == affiliation.AffId && ah.StartDate <= startDate && ah.EndDate >= startDate)?.Hours ?? 0;
+                // Aquí utilizas workingDays obtenidos de DailyPmValues
+                foreach (var affiliation in affiliations)
+                {
+                    var affHours = affHoursList.FirstOrDefault(ah => ah.AffId == affiliation.AffId && ah.StartDate <= startDate && ah.EndDate >= startDate)?.Hours ?? 0;
+                    hoursForMonth += affHours * workingDays;
+                }
 
-                hoursForMonth += affHours * workingDays;
+                if (affiliations.Any())
+                {
+                    hoursForMonth /= affiliations.Count;
+                }
+
+                totalHoursPerMonth.Add(new DateTime(startDate.Year, startDate.Month, 1), hoursForMonth);
             }
-
-            if (affiliations.Any())
-            {
-                hoursForMonth /= affiliations.Count;
-            }
-
-            totalHoursPerMonth.Add(startDate, hoursForMonth);
 
             startDate = startDate.AddMonths(1);
         }
@@ -757,6 +754,33 @@ public class WorkCalendarService
 
         return Math.Round(totalPm, 2);
     }
+
+    public async Task<Dictionary<DateTime, int>> GetWorkingDaysFromDbForRange(DateTime startDate, DateTime endDate)
+    {
+        var workingDaysPerMonth = new Dictionary<DateTime, int>();
+
+        // Obtén todos los valores dentro del rango de años.
+        var dailyPmValuesInRange = await _context.DailyPMValues
+            .Where(dpv => dpv.Year >= startDate.Year && dpv.Year <= endDate.Year)
+            .ToListAsync();
+
+        // Filtra los valores en memoria para incluir solo aquellos dentro del rango de meses.
+        var filteredValues = dailyPmValuesInRange
+            .Where(dpv =>
+                new DateTime(dpv.Year, dpv.Month, 1) >= startDate &&
+                new DateTime(dpv.Year, dpv.Month, 1) <= endDate)
+            .ToList();
+
+        foreach (var dpv in filteredValues)
+        {
+            DateTime firstDayOfMonth = new DateTime(dpv.Year, dpv.Month, 1);
+            workingDaysPerMonth[firstDayOfMonth] = dpv.WorkableDays;
+        }
+
+        return workingDaysPerMonth;
+    }
+
+
 
 
 }

@@ -34,6 +34,10 @@ namespace TRS2._0.Models.ViewModels
             public Dictionary<DateTime, decimal> HoursinProyect { get; set; }
 
             public Dictionary<DateTime, decimal> TotalHours { get; set; }
+
+            // Diccionario que mapea ID de persona a un diccionario de año-mes a un par de bools (Out of Contract, Overloaded)
+            public Dictionary<int, Dictionary<string, (bool OutOfContract, bool Overloaded)>> PersonStatusByMonth {get; set;}
+
         }
     }
 }
