@@ -1,4 +1,7 @@
 ﻿@model TRS2._0.Models.ViewModels.PeriodDetailsViewModel
+@using System.Globalization
+
+
 
 <div class="table-responsive mx-3 mb-4">
     <table class="table table-bordered table-striped table-hover">
@@ -31,13 +34,34 @@
                         var backgroundColor = status.OutOfContract ? "#FF8C00" : (status.Overloaded ? "#FFFF00" : "");
 
                         <td style="background-color: @backgroundColor; padding: 4px; vertical-align: top;">
-                            <div class="d-block" style="margin-bottom: 4px;">
+                            <div class="d-flex justify-content-center align-items-center" style="flex-grow: 1; font-size: 0.875rem;">
                                 <span class="font-weight-bold">@declaredHours | @hoursInProject</span>
                             </div>
                             <div class="progress" style="height: 10px;">
-                                <div class="progress-bar" role="progressbar" style="width: @completionPercentage%; background-color: #28a745 !important;" aria-valuenow="@completionPercentage" aria-valuemin="0" aria-valuemax="100"></div>
+                                <div class="progress-bar bg-success" role="progressbar" style="width: @(completionPercentage.ToString(CultureInfo.InvariantCulture))%;"
+                                     background-color: #28a745 !important;" aria-valuenow="@completionPercentage" aria-valuemin="0" aria-valuemax="100"></div>
+
                             </div>
                             <div class="text-center" style="font-size: 0.75rem;">@completionPercentage%</div>
+                            @{
+                                var lockStatusKey = $"{monthDate.Year}-{monthDate.Month:D2}";
+                                var isLocked = person.LockStatusByMonth.ContainsKey(lockStatusKey) && person.LockStatusByMonth[lockStatusKey];
+                                var canLock = (!status.OutOfContract && !status.Overloaded) || (status.OutOfContract && (declaredHours > 0 || hoursInProject > 0));
+                                var buttonText = isLocked ? "Desbloquear" : "Bloquear";
+                                var buttonClass = isLocked ? "btn-danger" : "btn-success";
+                                var action = isLocked ? "Unlock" : "Lock";
+                            }
+
+                            @if (status.Overloaded || (status.OutOfContract && !canLock))
+                            {
+                                <button class="btn btn-secondary disabled" disabled>@buttonText</button>
+                            }
+                            else
+                            {
+                                var actionUrl = isLocked ? "/Projects/Unlock" : "/Projects/Lock"; // Define la URL de acción basada en el estado de bloqueo
+                                <button class="btn @buttonClass" onclick="updateLockStatus('@person.Personnel.Id', '@monthDate.Year', '@monthDate.Month', '@ViewBag.ProjectId','@ViewBag.PeriodId', '@actionUrl')">@buttonText</button>
+                            }
+
                         </td>
                     }
                 </tr>
@@ -58,3 +82,37 @@
 
 
 </style>
+
+<script>
+    function updateLockStatus(personId, year, month, projectId, periodId, actionUrl) {
+        var data = { personId: personId, projectId: projectId, year: year, month: month };
+
+        $.ajax({
+            url: actionUrl,
+            type: 'POST',
+            data: JSON.stringify(data),
+            contentType: 'application/json; charset=utf-8',
+            success: function (response) {
+                if (response.success) {
+                    // Solicitud AJAX para obtener la vista parcial actualizada
+                    $.ajax({
+                        url: '/Projects/PeriodDetails',
+                        data: { id: periodId, projectId: projectId }, // Asegúrate de pasar los parámetros necesarios
+                        success: function (partialViewResult) {
+                            // Actualiza el contenedor de la vista parcial con el nuevo contenido
+                            $('#detallesPeriodoContainer').html(partialViewResult);
+                        }
+                    });
+                } else {
+                    alert('No se pudo actualizar el estado de bloqueo.');
+                }
+            },
+            error: function (error) {
+                console.log(error);
+                alert('Ocurrió un error al intentar actualizar el estado de bloqueo.');
+            }
+        });
+    }
+
+
+</script>

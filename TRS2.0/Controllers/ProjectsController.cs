@@ -1226,16 +1226,11 @@ namespace TRS2._0.Controllers
                             e => e.TotalEffort
                         )
                     );
-                
+
 
                 var lockStatuses = await _context.ProjectMonthLocks
-                    .Where(l => personIds.Contains(l.PersonId) &&
-                                l.ProjectId == projectId &&
-                                l.Year >= reportPeriod.StartDate.Year &&
-                                l.Month >= reportPeriod.StartDate.Month &&
-                                l.Year <= reportPeriod.EndDate.Year &&
-                                l.Month <= reportPeriod.EndDate.Month)
-                    .ToListAsync();
+                            .Where(l => personIds.Contains(l.PersonId) && l.ProjectId == projectId)
+                            .ToListAsync();
 
                 if (!workPackages.Any()) return NotFound("No work packages found for the given period and project.");
 
@@ -1260,10 +1255,12 @@ namespace TRS2._0.Controllers
 
                     var personLockStatusByMonth = new Dictionary<string, bool>();
 
-                    foreach (var lockStatus in lockStatuses.Where(l => l.PersonId == personId))
+                    for (var dt = reportPeriod.StartDate; dt <= reportPeriod.EndDate; dt = dt.AddMonths(1))
                     {
-                        string yearMonthKey = $"{lockStatus.Year}-{lockStatus.Month:D2}";
-                        personLockStatusByMonth[yearMonthKey] = lockStatus.IsLocked;
+                        var yearMonthKey = $"{dt.Year}-{dt.Month:00}";
+                        var isLocked = lockStatuses.Any(l => l.PersonId == personId && l.Year == dt.Year && l.Month == dt.Month && l.IsLocked);
+
+                        personLockStatusByMonth[yearMonthKey] = isLocked;
                     }
 
                     declaredHoursStopwatch.Start();
@@ -1364,6 +1361,7 @@ namespace TRS2._0.Controllers
                         PersonStatusByMonth = personStatusByMonth,
                         HoursinProyect = hoursInProject,
                         TotalEffortinProyect = totalEffortInProyect,
+                        LockStatusByMonth = personLockStatusByMonth,
                         CompletionPercentage = completionPercentage
                 };
 
@@ -1384,6 +1382,8 @@ namespace TRS2._0.Controllers
 
                 totalStopwatch.Stop();
                 Console.WriteLine($"Total execution time of PeriodDetails was {totalStopwatch.ElapsedMilliseconds} ms");
+                ViewBag.ProjectId = projectId;
+                ViewBag.PeriodId = id;
 
                 return PartialView("_DetallesPeriodo", model);
             }
@@ -1394,6 +1394,76 @@ namespace TRS2._0.Controllers
             }
         }
 
+        [HttpPost]
+        public async Task<IActionResult> Lock([FromBody] LockModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                var lockEntry = await _context.ProjectMonthLocks
+                    .FirstOrDefaultAsync(l => l.PersonId == model.PersonId && l.ProjectId == model.ProjectId &&
+                                              l.Year == model.Year && l.Month == model.Month);
+
+                if (lockEntry == null)
+                {
+                    // Crear un nuevo registro marcado como bloqueado
+                    lockEntry = new ProjectMonthLock
+                    {
+                        PersonId = model.PersonId,
+                        ProjectId = model.ProjectId,
+                        Year = model.Year,
+                        Month = model.Month,
+                        IsLocked = true
+                    };
+                    _context.ProjectMonthLocks.Add(lockEntry);
+                }
+                else
+                {
+                    // Actualizar el registro existente a bloqueado
+                    lockEntry.IsLocked = true;
+                }
+
+                await _context.SaveChangesAsync();
+                return Json(new { success = true, message = "Mes bloqueado exitosamente." });
+            }
+
+            return Json(new { success = false, message = "Datos inválidos." });
+        }
+
+
+        [HttpPost]
+        public async Task<IActionResult> Unlock([FromBody] LockModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                var lockEntry = await _context.ProjectMonthLocks
+                    .FirstOrDefaultAsync(l => l.PersonId == model.PersonId && l.ProjectId == model.ProjectId &&
+                                              l.Year == model.Year && l.Month == model.Month);
+
+                if (lockEntry == null)
+                {
+                    // Si no existe, crear un nuevo registro marcado como desbloqueado
+                    lockEntry = new ProjectMonthLock
+                    {
+                        PersonId = model.PersonId,
+                        ProjectId = model.ProjectId,
+                        Year = model.Year,
+                        Month = model.Month,
+                        IsLocked = false
+                    };
+                    _context.ProjectMonthLocks.Add(lockEntry);
+                }
+                else
+                {
+                    // Si existe, actualizar el registro a desbloqueado
+                    lockEntry.IsLocked = false;
+                }
+
+                await _context.SaveChangesAsync();
+                return Json(new { success = true, message = "Mes desbloqueado exitosamente." });
+            }
+
+            return Json(new { success = false, message = "Datos inválidos." });
+        }
 
 
     }
