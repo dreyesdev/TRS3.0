@@ -57,6 +57,7 @@
                                         var monthStatus = personnelInfo?.MonthlyStatuses.FirstOrDefault(ms => ms.Month == month);
                                         var cellClass = "effort-cell"; // Clase por defecto
                                         var cellStyle = ""; // Estilo por defecto
+                                        var isLocked = monthStatus?.IsLocked ?? false; // Chequea si el mes está bloqueado
 
                                         if (monthStatus != null)
                                         {
@@ -143,9 +144,8 @@
                                         var effortValue = personnelEffort.Efforts.ContainsKey(month) ? personnelEffort.Efforts[month] : 0.00M;
 
                                         <td class="@cellClass" style="@cellStyle">
-                                            @if (isActiveMonth)
+                                            @if (isActiveMonth && !isLocked) // Permite edición solo si el mes está activo y no está bloqueado
                                             {
-                                                <!-- Mostrar input con esfuerzo o 0.00 si no hay esfuerzo -->
                                                 <input type="text" class="form-control input-effort"
                                                        value="@effortValue.ToString("0.00", CultureInfo.InvariantCulture)"
                                                        data-personid="@personnelEffort.PersonId"
@@ -155,8 +155,8 @@
                                             }
                                             else
                                             {
-                                                
-
+                                                <span style="display: block; text-align: center; text-size-adjust:auto; font-weight: bold;">@effortValue.ToString("0.00", CultureInfo.InvariantCulture)</span>
+                                                // Muestra el valor como texto si está bloqueado o no es un mes activo
                                             }
                                         </td>
                                     }

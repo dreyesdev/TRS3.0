@@ -48,6 +48,7 @@ namespace TRS2._0.Models.ViewModels
         public int ProjectId { get; set; }
         public decimal Effort { get; set; }
 
+        public bool IsLocked { get; set; }
         public decimal EstimatedHours { get; set; } // Nueva propiedad para las horas estimadas
 
         public List<Timesheet> Timesheets { get; set; } = new List<Timesheet>();

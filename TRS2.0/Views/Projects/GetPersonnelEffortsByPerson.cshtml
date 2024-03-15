@@ -78,6 +78,9 @@
                                     {
                                         var cellClass = "effort-cell";
                                         var cellStyle = "";
+                                        var isProjectLockedThisMonth = ViewBag.ProjectLocksByMonth.ContainsKey(monthStatus.Month.ToString("yyyy-MM")) &&
+                                        ViewBag.ProjectLocksByMonth[monthStatus.Month.ToString("yyyy-MM")].ContainsKey(projectEffort.ProjectId) &&
+                                        ViewBag.ProjectLocksByMonth[monthStatus.Month.ToString("yyyy-MM")][projectEffort.ProjectId];
                                         
                                         bool hasGradient = !string.IsNullOrEmpty(monthStatus.Gradient);
                                         
@@ -118,12 +121,20 @@
                                         }
 
                                         <td class="@cellClass" style="@cellStyle">
-                                            <input type="text" class="form-control input-effort"
-                                                   value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")"
-                                                   data-personid="@personnelEffort.PersonId"
-                                                   data-wpid="@wp.WpId"
-                                                   data-month="@monthStatus.Month.ToString("yyyy-MM-dd")"
-                                                   data-original-value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")" />
+
+                                            @if (!isProjectLockedThisMonth)
+                                            {
+                                                <input type="text" class="form-control input-effort"
+                                                       value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")"
+                                                       data-personid="@personnelEffort.PersonId"
+                                                       data-wpid="@wp.WpId"
+                                                       data-month="@monthStatus.Month.ToString("yyyy-MM-dd")"
+                                                       data-original-value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")" />
+                                            }
+                                            else
+                                            {
+                                                <span style="text-align:center; font-weight:bold; display:block;">@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")</span>
+                                            }
                                         </td>
                                     }
 

@@ -364,7 +364,8 @@ public class WorkCalendarService
     int personId,
     List<DateTime> uniqueMonths,
     Dictionary<string, decimal> totalEffortsPerMonth,
-    Dictionary<string, decimal> pmValuesPerMonth)
+    Dictionary<string, decimal> pmValuesPerMonth,
+    List<ProjectMonthLock> projectMonthLocks)
     {
         var monthStatuses = new List<MonthStatus>();
         var outOfContractForMonths = await IsOutOfContractForMonths(personId, uniqueMonths);
@@ -378,6 +379,7 @@ public class WorkCalendarService
             var gradientParts = new List<string>();
             var monthKey = $"{month.Year}-{month.Month:D2}";
             var travelDetails = travelDetailsForMonths.GetValueOrDefault(month, new List<TravelDetails>());
+            bool isLocked = projectMonthLocks.Any(l => l.Year == month.Year && l.Month == month.Month && l.IsLocked);
 
             // Determine if out of contract
             if (outOfContractForMonths.TryGetValue(month, out bool isOutOfContract) && isOutOfContract)
@@ -433,6 +435,7 @@ public class WorkCalendarService
             {
                 Month = month,
                 Status = status,
+                IsLocked = isLocked,
                 AdditionalStatuses = additionalStatuses,
                 Gradient = gradientParts.Any() ? $"linear-gradient(to right, {string.Join(", ", gradientParts)})" : "",
                 TravelDetails = travelDetails,

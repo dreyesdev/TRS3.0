@@ -114,60 +114,58 @@
                                 var isWeekend = day.DayOfWeek == DayOfWeek.Saturday || day.DayOfWeek == DayOfWeek.Sunday;
                                 var leave = Model.LeavesthisMonth.FirstOrDefault(l => l.Day.Date == day.Date);
                                 var hasTravel = Model.TravelsthisMonth.Any(t => day.Date >= t.StartDate && day.Date <= t.EndDate);
-                                var isFuture = day.Date > DateTime.Now.Date; // Verifica si el día es posterior al día actual
-                                var isHoliday = Model.Holidays.Any(h => h.Date == day.Date); // Verifica si el día es una fiesta nacional
+                                var isFuture = day.Date > DateTime.Now.Date;
+                                var isHoliday = Model.Holidays.Any(h => h.Date == day.Date);
                                 var cellStyle = "";
 
-
-                                // Aplica estilos específicos para cada condición
+                                // Define el estilo de la celda según las condiciones dadas
                                 if (isHoliday)
                                 {
-                                    cellStyle = "background-color: #FFD700;"; // Dorado para fiestas nacionales
+                                    cellStyle = "background-color: #FFD700;";
                                 }
                                 else if (hasTravel && !isFuture)
                                 {
-                                    cellStyle = "background-color: lightgreen;"; // Verde para días de viaje
+                                    cellStyle = "background-color: lightgreen;";
                                 }
-                                else if (isWeekend || isFuture) // Considera los días futuros como fines de semana para el estilo
+                                else if (isWeekend || isFuture)
                                 {
-                                    cellStyle = "background-color: #6c757d;"; // Gris para fines de semana y días futuros
+                                    cellStyle = "background-color: #6c757d;";
                                 }
                                 else if (leave != null)
                                 {
                                     switch (leave.Type)
                                     {
-                                        case 1: // Ausencia
+                                        case 1:
                                             cellStyle = "background-color: lightsalmon;";
                                             break;
-                                        case 2: // Vacaciones personales
+                                        case 2:
                                             cellStyle = "background-color: lightblue;";
                                             break;
-                                        case 3: // Fuera de contrato
+                                        case 3:
                                             cellStyle = "background-color: purple;";
                                             break;
                                     }
                                 }
 
-                                // Genera la celda con el estilo adecuado
-
                                 <td class="hour-input-cell" style="@cellStyle">
-                                    @if (!isWeekend && leave == null && !hasTravel && !isFuture && !isHoliday)
+                                    @if (!wp.IsLocked && !isWeekend && leave == null && !hasTravel && !isFuture && !isHoliday)
                                     {
                                         var timesheetEntry = wp.Timesheets.FirstOrDefault(ts => ts.Day.Date == day.Date);
                                         <input type="text" class="form-control input-hours"
-                                               value="@((timesheetEntry != null) ? timesheetEntry.Hours.ToString("0.##") : "0")"  
+                                               value="@((timesheetEntry != null) ? timesheetEntry.Hours.ToString("0.##") : "0")"
                                                data-projectid="@wp.ProjectId"
                                                data-wpid="@wp.WpId"
                                                data-day="@day.ToString("yyyy-MM-dd")"
                                                data-original-value="@((timesheetEntry != null) ? timesheetEntry.Hours.ToString("0.##") : "0")" />
-                                               
                                     }
                                     else
                                     {
-                                        @:
+                                        var timesheetEntry = wp.Timesheets.FirstOrDefault(ts => ts.Day.Date == day.Date);
+                                        <span class="font-weight-bold" style="display: block; text-align: center;">
+                                            @((timesheetEntry != null) ? timesheetEntry.Hours.ToString("0.##") : "0")
+                                        </span>
                                     }
                                 </td>
-                                
                             }
 
 

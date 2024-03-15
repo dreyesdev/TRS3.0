@@ -523,6 +523,13 @@ namespace TRS2._0.Controllers
                     .Where(pe => pe.Month >= adjustedProjectStartDate && pe.Month <= adjustedProjectEndDate)
                     .ToListAsync();
 
+            var projectMonthLocksAllPersons = await _context.ProjectMonthLocks
+                    .Where(l => l.ProjectId == projId &&
+                                personIds.Contains(l.PersonId) &&
+                                ((l.Year > adjustedProjectStartDate.Year || (l.Year == adjustedProjectStartDate.Year && l.Month >= adjustedProjectStartDate.Month)) &&
+                                (l.Year < adjustedProjectEndDate.Year || (l.Year == adjustedProjectEndDate.Year && l.Month <= adjustedProjectEndDate.Month))))
+                    .ToListAsync();
+
             if (wpId.HasValue)
             {
                 workPackages = workPackages.Where(wp => wp.Id == wpId.Value).ToList();
@@ -618,8 +625,12 @@ namespace TRS2._0.Controllers
 
                 _logger.LogInformation($"Esfuerzos maximos/totales calculados para persona {person.Person} en {stopwatch.ElapsedMilliseconds} ms");
 
+                var personProjectMonthLocks = projectMonthLocksAllPersons
+                                                .Where(l => l.PersonId == person.Person)
+                                                .ToList();
 
-                var monthStatuses = await _workCalendarService.CalculateMonthlyStatusesForPersonWithLists(person.Person, uniqueMonths, totalEffortsPerMonth, pmValuesPerMonth);
+                
+                var monthStatuses = await _workCalendarService.CalculateMonthlyStatusesForPersonWithLists(person.Person, uniqueMonths, totalEffortsPerMonth, pmValuesPerMonth, personProjectMonthLocks);
                 _logger.LogInformation($"Estados mensuales calculados para persona {person.Person} en {stopwatch.ElapsedMilliseconds} ms");
 
                 // Añade la info de la persona a la lista
@@ -819,6 +830,35 @@ namespace TRS2._0.Controllers
                                     })
                                     .ToListAsync();
 
+            // Consulta para obtener los ProjectIds en los que la persona está involucrada y que se solapan con el rango de fechas ajustado
+            var personProjectIds = await _context.Wpxpeople
+                .Include(wpx => wpx.WpNavigation)
+                .Where(wpx => wpx.Person == personId &&
+                              wpx.WpNavigation.StartDate <= adjustedProjectEndDate &&
+                              wpx.WpNavigation.EndDate >= adjustedProjectStartDate)
+                .Select(wpx => wpx.WpNavigation.ProjId)
+                .Distinct()
+                .ToListAsync();
+
+            // Utilizar la lista de ProjectIds para filtrar en ProjectMonthLocks
+            var projectMonthLocks = await _context.ProjectMonthLocks
+                .Where(l => l.PersonId == personId &&
+                            personProjectIds.Contains(l.ProjectId) &&
+                            ((l.Year > adjustedProjectStartDate.Year || (l.Year == adjustedProjectStartDate.Year && l.Month >= adjustedProjectStartDate.Month)) &&
+                             (l.Year < adjustedProjectEndDate.Year || (l.Year == adjustedProjectEndDate.Year && l.Month <= adjustedProjectEndDate.Month))))
+                .ToListAsync();
+
+            // Agrupa los bloqueos por mes y luego por proyecto
+            var projectLocksByMonth = projectMonthLocks
+                .GroupBy(l => new { l.Year, l.Month })
+                .ToDictionary(
+                    group => $"{group.Key.Year}-{group.Key.Month:D2}",
+                    group => group.ToDictionary(
+                        g => g.ProjectId,
+                        g => g.IsLocked
+                    )
+                );
+
             // Calcular el esfuerzo total por mes para la persona
             var totalEffortsPerMonth = new Dictionary<string, decimal>();
 
@@ -874,14 +914,15 @@ namespace TRS2._0.Controllers
                 
                 totalEffortsPerMonth[monthKey] = await _workCalendarService.CalculateMonthlyEffortForPerson(personId, month.Year, month.Month);
             }
+            
 
-
-            var monthStatuses = await _workCalendarService.CalculateMonthlyStatusesForPersonWithLists(personId, uniqueMonths, totalEffortsPerMonth, pmValuesPerMonth);
+            var monthStatuses = await _workCalendarService.CalculateMonthlyStatusesForPersonWithLists(personId, uniqueMonths, totalEffortsPerMonth, pmValuesPerMonth, projectMonthLocks);
 
             personnelinfo.MonthlyStatuses = monthStatuses;
             ViewBag.TotalEffortsPerMonth = totalEffortsPerMonth;
             ViewBag.PMValuesPerMonth = pmValuesPerMonth;
             ViewBag.PersonnelInfo = personnelinfo;
+            ViewBag.ProjectLocksByMonth = projectLocksByMonth;
 
             var projectMonths = new List<string>();
             DateTime monthstart = adjustedProjectStartDate;
