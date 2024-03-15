@@ -100,6 +100,16 @@ namespace TRS2._0.Controllers
                         group => group.Key,
                         group => group.Sum(ts => ts.Hours) // Asume que 'Hours' ya está ajustado por la dedicación si es necesario
                     );
+
+            // Suponiendo que tienes una lista o puedes obtener los IDs de los proyectos a los que la persona está asignada en ese mes concreto
+            var projectIds = wpxPersons.Select(wpx => wpx.WpNavigation.ProjId).Distinct().ToList();
+
+            // Obtener los estados de bloqueo para esos proyectos en el mes y año específicos
+            var projectLocks = await _context.ProjectMonthLocks
+                .Where(l => projectIds.Contains(l.ProjectId) &&
+                            l.Year == currentYear &&
+                            l.Month == currentMonth)
+                .ToListAsync();
             // Preparación del ViewModel
             var viewModel = new TimesheetViewModel
             {
@@ -117,8 +127,8 @@ namespace TRS2._0.Controllers
                 WorkPackages = wpxPersons.Select(wpx =>
                 {
                     var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
-                    var estimatedHours = Math.Round(totalWorkHours * effort, 1); 
-
+                    var estimatedHours = Math.Round(totalWorkHours * effort, 1);
+                    var isLocked = projectLocks.Any(l => l.ProjectId == wpx.WpNavigation.ProjId);
                     return new WorkPackageInfoTS
                     {
                         WpId = wpx.Wp,
@@ -127,6 +137,7 @@ namespace TRS2._0.Controllers
                         ProjectName = wpx.WpNavigation.Proj.Acronim,
                         ProjectSAPCode = wpx.WpNavigation.Proj.SapCode,
                         ProjectId = wpx.WpNavigation.Proj.ProjId,
+                        IsLocked = isLocked,
                         Effort = effort, // Asigna el esfuerzo calculado
                         EstimatedHours = estimatedHours, // Asigna las horas estimadas calculadas
                         Timesheets = timesheets.Where(ts => ts.WpxPersonId == wpx.Id).ToList()
@@ -208,15 +219,7 @@ namespace TRS2._0.Controllers
                         group => group.Sum(ts => ts.Hours) // Asume que 'Hours' ya está ajustado por la dedicación si es necesario
                     );
 
-            // Suponiendo que tienes una lista o puedes obtener los IDs de los proyectos a los que la persona está asignada en ese mes concreto
-            var projectIds = wpxPersons.Select(wpx => wpx.WpNavigation.ProjId).Distinct().ToList();
-
-            // Obtener los estados de bloqueo para esos proyectos en el mes y año específicos
-            var projectLocks = await _context.ProjectMonthLocks
-                .Where(l => projectIds.Contains(l.ProjectId) &&
-                            l.Year == currentYear &&
-                            l.Month == currentMonth)
-                .ToListAsync();
+            
 
             // Preparación del ViewModel
             var viewModel = new TimesheetViewModel
@@ -236,7 +239,7 @@ namespace TRS2._0.Controllers
                 {
                     var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
                     var estimatedHours = Math.Round(totalWorkHours * effort, 1);
-                    var isLocked = projectLocks.Any(l => l.ProjectId == wpx.WpNavigation.ProjId);
+                    
                     return new WorkPackageInfoTS
                     {
                         WpId = wpx.Wp,
@@ -244,8 +247,7 @@ namespace TRS2._0.Controllers
                         WpTitle = wpx.WpNavigation.Title,
                         ProjectName = wpx.WpNavigation.Proj.Acronim,
                         ProjectSAPCode = wpx.WpNavigation.Proj.SapCode,
-                        ProjectId = wpx.WpNavigation.Proj.ProjId,
-                        IsLocked = isLocked,
+                        ProjectId = wpx.WpNavigation.Proj.ProjId,                        
                         Effort = effort, // Asigna el esfuerzo calculado
                         EstimatedHours = estimatedHours, // Asigna las horas estimadas calculadas
                         Timesheets = timesheets.Where(ts => ts.WpxPersonId == wpx.Id).ToList()
