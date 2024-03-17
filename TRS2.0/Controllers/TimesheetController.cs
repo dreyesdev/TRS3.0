@@ -128,7 +128,7 @@ namespace TRS2._0.Controllers
                 {
                     var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
                     var estimatedHours = Math.Round(totalWorkHours * effort, 1);
-                    var isLocked = projectLocks.Any(l => l.ProjectId == wpx.WpNavigation.ProjId);
+                    var isLocked = projectLocks.Any(l => l.ProjectId == wpx.WpNavigation.ProjId && (l.IsLocked == true));
                     return new WorkPackageInfoTS
                     {
                         WpId = wpx.Wp,
