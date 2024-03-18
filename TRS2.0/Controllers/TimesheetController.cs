@@ -312,7 +312,9 @@ namespace TRS2._0.Controllers
         [HttpGet]
         public async Task<IActionResult> ExportTimesheetToPdf(int personId, int year, int month)
         {
-            var model = await GetTimesheetDataForPerson(personId, year, month); // Asegúrate de tener este método.
+            var model = await GetTimesheetDataForPerson(personId, year, month); // Asegúrate de tener este método implementado.
+            var logoPath = Path.Combine(Directory.GetCurrentDirectory(), "Resources", "logo.png");
+
 
             var document = Document.Create(document =>
             {
@@ -322,58 +324,40 @@ namespace TRS2._0.Controllers
                     page.Size(PageSizes.A4.Landscape());
                     page.DefaultTextStyle(x => x.FontSize(10));
 
-                    page.Header().Text($"Timesheet: {model.Person.Name} - {year}/{month}", TextStyle.Default.Size(20));
-
-                    page.Content().Table(table =>
+                    page.Header().Row(row =>
                     {
-                        // Define las columnas
-                        table.ColumnsDefinition(columns =>
+                        // Logo de la empresa a la izquierda
+                        row.RelativeItem().Column(column =>
                         {
-                            columns.ConstantColumn(100); // Proyecto - Acrónimo
-                            columns.ConstantColumn(150); // Dedication - Estimated Hours
-                            foreach (var _ in Enumerable.Range(1, DateTime.DaysInMonth(year, month)))
-                            {
-                                columns.RelativeColumn(); // Una columna por cada día
-                            }
-                            columns.ConstantColumn(50); // Columna de Total
+                            column.Item().Image(logoPath, ImageScaling.FitArea);
                         });
 
-                        // Encabezado
-                        table.Header(header =>
+                        // Título con fondo azul oscuro
+                        row.RelativeItem().Column(column =>
                         {
-                            header.Cell().Text("Proyecto - Acrónimo");
-                            header.Cell().Text("Dedication - Estimated Hours");
-                            foreach (var day in Enumerable.Range(1, DateTime.DaysInMonth(year, month)))
-                            {
-                                header.Cell().Text(day.ToString());
-                            }
-                            header.Cell().Text("Total");
+                            column.Item().Background("#123456").Padding(5).AlignCenter().Text($"Timesheet for {model.Person.Name} - {new DateTime(year, month, 1).ToString("MMMM yyyy")}", TextStyle.Default.Size(20).Color("#FFFFFF"));
                         });
 
-                        // Datos
-                        foreach (var wp in model.WorkPackages)
+                        // Tabla pequeña a la derecha
+                        row.RelativeItem().Column(column =>
                         {
-                            table.Cell().Text(wp.ProjectName);
-                            table.Cell().Text($"Dedication: {wp.Effort:P1}, Estimated Hours: {wp.EstimatedHours}");
-
-                            foreach (var day in Enumerable.Range(1, DateTime.DaysInMonth(year, month)))
+                            column.Item().Table(table =>
                             {
-                                var timesheetEntry = wp.Timesheets.FirstOrDefault(ts => ts.Day.Day == day);
-                                table.Cell().Text(timesheetEntry?.Hours.ToString("0.##") ?? "");
-                            }
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn();
+                                    columns.RelativeColumn();
+                                });
 
-                            table.Cell().Text(wp.Timesheets.Sum(ts => ts.Hours).ToString("0.##"));
-                        }
+                                // Aquí puedes agregar las filas que necesites a tu tabla pequeña
+                                table.Cell().Border(1).BorderColor("#808080").Text("Cell 1"); // Gris
+                                table.Cell().Border(1).BorderColor("#808080").Text("Cell 2"); // Gris
+                            });
+                        });
                     });
 
-                    page.Footer().AlignCenter().Text(text =>
-                    {
-                        text.CurrentPageNumber();
-                        text.Span(" of ");
-                        text.TotalPages();
-                    });
+                    // Aquí sigue el resto de tu diseño de documento...
                 });
-
             });
 
             using var stream = new MemoryStream();
@@ -383,6 +367,7 @@ namespace TRS2._0.Controllers
             var pdfFileName = $"Timesheet_{personId}_{year}_{month}.pdf";
             return File(stream.ToArray(), "application/pdf", pdfFileName);
         }
+
 
 
 
