@@ -322,42 +322,55 @@ namespace TRS2._0.Controllers
                 {
                     page.Margin(40);
                     page.Size(PageSizes.A4.Landscape());
-                    page.DefaultTextStyle(x => x.FontSize(10));
 
-                    page.Header().Row(row =>
+                    // Sección del título
+                    page.Header().Element(header =>
                     {
-                        // Logo de la empresa a la izquierda
-                        row.RelativeItem().Column(column =>
+                        header.Background("#123456").Padding(5).Row(row =>
                         {
-                            column.Item().Image(logoPath, ImageScaling.FitArea);
+                            row.RelativeItem().AlignCenter().Text($"Timesheet for {model.Person.Name} - {new DateTime(year, month, 1):MMMM} | {year}", TextStyle.Default.Size(16).Bold().Color("#FFFFFF"));
                         });
+                    }); // Se elimina el encadenamiento después de definir la altura
 
-                        // Título con fondo azul oscuro
-                        row.RelativeItem().Column(column =>
-                        {
-                            column.Item().Background("#123456").Padding(5).AlignCenter().Text($"Timesheet for {model.Person.Name} - {new DateTime(year, month, 1).ToString("MMMM yyyy")}", TextStyle.Default.Size(20).Color("#FFFFFF"));
-                        });
+                    // Espacio entre el título y la tabla de detalles
+                    page.Header().Element(header =>
+                    {
+                        header.PaddingTop(10); // Se ajusta el padding en una llamada separada
+                    });
 
-                        // Tabla pequeña a la derecha
-                        row.RelativeItem().Column(column =>
+                    // Resto del encabezado para el logo y la tabla de detalles
+                    page.Header().Element(header =>
+                    {
+                        header.Row(row =>
                         {
-                            column.Item().Table(table =>
+                            // Logo de la empresa
+                            row.ConstantItem(100).Height(50).Image(logoPath, ImageScaling.FitArea);
+
+                            // Tabla de detalles a la derecha
+                            row.RelativeItem().Table(table =>
                             {
                                 table.ColumnsDefinition(columns =>
                                 {
-                                    columns.RelativeColumn();
-                                    columns.RelativeColumn();
+                                    columns.RelativeColumn(1); // Columna de títulos
+                                    columns.RelativeColumn(2); // Columna de datos
                                 });
 
-                                // Aquí puedes agregar las filas que necesites a tu tabla pequeña
-                                table.Cell().Border(1).BorderColor("#808080").Text("Cell 1"); // Gris
-                                table.Cell().Border(1).BorderColor("#808080").Text("Cell 2"); // Gris
-                            });
+                                var titles = new[] { "Name of Beneficiary", "Name of Staff Member", "Job Title", "Calendar Month", "Calendar Year" };
+                                var details = new[] { "Beneficiary Name", model.Person.Name, "Staff Member's Job Title", $"{new DateTime(year, month, 1):MMMM}", year.ToString() };
+
+                                for (int i = 0; i < titles.Length; i++)
+                                {
+                                    table.Cell().BorderBottom(1).BorderColor("#DDDDDD").PaddingVertical(5).Text(titles[i]);
+                                    table.Cell().BorderBottom(1).BorderColor("#DDDDDD").PaddingVertical(5).Text(details[i]);
+                                }
+                            }); // Se ajusta el padding en una llamada separada para la tabla
                         });
-                    });
+                    }); // Se elimina el encadenamiento después de definir la altura
 
                     // Aquí sigue el resto de tu diseño de documento...
                 });
+
+
             });
 
             using var stream = new MemoryStream();
