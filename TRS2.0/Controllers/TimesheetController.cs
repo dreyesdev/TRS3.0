@@ -8,6 +8,7 @@ using static TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel;
 using QuestPDF.Fluent;
 using QuestPDF.Infrastructure;
 using QuestPDF.Helpers;
+using QuestPDF.Previewer;
 
 
 
@@ -313,76 +314,161 @@ namespace TRS2._0.Controllers
         public async Task<IActionResult> ExportTimesheetToPdf(int personId, int year, int month)
         {
             var model = await GetTimesheetDataForPerson(personId, year, month); // Asegúrate de tener este método implementado.
-            var logoPath = Path.Combine(Directory.GetCurrentDirectory(), "Resources", "logo.png");
-
+            
 
             var document = Document.Create(document =>
             {
                 document.Page(page =>
                 {
-                    page.Margin(40);
+
+                    page.Margin(30);
                     page.Size(PageSizes.A4.Landscape());
+                    //page.Header().Height(100).Background(Colors.Blue.Medium);
+                    //page.Content().Background(Colors.Yellow.Medium);
+                    //page.Footer().Height(50).Background(Colors.Red.Medium);
 
-                    // Sección del título
-                    page.Header().Element(header =>
+                    page.Header().ShowOnce().Row(row =>
                     {
-                        header.Background("#123456").Padding(5).Row(row =>
+                        var logoPath = Path.Combine(Directory.GetCurrentDirectory(), "Resources", "logo.png");
+                        byte[] logoBytes = System.IO.File.ReadAllBytes(logoPath);
+                        row.ConstantItem(140).Height(60).Image(logoBytes);
+
+
+                        row.RelativeItem().Column(col =>
                         {
-                            row.RelativeItem().AlignCenter().Text($"Timesheet for {model.Person.Name} - {new DateTime(year, month, 1):MMMM} | {year}", TextStyle.Default.Size(16).Bold().Color("#FFFFFF"));
-                        });
-                    }); // Se elimina el encadenamiento después de definir la altura
+                            col.Item().AlignCenter().Text("Codigo Estudiante SAC").Bold().FontSize(14);
+                            col.Item().AlignCenter().Text("Jr. Las mercedes N378 - Lima").FontSize(9);
+                            col.Item().AlignCenter().Text("987 987 123 / 02 213232").FontSize(9);
+                            col.Item().AlignCenter().Text("codigo@example.com").FontSize(9);
 
-                    // Espacio entre el título y la tabla de detalles
-                    page.Header().Element(header =>
-                    {
-                        header.PaddingTop(10); // Se ajusta el padding en una llamada separada
+                        });
+
+                        row.RelativeItem().Column(col =>
+                        {
+                            col.Item().Border(1).BorderColor("#257272")
+                            .AlignCenter().Text("RUC 21312312312");
+
+                            col.Item().Background("#257272").Border(1)
+                            .BorderColor("#257272").AlignCenter()
+                            .Text("Boleta de venta").FontColor("#fff");
+
+                            col.Item().Border(1).BorderColor("#257272").
+                            AlignCenter().Text("B0001 - 234");
+
+
+                        });
                     });
 
-                    // Resto del encabezado para el logo y la tabla de detalles
-                    page.Header().Element(header =>
+                    page.Content().PaddingVertical(10).Column(col1 =>
                     {
-                        header.Row(row =>
+                        col1.Item().Column(col2 =>
                         {
-                            // Logo de la empresa
-                            row.ConstantItem(100).Height(50).Image(logoPath, ImageScaling.FitArea);
+                            col2.Item().Text("Datos del cliente").Underline().Bold();
 
-                            // Tabla de detalles a la derecha
-                            row.RelativeItem().Table(table =>
+                            col2.Item().Text(txt =>
                             {
-                                table.ColumnsDefinition(columns =>
-                                {
-                                    columns.RelativeColumn(1); // Columna de títulos
-                                    columns.RelativeColumn(2); // Columna de datos
-                                });
+                                txt.Span("Nombre: ").SemiBold().FontSize(10);
+                                txt.Span("Mario mendoza").FontSize(10);
+                            });
 
-                                var titles = new[] { "Name of Beneficiary", "Name of Staff Member", "Job Title", "Calendar Month", "Calendar Year" };
-                                var details = new[] { "Beneficiary Name", model.Person.Name, "Staff Member's Job Title", $"{new DateTime(year, month, 1):MMMM}", year.ToString() };
+                            col2.Item().Text(txt =>
+                            {
+                                txt.Span("DNI: ").SemiBold().FontSize(10);
+                                txt.Span("978978979").FontSize(10);
+                            });
 
-                                for (int i = 0; i < titles.Length; i++)
-                                {
-                                    table.Cell().BorderBottom(1).BorderColor("#DDDDDD").PaddingVertical(5).Text(titles[i]);
-                                    table.Cell().BorderBottom(1).BorderColor("#DDDDDD").PaddingVertical(5).Text(details[i]);
-                                }
-                            }); // Se ajusta el padding en una llamada separada para la tabla
+                            col2.Item().Text(txt =>
+                            {
+                                txt.Span("Direccion: ").SemiBold().FontSize(10);
+                                txt.Span("av. miraflores 123").FontSize(10);
+                            });
                         });
-                    }); // Se elimina el encadenamiento después de definir la altura
 
-                    // Aquí sigue el resto de tu diseño de documento...
+                        col1.Item().LineHorizontal(0.5f);
+
+                        col1.Item().Table(tabla =>
+                        {
+                            tabla.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(3);
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+
+                            });
+
+                            tabla.Header(header =>
+                            {
+                                header.Cell().Background("#257272")
+                                .Padding(2).Text("Producto").FontColor("#fff");
+
+                                header.Cell().Background("#257272")
+                               .Padding(2).Text("Precio Unit").FontColor("#fff");
+
+                                header.Cell().Background("#257272")
+                               .Padding(2).Text("Cantidad").FontColor("#fff");
+
+                                header.Cell().Background("#257272")
+                               .Padding(2).Text("Total").FontColor("#fff");
+                            });
+
+                            foreach (var item in Enumerable.Range(1, 45))
+                            {
+                                var cantidad = Placeholders.Random.Next(1, 10);
+                                var precio = Placeholders.Random.Next(5, 15);
+                                var total = cantidad * precio;
+
+                                tabla.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9")
+                                .Padding(2).Text(Placeholders.Label()).FontSize(10);
+
+                                tabla.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9")
+                         .Padding(2).Text(cantidad.ToString()).FontSize(10);
+
+                                tabla.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9")
+                         .Padding(2).Text($"S/. {precio}").FontSize(10);
+
+                                tabla.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9")
+                         .Padding(2).AlignRight().Text($"S/. {total}").FontSize(10);
+                            }
+
+                        });
+
+                        col1.Item().AlignRight().Text("Total: 1500").FontSize(12);
+
+                        if (1 == 1)
+                            col1.Item().Background(Colors.Grey.Lighten3).Padding(10)
+                            .Column(column =>
+                            {
+                                column.Item().Text("Comentarios").FontSize(14);
+                                column.Item().Text(Placeholders.LoremIpsum());
+                                column.Spacing(5);
+                            });
+
+                        col1.Spacing(10);
+                    });
+
+
+                    page.Footer()
+                    .AlignRight()
+                    .Text(txt =>
+                    {
+                        txt.Span("Pagina ").FontSize(10);
+                        txt.CurrentPageNumber().FontSize(10);
+                        txt.Span(" de ").FontSize(10);
+                        txt.TotalPages().FontSize(10);
+                    });
                 });
 
 
             });
 
             using var stream = new MemoryStream();
-            document.GeneratePdf(stream);
+            document.ShowInPreviewer();
             stream.Seek(0, SeekOrigin.Begin);
 
             var pdfFileName = $"Timesheet_{personId}_{year}_{month}.pdf";
             return File(stream.ToArray(), "application/pdf", pdfFileName);
-        }
-
-
-
+        }        
 
 
 
