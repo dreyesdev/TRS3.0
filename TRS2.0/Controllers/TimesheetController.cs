@@ -362,7 +362,7 @@ namespace TRS2._0.Controllers
                         row.ConstantItem(100).Column(col =>
                         {
                             col.Item().Border(1).BorderColor("#004488") // Changed to dark blue
-                            .AlignCenter().Text("");
+                            .AlignCenter().Text($"{model.TotalHours}");
 
                             col.Item().Background("#004488").Border(1) // Background and border changed to dark blue
                             .BorderColor("#004488").AlignCenter()
@@ -428,15 +428,17 @@ namespace TRS2._0.Controllers
                                 {
                                     var date = new DateTime(year, month, day);
                                     var dayAbbreviation = date.ToString("ddd", CultureInfo.CreateSpecificCulture("en")); // Obtiene la abreviatura del día en inglés
-                                    header.Cell().Background("#004488").Padding(2).Text($"{dayAbbreviation} {day:00}").FontColor("#fff").FontSize(10);
+                                    header.Cell().Background("#004488").Padding(2).Text($"{dayAbbreviation} {day:00}").FontColor("#fff").FontSize(8);
                                 }
                             });
 
+                            
                             foreach (var wp in model.WorkPackages)
                             {
                                 // For each work package, add a new cell for the WP name
                                 tabla.Cell().Text(wp.WpName);
-
+                                var totalWp = wp.Timesheets.Sum(ts => ts.Hours);
+                                
                                 // Then, for each day of the month, add a new cell with either the timesheet entry hours or "0"
                                 foreach (var day in Enumerable.Range(1, DateTime.DaysInMonth(year, month)))
                                 {
@@ -444,8 +446,14 @@ namespace TRS2._0.Controllers
                                     var timesheetEntry = wp.Timesheets.FirstOrDefault(ts => ts.Day.Date == date);
 
                                     // Directly add cells for each day within the same iteration that adds the work package name
-                                    tabla.Cell().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").FontSize(10);
+                                    tabla.Cell().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").FontSize(8);
                                 }
+
+                                // Calcular el total de horas para este WP
+                                var totalHours = wp.Timesheets.Sum(ts => ts.Hours);
+
+                                // Celda para el total de horas
+                                tabla.Cell().Text(totalHours.ToString("0.##"));
 
                                 // Note: Ensure this code is placed within the context of configuring the table, especially within the .Content() section where the table is being defined.
                             }
