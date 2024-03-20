@@ -13,6 +13,7 @@ using QuestPDF.Previewer;
 
 
 
+
 namespace TRS2._0.Controllers
 {
     public class TimesheetController : Controller
@@ -154,7 +155,7 @@ namespace TRS2._0.Controllers
             return View(viewModel); 
         }
 
-        public async Task<TimesheetViewModel> GetTimesheetDataForPerson(int personId, int year, int month)
+        public async Task<TimesheetViewModel> GetTimesheetDataForPerson(int personId, int year, int month, int project)
         {
             // Determina el año y mes actual si no se proporcionan
             var currentYear = year;
@@ -179,8 +180,8 @@ namespace TRS2._0.Controllers
             var wpxPersons = await _context.Wpxpeople
                 .Include(wpx => wpx.PersonNavigation)
                 .Include(wpx => wpx.WpNavigation)
-                    .ThenInclude(wp => wp.Proj)
-                .Where(wpx => wpx.Person == personId && wpx.WpNavigation.StartDate <= endDate && wpx.WpNavigation.EndDate >= startDate)
+            .ThenInclude(wp => wp.Proj )
+                .Where(wpx => wpx.Person == personId && wpx.WpNavigation.ProjId == project && wpx.WpNavigation.StartDate <= endDate && wpx.WpNavigation.EndDate >= startDate)
                 .Select(wpx => new {
                     WpxPerson = wpx,
                     Effort = _context.Persefforts
@@ -194,8 +195,12 @@ namespace TRS2._0.Controllers
 
             // Obtener Timesheets para la persona en el rango de fecha especificado
             var timesheets = await _context.Timesheets
-                .Where(ts => wpxPersons.Select(wpx => wpx.Id).Contains(ts.WpxPersonId) && ts.Day >= startDate && ts.Day <= endDate)
-                .ToListAsync();
+                        .Include(ts => ts.WpxPersonNavigation)
+                            .ThenInclude(wpx => wpx.WpNavigation)
+                        .Where(ts => ts.WpxPersonNavigation.Person == personId &&
+                                     ts.Day >= startDate && ts.Day <= endDate &&
+                                     ts.WpxPersonNavigation.WpNavigation.ProjId == project) // Filtrado por proyecto
+                        .ToListAsync();
 
             var hoursUsed = timesheets.Sum(ts => ts.Hours);
 
@@ -311,9 +316,9 @@ namespace TRS2._0.Controllers
 
         
         [HttpGet]
-        public async Task<IActionResult> ExportTimesheetToPdf(int personId, int year, int month)
+        public async Task<IActionResult> ExportTimesheetToPdf(int personId, int year, int month, int project)
         {
-            var model = await GetTimesheetDataForPerson(personId, year, month); // Asegúrate de tener este método implementado.
+            var model = await GetTimesheetDataForPerson(personId, year, month, project); // Asegúrate de tener este método implementado.
             
 
             var document = Document.Create(document =>
@@ -336,111 +341,126 @@ namespace TRS2._0.Controllers
 
                         row.RelativeItem().Column(col =>
                         {
-                            col.Item().AlignCenter().Text("Codigo Estudiante SAC").Bold().FontSize(14);
-                            col.Item().AlignCenter().Text("Jr. Las mercedes N378 - Lima").FontSize(9);
-                            col.Item().AlignCenter().Text("987 987 123 / 02 213232").FontSize(9);
-                            col.Item().AlignCenter().Text("codigo@example.com").FontSize(9);
-
+                            var monthName = new DateTime(year, month, 1).ToString("MMMM", CultureInfo.CreateSpecificCulture("en"));
+                            col.Item().AlignCenter().Text($"{model.Person.Name} {model.Person.Surname} Timesheet").Bold().FontSize(14);
+                            col.Item().AlignCenter().Text($"{monthName} {year}").FontSize(12);
                         });
 
-                        row.RelativeItem().Column(col =>
+                        row.ConstantItem(180).Column(col =>
                         {
-                            col.Item().Border(1).BorderColor("#257272")
-                            .AlignCenter().Text("RUC 21312312312");
+                            col.Item().Border(1).BorderColor("#004488") // Changed to dark blue
+                            .AlignCenter().Text("Hours worked");
 
-                            col.Item().Background("#257272").Border(1)
-                            .BorderColor("#257272").AlignCenter()
-                            .Text("Boleta de venta").FontColor("#fff");
+                            col.Item().Background("#004488").Border(1) // Background and border changed to dark blue
+                            .BorderColor("#004488").AlignCenter()
+                            .Text("Total hours worked on project").FontColor("#fff");
 
-                            col.Item().Border(1).BorderColor("#257272").
-                            AlignCenter().Text("B0001 - 234");
-
-
+                            col.Item().Border(1).BorderColor("#004488"). // Border changed to dark blue
+                            AlignCenter().Text("Total days worked on project");
                         });
+
+                        row.ConstantItem(100).Column(col =>
+                        {
+                            col.Item().Border(1).BorderColor("#004488") // Changed to dark blue
+                            .AlignCenter().Text("");
+
+                            col.Item().Background("#004488").Border(1) // Background and border changed to dark blue
+                            .BorderColor("#004488").AlignCenter()
+                            .Text("").FontColor("#fff");
+
+                            col.Item().Border(1).BorderColor("#004488"). // Border changed to dark blue
+                            AlignCenter().Text("");
+                        });
+
                     });
 
                     page.Content().PaddingVertical(10).Column(col1 =>
                     {
                         col1.Item().Column(col2 =>
                         {
-                            col2.Item().Text("Datos del cliente").Underline().Bold();
+                            col2.Item().Text("Personnel Data").Underline().Bold();
 
                             col2.Item().Text(txt =>
                             {
-                                txt.Span("Nombre: ").SemiBold().FontSize(10);
-                                txt.Span("Mario mendoza").FontSize(10);
+                                txt.Span("Name of Beneficiary: ").SemiBold().FontSize(10);
+                                txt.Span("BARCELONA SUPERCOMPUTING CENTER - CENTRO NACIONAL DE SUPERCOMPUTACIÓN").FontSize(10);
                             });
 
                             col2.Item().Text(txt =>
                             {
-                                txt.Span("DNI: ").SemiBold().FontSize(10);
-                                txt.Span("978978979").FontSize(10);
+                                txt.Span("Name of staff member: ").SemiBold().FontSize(10);
+                                txt.Span($"{model.Person.Name} {model.Person.Surname}").FontSize(10);
                             });
 
                             col2.Item().Text(txt =>
                             {
-                                txt.Span("Direccion: ").SemiBold().FontSize(10);
-                                txt.Span("av. miraflores 123").FontSize(10);
+                                txt.Span("Job Title: ").SemiBold().FontSize(10);
+                                txt.Span($"{model.Person.Category}").FontSize(10);
                             });
+
                         });
 
                         col1.Item().LineHorizontal(0.5f);
 
                         col1.Item().Table(tabla =>
                         {
+                            // Definición dinámica de las columnas según el mes
                             tabla.ColumnsDefinition(columns =>
                             {
-                                columns.RelativeColumn(3);
-                                columns.RelativeColumn();
-                                columns.RelativeColumn();
-                                columns.RelativeColumn();
-
+                                columns.RelativeColumn(3); // Para "Proyecto"
+                                                           // Agrega una columna por cada día del mes
+                                var daysInMonth = DateTime.DaysInMonth(year, month);
+                                for (int day = 1; day <= daysInMonth; day++)
+                                {
+                                    columns.RelativeColumn(); // Una columna por día
+                                }
                             });
 
+                            // Encabezado de la tabla
                             tabla.Header(header =>
                             {
-                                header.Cell().Background("#257272")
-                                .Padding(2).Text("Producto").FontColor("#fff");
+                                // Primera columna fija
+                                header.Cell().Background("#004488").Padding(2).Text("Proyecto").FontColor("#fff");
 
-                                header.Cell().Background("#257272")
-                               .Padding(2).Text("Precio Unit").FontColor("#fff");
-
-                                header.Cell().Background("#257272")
-                               .Padding(2).Text("Cantidad").FontColor("#fff");
-
-                                header.Cell().Background("#257272")
-                               .Padding(2).Text("Total").FontColor("#fff");
+                                // Columnas para cada día del mes
+                                var daysInMonth = DateTime.DaysInMonth(year, month);
+                                for (int day = 1; day <= daysInMonth; day++)
+                                {
+                                    var date = new DateTime(year, month, day);
+                                    var dayAbbreviation = date.ToString("ddd", CultureInfo.CreateSpecificCulture("en")); // Obtiene la abreviatura del día en inglés
+                                    header.Cell().Background("#004488").Padding(2).Text($"{dayAbbreviation} {day:00}").FontColor("#fff").FontSize(10);
+                                }
                             });
 
-                            foreach (var item in Enumerable.Range(1, 45))
+                            foreach (var wp in model.WorkPackages)
                             {
-                                var cantidad = Placeholders.Random.Next(1, 10);
-                                var precio = Placeholders.Random.Next(5, 15);
-                                var total = cantidad * precio;
+                                // For each work package, add a new cell for the WP name
+                                tabla.Cell().Text(wp.WpName);
 
-                                tabla.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9")
-                                .Padding(2).Text(Placeholders.Label()).FontSize(10);
+                                // Then, for each day of the month, add a new cell with either the timesheet entry hours or "0"
+                                foreach (var day in Enumerable.Range(1, DateTime.DaysInMonth(year, month)))
+                                {
+                                    var date = new DateTime(year, month, day);
+                                    var timesheetEntry = wp.Timesheets.FirstOrDefault(ts => ts.Day.Date == date);
 
-                                tabla.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9")
-                         .Padding(2).Text(cantidad.ToString()).FontSize(10);
+                                    // Directly add cells for each day within the same iteration that adds the work package name
+                                    tabla.Cell().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").FontSize(10);
+                                }
 
-                                tabla.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9")
-                         .Padding(2).Text($"S/. {precio}").FontSize(10);
-
-                                tabla.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9")
-                         .Padding(2).AlignRight().Text($"S/. {total}").FontSize(10);
+                                // Note: Ensure this code is placed within the context of configuring the table, especially within the .Content() section where the table is being defined.
                             }
+
+
 
                         });
 
-                        col1.Item().AlignRight().Text("Total: 1500").FontSize(12);
+                        col1.Item().AlignRight().Text("Total: ").FontSize(12);
 
                         if (1 == 1)
                             col1.Item().Background(Colors.Grey.Lighten3).Padding(10)
                             .Column(column =>
                             {
-                                column.Item().Text("Comentarios").FontSize(14);
-                                column.Item().Text(Placeholders.LoremIpsum());
+                                column.Item().Text("Travels").FontSize(14);                               
                                 column.Spacing(5);
                             });
 
