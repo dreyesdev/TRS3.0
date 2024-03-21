@@ -34,6 +34,8 @@ namespace TRS2._0.Models.ViewModels
 
         public List<DateTime> Holidays { get; set; } = new List<DateTime>();
 
+        public decimal AffiliationHours { get; set; }
+
 
     }
 

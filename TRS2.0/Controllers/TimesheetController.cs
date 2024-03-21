@@ -214,6 +214,20 @@ namespace TRS2._0.Controllers
                                     .Where(pe => pe.WpxPersonNavigation.Person == personId && pe.Month >= startDate && pe.Month <= endDate)
                                     .ToListAsync();
 
+            // Obtener todas las afiliaciones para la persona en el mes dado
+            var affiliations = await _context.AffxPersons
+                                .Where(ap => ap.PersonId == personId && ap.Start <= startDate.AddMonths(1).AddDays(-1) && ap.End >= startDate)
+                                .Select(ap => ap.AffId)
+                                .Distinct()
+                                .ToListAsync();
+
+            // Obtener las horas de trabajo de todas las afiliaciones aplicables
+            var affHoursList = await _context.AffHours
+                                .Where(ah => affiliations.Contains(ah.AffId) && ah.StartDate <= startDate.AddMonths(1).AddDays(-1) && ah.EndDate >= startDate)
+                                .ToListAsync();
+
+            var maxHours = affHoursList.Max(ah => ah.Hours);
+
             var dailyworkhours = await _workCalendarService.CalculateDailyWorkHours(personId, currentYear, currentMonth);
             var totalWorkHours = dailyworkhours.Sum(entry => entry.Value);
             decimal percentageUsed = totalWorkHours > 0 ? hoursUsed / totalWorkHours * 100 : 0;
@@ -240,6 +254,7 @@ namespace TRS2._0.Controllers
                 TotalHours = totalWorkHours,
                 TotalHoursWithDedication = totalWorkHoursWithDedication,
                 Holidays = holidays,
+                AffiliationHours = maxHours,
                 MonthDays = Enumerable.Range(1, DateTime.DaysInMonth(currentYear, currentMonth)).Select(day => new DateTime(currentYear, currentMonth, day)).ToList(),
                 WorkPackages = wpxPersons.Select(wpx =>
                 {
@@ -319,7 +334,12 @@ namespace TRS2._0.Controllers
         public async Task<IActionResult> ExportTimesheetToPdf(int personId, int year, int month, int project)
         {
             var model = await GetTimesheetDataForPerson(personId, year, month, project); // Asegúrate de tener este método implementado.
-            
+            var totalhours = model.TotalHours;
+            var totalhoursworkedonproject = model.WorkPackages.Sum(wp => wp.Timesheets.Sum(ts => ts.Hours));
+            var totaldaysWorkedOnProject = (totalhoursworkedonproject / model.AffiliationHours) * 1;
+
+            decimal roundedtotalHours = Math.Round(totalhours * 2, MidpointRounding.AwayFromZero) / 2;
+            decimal roundedtotalHoursWorkedOnProject = Math.Round(totalhoursworkedonproject * 2, MidpointRounding.AwayFromZero) / 2;
 
             var document = Document.Create(document =>
             {
@@ -362,14 +382,14 @@ namespace TRS2._0.Controllers
                         row.ConstantItem(100).Column(col =>
                         {
                             col.Item().Border(1).BorderColor("#004488") // Changed to dark blue
-                            .AlignCenter().Text($"{model.TotalHours}");
+                            .AlignCenter().Text($"{roundedtotalHours}");
 
                             col.Item().Background("#004488").Border(1) // Background and border changed to dark blue
                             .BorderColor("#004488").AlignCenter()
-                            .Text("").FontColor("#fff");
+                            .Text($"{roundedtotalHoursWorkedOnProject}").FontColor("#fff");
 
                             col.Item().Border(1).BorderColor("#004488"). // Border changed to dark blue
-                            AlignCenter().Text("");
+                            AlignCenter().Text($"{totaldaysWorkedOnProject}");
                         });
 
                     });
@@ -414,13 +434,14 @@ namespace TRS2._0.Controllers
                                 {
                                     columns.RelativeColumn(); // Una columna por día
                                 }
+                                columns.RelativeColumn(); // Additional column for "Total"
                             });
 
                             // Encabezado de la tabla
                             tabla.Header(header =>
                             {
                                 // Primera columna fija
-                                header.Cell().Background("#004488").Padding(2).Text("Proyecto").FontColor("#fff");
+                                header.Cell().Background("#004488").Padding(2).AlignCenter().Text("Proyecto").FontColor("#fff").FontSize(10);
 
                                 // Columnas para cada día del mes
                                 var daysInMonth = DateTime.DaysInMonth(year, month);
@@ -428,16 +449,17 @@ namespace TRS2._0.Controllers
                                 {
                                     var date = new DateTime(year, month, day);
                                     var dayAbbreviation = date.ToString("ddd", CultureInfo.CreateSpecificCulture("en")); // Obtiene la abreviatura del día en inglés
-                                    header.Cell().Background("#004488").Padding(2).Text($"{dayAbbreviation} {day:00}").FontColor("#fff").FontSize(8);
+                                    header.Cell().Background("#004488").Padding(2).AlignCenter().Text($"{dayAbbreviation} {day:00}").FontColor("#fff").FontSize(8);
                                 }
+                                // Add "Total" column header
+                                header.Cell().Background("#004488").Padding(2).AlignMiddle().AlignCenter().Text("Total").FontColor("#FFFFFF").FontSize(8);
                             });
 
                             
                             foreach (var wp in model.WorkPackages)
                             {
                                 // For each work package, add a new cell for the WP name
-                                tabla.Cell().Text(wp.WpName);
-                                var totalWp = wp.Timesheets.Sum(ts => ts.Hours);
+                                tabla.Cell().AlignCenter().Text($"{wp.WpName} - {wp.WpTitle}").FontSize(8);                                
                                 
                                 // Then, for each day of the month, add a new cell with either the timesheet entry hours or "0"
                                 foreach (var day in Enumerable.Range(1, DateTime.DaysInMonth(year, month)))
@@ -446,19 +468,29 @@ namespace TRS2._0.Controllers
                                     var timesheetEntry = wp.Timesheets.FirstOrDefault(ts => ts.Day.Date == date);
 
                                     // Directly add cells for each day within the same iteration that adds the work package name
-                                    tabla.Cell().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").FontSize(8);
+                                    tabla.Cell().AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").FontSize(8);
                                 }
 
-                                // Calcular el total de horas para este WP
+                                // Calculate the total hours for this WP and add a cell for it
                                 var totalHours = wp.Timesheets.Sum(ts => ts.Hours);
-
-                                // Celda para el total de horas
-                                tabla.Cell().Text(totalHours.ToString("0.##"));
-
-                                // Note: Ensure this code is placed within the context of configuring the table, especially within the .Content() section where the table is being defined.
+                                tabla.Cell().AlignMiddle().AlignCenter().Text(totalHours.ToString("0.##")).FontSize(8);
+                                
                             }
 
-
+                            // Fila de "Total" al final
+                            tabla.Footer(footer =>
+                            {
+                                footer.Cell().ColumnSpan((uint)DateTime.DaysInMonth(year, month) + 2).Background("#004488").Padding(2).AlignMiddle().AlignCenter().Text("Total").FontColor("#FFFFFF").FontSize(8);
+                                footer.Cell().Background("#004488").Padding(2).AlignCenter().Text("").FontColor("#FFFFFF").FontSize(8);
+                                for (int day = 1; day <= DateTime.DaysInMonth(year, month); day++)
+                                {
+                                    var totalHoursForDay = model.WorkPackages.Sum(wp => wp.Timesheets.FirstOrDefault(ts => ts.Day.Day == day)?.Hours ?? 0);
+                                    decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay * 2, MidpointRounding.AwayFromZero) / 2;
+                                    footer.Cell().Background("#004488").Padding(2).AlignCenter().Text($"{roundedtotalHoursForDay}").FontColor("#FFFFFF").FontSize(8);
+                                }
+                                // Aquí puedes calcular el total general si lo necesitas
+                                footer.Cell().Background("#004488").Padding(2).AlignCenter().Text("0").FontColor("#FFFFFF").FontSize(8);
+                            });
 
                         });
 
