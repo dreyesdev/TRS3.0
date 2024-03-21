@@ -6,7 +6,9 @@ namespace TRS2._0.Models.ViewModels
 {
     public class TimesheetViewModel
     {
-        public Personnel Person { get; set; }        
+        public Personnel Person { get; set; }   
+        
+        public Project ProjectData { get; set; }
         
         public List<WorkPackageInfoTS> WorkPackages { get; set; } = new List<WorkPackageInfoTS>();
 
@@ -35,6 +37,8 @@ namespace TRS2._0.Models.ViewModels
         public List<DateTime> Holidays { get; set; } = new List<DateTime>();
 
         public decimal AffiliationHours { get; set; }
+
+        public string Responsible { get; set; }
 
 
     }
