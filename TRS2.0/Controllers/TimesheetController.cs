@@ -10,6 +10,7 @@ using QuestPDF.Infrastructure;
 using QuestPDF.Helpers;
 using QuestPDF.Previewer;
 using System.Drawing;
+using Microsoft.CodeAnalysis.Options;
 
 
 
@@ -448,7 +449,7 @@ namespace TRS2._0.Controllers
                             tabla.Header(header =>
                             {
                                 // Primera columna fija
-                                header.Cell().Background("#004488").Padding(2).AlignCenter().Text("Work Packages").FontColor("#fff").FontSize(10);
+                                header.Cell().Background("#0055A4").Padding(2).AlignCenter().Text("Work Packages").Bold().FontColor("#fff").FontSize(10);
 
                                 // Columnas para cada día del mes
                                 var daysInMonth = DateTime.DaysInMonth(year, month);
@@ -456,10 +457,10 @@ namespace TRS2._0.Controllers
                                 {
                                     var date = new DateTime(year, month, day);
                                     var dayAbbreviation = date.ToString("ddd", CultureInfo.CreateSpecificCulture("en")); // Obtiene la abreviatura del día en inglés
-                                    header.Cell().Background("#004488").Padding(2).AlignCenter().Text($"{dayAbbreviation} {day:00}").FontColor("#fff").FontSize(8);
+                                    header.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{dayAbbreviation} {day:00}").ExtraBold().FontColor("#fff").FontSize(8);
                                 }
                                 // Add "Total" column header
-                                header.Cell().Background("#004488").Padding(2).AlignMiddle().AlignCenter().Text("Total").Bold().FontColor("#FFFFFF").FontSize(8);
+                                header.Cell().Background("#0055A4").Padding(2).AlignMiddle().AlignCenter().Text("Total").Bold().FontColor("#FFFFFF").FontSize(8);
                             });
 
                             
@@ -467,7 +468,7 @@ namespace TRS2._0.Controllers
                             {
                                 
                                 // For each work package, add a new cell for the WP name
-                                tabla.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{wp.WpName} - {wp.WpTitle}").FontSize(8);
+                                tabla.Cell().Border(1).BorderColor("#00BFFF").AlignCenter().Text($"{wp.WpName} - {wp.WpTitle}").Bold().FontSize(8);
 
                                 // Then, for each day of the month, add a new cell with either the timesheet entry hours or "0"
                                 foreach (var day in Enumerable.Range(1, DateTime.DaysInMonth(year, month)).Select(day => new DateTime(year, month, day)))
@@ -510,28 +511,28 @@ namespace TRS2._0.Controllers
                                         }
                                     }
                                     // Directly add cells for each day within the same iteration that adds the work package name
-                                    tabla.Cell().Background(cellBackground).BorderHorizontal(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").FontSize(8);
+                                    tabla.Cell().Background(cellBackground).Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").Bold().FontSize(8);
                                 }
 
                                 // Calculate the total hours for this WP and add a cell for it
                                 var totalHours = wp.Timesheets.Sum(ts => ts.Hours);
-                                tabla.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(totalHours.ToString("0.##")).Bold().FontSize(8);                                
+                                tabla.Cell().Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(totalHours.ToString("0.##")).Bold().FontSize(8);                                
                                 
                             }
 
                             // Fila de "Total" al final
                             tabla.Footer(footer =>
                             {
-                                footer.Cell().ColumnSpan((uint)DateTime.DaysInMonth(year, month) + 2).BorderHorizontal(1).BorderColor("#00BFFF").Background("#004488").Padding(2).AlignMiddle().AlignCenter().Text("Total Hours worked on project").FontColor("#FFFFFF").FontSize(8);
-                                footer.Cell().Background("#004488").Padding(2).AlignCenter().Text("").FontColor("#FFFFFF").FontSize(8);
+                                footer.Cell().ColumnSpan((uint)DateTime.DaysInMonth(year, month) + 2).BorderHorizontal(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignMiddle().AlignCenter().Text("Total Hours worked on project").Bold().FontColor("#FFFFFF").FontSize(8);
+                                footer.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text("").FontColor("#FFFFFF").FontSize(8);
                                 for (int day = 1; day <= DateTime.DaysInMonth(year, month); day++)
                                 {
                                     var totalHoursForDay = model.WorkPackages.Sum(wp => wp.Timesheets.FirstOrDefault(ts => ts.Day.Day == day)?.Hours ?? 0);
                                     decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay * 2, MidpointRounding.AwayFromZero) / 2;
-                                    footer.Cell().Background("#004488").Padding(2).AlignCenter().Text($"{roundedtotalHoursForDay}").FontColor("#FFFFFF").FontSize(8);
+                                    footer.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursForDay}").ExtraBold().FontColor("#FFFFFF").FontSize(8);
                                 }
                                 
-                                footer.Cell().Background("#004488").Padding(2).AlignCenter().Text($"{roundedtotalHoursWorkedOnProject}").FontColor("#FFFFFF").Bold().FontSize(8);
+                                footer.Cell().Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursWorkedOnProject}").ExtraBold().FontColor("#FFFFFF").Bold().FontSize(8);
                             });
 
                         });
@@ -642,8 +643,9 @@ namespace TRS2._0.Controllers
             });
 
             using var stream = new MemoryStream();
-            
-            document.GeneratePdf(stream);
+            document.ShowInPreviewer();
+
+            //document.GeneratePdf(stream);
             stream.Seek(0, SeekOrigin.Begin);
 
             var pdfFileName = $"Timesheet_{personId}_{year}_{month}.pdf";
