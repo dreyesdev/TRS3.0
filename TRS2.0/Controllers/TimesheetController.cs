@@ -574,7 +574,7 @@ namespace TRS2._0.Controllers
                                      {
                                         table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.LiqId}").FontSize(8);
                                         table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.ProjectSAPCode} - {travel.ProjectAcronimo}").FontSize(8);
-                                        table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.Dedication}").FontSize(8);
+                                        table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.Dedication:0.0}%").FontSize(8);
                                         table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.StartDate:dd/MM/yyyy}").FontSize(8);
                                         table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.EndDate:dd/MM/yyyy}").FontSize(8);
                                     }
