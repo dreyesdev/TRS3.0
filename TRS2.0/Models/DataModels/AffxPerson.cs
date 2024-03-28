@@ -21,5 +21,8 @@ namespace TRS2._0.Models.DataModels
 
         [DataType(DataType.Date)]
         public DateTime End { get; set; }
+
+        public int LineId { get; set; }
+        public bool Exist { get; set; }
     }
 }

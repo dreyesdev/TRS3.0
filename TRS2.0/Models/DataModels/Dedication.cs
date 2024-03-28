@@ -21,5 +21,9 @@ public partial class Dedication
     public int Type { get; set; }
     [ForeignKey("PersId")]
     public virtual Personnel Pers { get; set; } = null!;
+
+    public int LineId { get; set; }
+    public bool Exist { get; set; }
+
 }
 

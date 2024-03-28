@@ -58,6 +58,8 @@ public partial class TRSDBContext : DbContext
 
     public DbSet<ProjectMonthLock> ProjectMonthLocks { get; set; }
 
+    public DbSet<AffCodification> AffCodifications { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseSqlServer("data source = OPSTRS03.BSC.ES; initial catalog = TRSBDD; user id = admin; password = seidor; Trusted_Connection = True;TrustServerCertificate=True;Integrated Security=False;");
@@ -227,6 +229,9 @@ public partial class TRSDBContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull); // Configura el comportamiento en caso de eliminación
         });
         OnModelCreatingPartial(modelBuilder);
+
+        modelBuilder.Entity<AffCodification>()
+            .HasKey(c => new { c.Contract, c.Dist });
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);

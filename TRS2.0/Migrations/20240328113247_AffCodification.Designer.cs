@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TRS2._0.Models.DataModels;
 
@@ -11,9 +12,11 @@ using TRS2._0.Models.DataModels;
 namespace TRS2._0.Migrations
 {
     [DbContext(typeof(TRSDBContext))]
-    partial class TRSDBContextModelSnapshot : ModelSnapshot
+    [Migration("20240328113247_AffCodification")]
+    partial class AffCodification
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -97,12 +100,6 @@ namespace TRS2._0.Migrations
                     b.Property<DateTime>("End")
                         .HasColumnType("datetime2");
 
-                    b.Property<bool>("Exist")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("LineId")
-                        .HasColumnType("int");
-
                     b.Property<int>("PersonId")
                         .HasColumnType("int");
 
@@ -153,12 +150,6 @@ namespace TRS2._0.Migrations
 
                     b.Property<DateTime>("End")
                         .HasColumnType("date");
-
-                    b.Property<bool>("Exist")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("LineId")
-                        .HasColumnType("int");
 
                     b.Property<int>("PersId")
                         .HasColumnType("int");
