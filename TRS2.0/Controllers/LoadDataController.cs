@@ -145,6 +145,38 @@ namespace TRS2._0.Controllers
                 // Maneja adecuadamente la excepción
                 return StatusCode(500, $"Error al iniciar el trabajo de carga de personal: {ex.Message}");
             }
-        }   
+        }
+
+        [HttpGet("/CargaAfiliacionesYDedicaciones")]
+        public async Task<IActionResult> TriggerLoadAffiliationsAndDedicationsJob()
+        {
+            try
+            {
+                var scheduler = await _schedulerFactory.GetScheduler();
+                var jobKey = new JobKey("LoadDataServiceJob");
+
+                // Configura JobDataMap con los parámetros específicos para esta acción
+                var jobDataMap = new JobDataMap
+        {
+            {"Action", "LoadAffiliationsAndDedicationsFromFile"},
+            {"FilePath", @"C:\Users\dreyes\Desktop\Desarrollo\TRS2.0\Load\AFILIACIONES_Y_DEDICACIONES.txt"} // Ajusta la ruta según corresponda
+        };
+                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
+                if (await scheduler.CheckExists(jobKey))
+                {
+                    await scheduler.TriggerJob(jobKey, jobDataMap);
+                    return Ok("El trabajo de carga de afiliaciones y dedicaciones se ha iniciado.");
+                }
+                else
+                {
+                    return NotFound("El trabajo de carga de afiliaciones y dedicaciones no se encontró.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Maneja adecuadamente la excepción
+                return StatusCode(500, $"Error al iniciar el trabajo de carga de afiliaciones y dedicaciones: {ex.Message}");
+            }
+        }
     }
 }

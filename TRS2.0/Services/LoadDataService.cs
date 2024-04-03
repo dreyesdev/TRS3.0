@@ -457,6 +457,11 @@ namespace TRS2._0.Services
                     await LoadPersonnelFromFileAsync(filePath2);
                     break;
 
+                case "LoadAffiliationsAndDedicationsFromFile": // Nuevo caso para la acción de carga de afiliaciones y dedicaciones
+                    var filePath3 = dataMap.GetString("FilePath"); // Obtener la ruta del archivo desde JobDataMap
+                    await LoadAffiliationsAndDedicationsFromFileAsync(filePath3);
+                    break;
+
                 default:
                     _logger.LogError($"Acción desconocida: {action}");
                     throw new ArgumentException("Acción no implementada para este trabajo.");
