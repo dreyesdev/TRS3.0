@@ -159,7 +159,7 @@ namespace TRS2._0.Controllers
                 var jobDataMap = new JobDataMap
         {
             {"Action", "LoadAffiliationsAndDedicationsFromFile"},
-            {"FilePath", @"C:\Users\dreyes\Desktop\Desarrollo\TRS2.0\Load\AFILIACIONES_Y_DEDICACIONES.txt"} // Ajusta la ruta según corresponda
+            {"FilePath", @"C:\Users\dreyes\Desktop\Desarrollo\TRS2.0\Load\DEDICACIO3.txt"} // Ajusta la ruta según corresponda
         };
                 // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
                 if (await scheduler.CheckExists(jobKey))

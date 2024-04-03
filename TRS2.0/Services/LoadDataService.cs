@@ -337,102 +337,148 @@ namespace TRS2._0.Services
         .WriteTo.File("CargaAfiliacionesYDedicacionesLog.txt", rollingInterval: RollingInterval.Day)
         .CreateLogger();
 
-            // Establecer todos los 'Exist' a 0 al inicio
-            await _context.Database.ExecuteSqlRawAsync("UPDATE AffxPersons SET Exist = 0");
-            await _context.Database.ExecuteSqlRawAsync("UPDATE Dedications SET Exist = 0 WHERE Type <= 1");
+            logger.Information("Iniciando la carga de afiliaciones y dedicaciones desde el archivo: {FilePath}", filePath);
 
-            var lines = await File.ReadAllLinesAsync(filePath);
-            foreach (var line in lines)
+            try
             {
-                var fields = line.Split('\t');
-                if (fields.Length < 6) // Considerando Dist como opcional
+                // Establecer todos los 'Exist' a 0 al inicio
+                logger.Debug("Reseteando el estado Exist de todas las entidades a 0.");
+                await _context.Database.ExecuteSqlRawAsync("UPDATE AffxPersons SET Exist = 0");
+                await _context.Database.ExecuteSqlRawAsync("UPDATE Dedication SET Exist = 0 WHERE Type <= 1");
+
+                var lines = await File.ReadAllLinesAsync(filePath);
+                logger.Information("Archivo leído con {LineCount} líneas.", lines.Length);
+
+                foreach (var line in lines)
                 {
-                    logger.Error($"Línea incompleta: {line}");
-                    continue;
-                }
+                    logger.Debug("Procesando línea: {Line}", line);
+                    var fields = line.Split('\t');
 
-                if (!int.TryParse(fields[0], out int personId) ||
-                    !int.TryParse(fields[1], out int lineId) ||
-                    !DateTime.TryParseExact(fields[2], "yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime startDate) ||
-                    !DateTime.TryParseExact(fields[3], "yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime endDate) ||
-                    !decimal.TryParse(fields[4], NumberStyles.Any, CultureInfo.InvariantCulture, out decimal dedication))
-                {
-                    logger.Error($"Error al parsear campos esenciales de la línea: {line}");
-                    continue;
-                }
+                    if (fields.Length < 6) // Ajustado para reflejar la corrección en la cantidad de campos esperados
+                    {
+                        logger.Error("Línea incompleta: {Line}", line);
+                        continue;
+                    }
 
-                dedication = 1m - dedication / 100;
+                    if (!int.TryParse(fields[0], out int personId) ||
+                        !int.TryParse(fields[1], out int lineId) ||
+                        !DateTime.TryParseExact(fields[2], "yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime startDate) ||
+                        !DateTime.TryParseExact(fields[3], "yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime endDate) ||
+                        !decimal.TryParse(fields[4], NumberStyles.Any, CultureInfo.InvariantCulture, out decimal dedication))
+                    {
+                        logger.Error("Error al parsear campos esenciales de la línea: {Line}", line);
+                        continue;
+                    }
 
-                string contract = fields[6];
-                string dist = fields.Length > 6 ? fields[7] : string.Empty;
+                    // Convertir el porcentaje a decimal para `Reduc`
+                    dedication = 1m - dedication / 100;
 
-                var affCodification = await _context.AffCodifications
-                    .Where(ac => ac.Contract == contract && (dist.StartsWith(ac.Dist) || ac.Dist == string.Empty))
-                    .OrderByDescending(ac => ac.Dist.Length) // Priorizar la coincidencia más larga
-                    .Select(ac => ac.Affiliation)
-                    .FirstOrDefaultAsync();
+                    string contract = fields[5];
+                    // Asegurando que Dist se maneje correctamente como cadena vacía si no existe
+                    string dist = fields.Length > 6 ? fields[6] : string.Empty;
 
-                int affId = affCodification > 0 ? affCodification : (string.IsNullOrWhiteSpace(contract) && string.IsNullOrWhiteSpace(dist) ? 0 : 1);
+                    logger.Debug("Buscando codificación para Contract: {Contract} y Dist: {Dist}", contract, dist);
+                    var affCodification = await _context.AffCodifications
+                        .Where(ac => ac.Contract == contract && (dist.StartsWith(ac.Dist) || ac.Dist == string.Empty))
+                        .OrderByDescending(ac => ac.Dist.Length) // Priorizar la coincidencia más larga
+                        .Select(ac => ac.Affiliation)
+                        .FirstOrDefaultAsync();
 
-                // Procesamiento de AffxPerson
-                var affPerson = await _context.AffxPersons
+                    // Log para indicar la codificación encontrada o si se asignará un valor por defecto
+                    if (affCodification > 0)
+                    {
+                        logger.Information("Codificación de afiliación encontrada para Contract: {Contract}, Dist: {Dist}. Afiliación asignada: {AffiliationId}.", contract, dist, affCodification);
+                    }
+                    else
+                    {                        
+                        logger.Information("No se encontró una codificación de afiliación específica para Contract: {Contract}, Dist: {Dist}. Asignando afiliación por defecto: {AffiliationIdDefault}.", contract, dist);
+                        
+                    }
+                    int affId = affCodification > 0 ? affCodification : (string.IsNullOrWhiteSpace(contract) && string.IsNullOrWhiteSpace(dist) ? 0 : 1);
+
+                    // Antes de intentar encontrar o insertar en AffxPersons, registra el intento con el PersonId
+                    logger.Debug("Procesando PersonId: {PersonId} con LineId: {LineId}.", personId, lineId);
+
+                    // Procesamiento de AffxPerson
+                    var affPerson = await _context.AffxPersons
                     .FirstOrDefaultAsync(ap => ap.PersonId == personId && ap.LineId == lineId);
 
-                if (affPerson == null)
-                {
-                    affPerson = new AffxPerson
+                    //Codigo a eliminar - Busqueda del id de persona que no encontramos
+                    logger.Debug("Buscando PersonId: {PersonId} en la base de datos.", personId);
+                    var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == personId);
+                    if (person == null)
                     {
-                        PersonId = personId,
-                        LineId = lineId,
-                        Start = startDate,
-                        End = endDate,
-                        AffId = affId,
-                        Exist = true // Marcamos como existente al crear
-                    };
-                    _context.AffxPersons.Add(affPerson);
-                }
-                else
-                {
-                    affPerson.Start = startDate;
-                    affPerson.End = endDate;
-                    affPerson.AffId = affId;
-                    affPerson.Exist = true; // Marcamos como existente al actualizar
+                        logger.Warning("No se encontró la persona con Id: {PersonId}. Saltando la línea.", personId);
+                        continue;
+                    }
+                    if (affPerson == null)
+                    {
+                        affPerson = new AffxPerson
+                        {
+                            PersonId = personId,
+                            LineId = lineId,
+                            Start = startDate,
+                            End = endDate,
+                            AffId = affId,
+                            Exist = true // Marcamos como existente al crear
+                        };
+                        _context.AffxPersons.Add(affPerson);
+                        logger.Information("Creando nueva entidad AffxPerson con PersonId: {PersonId}, LineId: {LineId}, Start: {Start}, End: {End}, AffId: {AffId}, Exist: {Exist}", personId, lineId, startDate, endDate, affId, affPerson.Exist);
+                    }
+                    else
+                    {
+                        affPerson.Start = startDate;
+                        affPerson.End = endDate;
+                        affPerson.AffId = affId;
+                        affPerson.Exist = true; // Marcamos como existente al actualizar
+                        logger.Information("Actualizando entidad AffxPerson existente con PersonId: {PersonId}, LineId: {LineId}, Start: {Start}, End: {End}, AffId: {AffId}, Exist: {Exist}", personId, lineId, startDate, endDate, affId, affPerson.Exist);
+                    }
+
+                    // Procesamiento de Dedication
+                    var dedicationRecord = await _context.Dedications
+                        .FirstOrDefaultAsync(d => d.PersId == personId && d.LineId == lineId);
+
+                    if (dedicationRecord == null)
+                    {
+                        dedicationRecord = new Dedication
+                        {
+                            PersId = personId,
+                            Reduc = dedication,
+                            Start = startDate,
+                            End = endDate,
+                            LineId = lineId,
+                            Type = 0,
+                            Exist = true // Marcamos como existente al crear
+                        };
+                        _context.Dedications.Add(dedicationRecord);
+                        logger.Information("Creando nueva entidad Dedication con PersId: {PersId}, Reduc: {Reduc}, Start: {Start}, End: {End}, LineId: {LineId}, Type: {Type}, Exist: {Exist}", personId, dedication, startDate, endDate, lineId, dedicationRecord.Type, dedicationRecord.Exist);
+                    }
+                    else
+                    {
+                        dedicationRecord.Reduc = dedication;
+                        dedicationRecord.Start = startDate;
+                        dedicationRecord.End = endDate;
+                        dedicationRecord.Exist = true; // Marcamos como existente al actualizar
+                        logger.Information("Actualizando entidad Dedication existente con PersId: {PersId}, Reduc: {Reduc}, Start: {Start}, End: {End}, LineId: {LineId}, Exist: {Exist}", personId, dedication, startDate, endDate, lineId, dedicationRecord.Exist);
+                    }
                 }
 
-                // Procesamiento de Dedication
-                var dedicationRecord = await _context.Dedications
-                    .FirstOrDefaultAsync(d => d.PersId == personId && d.LineId == lineId);
+                // Asegurar que las dedicaciones con Type > 1 se mantengan con Exist = 1
+                await _context.Dedications.Where(d => d.Type > 1).ForEachAsync(d => d.Exist = true);
 
-                if (dedicationRecord == null)
-                {
-                    dedicationRecord = new Dedication
-                    {
-                        PersId = personId,
-                        Reduc = dedication,
-                        Start = startDate,
-                        End = endDate,
-                        LineId = lineId,
-                        Exist = true // Marcamos como existente al crear
-                    };
-                    _context.Dedications.Add(dedicationRecord);
-                }
-                else
-                {
-                    dedicationRecord.Reduc = dedication;
-                    dedicationRecord.Start = startDate;
-                    dedicationRecord.End = endDate;
-                    dedicationRecord.Exist = true; // Marcamos como existente al actualizar
-                }
+                await _context.SaveChangesAsync();
+                logger.Information("Carga de afiliaciones y dedicaciones finalizada.");
+                
             }
-
-            // Asegurar que las dedicaciones con Type > 1 se mantengan con Exist = 1
-            await _context.Dedications.Where(d => d.Type > 1).ForEachAsync(d => d.Exist = true);
-
-            await _context.SaveChangesAsync();
-            logger.Information("Carga de afiliaciones y dedicaciones finalizada.");
-            logger.Dispose();
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Ocurrió un error durante la carga de afiliaciones y dedicaciones.");
+            }
+            finally
+            {
+                logger.Dispose();
+            }
         }
-
 
         public async Task Execute(IJobExecutionContext context)
         {
