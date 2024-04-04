@@ -408,7 +408,7 @@ namespace TRS2._0.Services
                     var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == personId);
                     if (person == null)
                     {
-                        logger.Warning("No se encontró la persona con Id: {PersonId}. Saltando la línea.", personId);
+                        logger.Warning("  {PersonId}. Saltando la línea.", personId);
                         continue;
                     }
                     if (affPerson == null)
