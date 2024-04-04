@@ -57,11 +57,12 @@ namespace TRS2._0.Controllers
                 var scheduler = await _schedulerFactory.GetScheduler();
                 var jobKey = new JobKey("LoadDataServiceJob");
 
+                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dataload", "Liquid.txt");
                 // Configura JobDataMap con los parámetros específicos para esta acción
                 var jobDataMap = new JobDataMap
                 {
                     {"Action", "LoadLiquidationsFromFile"},
-                    {"FilePath", @"C:\Users\dreyes\Desktop\Desarrollo\TRS2.0\Load\Liquid.txt"}
+                    {"FilePath", filePath}
                  };
 
                 // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
@@ -123,11 +124,14 @@ namespace TRS2._0.Controllers
                 var scheduler = await _schedulerFactory.GetScheduler();
                 var jobKey = new JobKey("LoadDataServiceJob");
 
+                // Construye la ruta al archivo dentro del directorio de salida de la aplicación
+                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dataload", "PERSONAL.txt");
+
                 // Configura JobDataMap con los parámetros específicos para esta acción
                 var jobDataMap = new JobDataMap
                 {
                     {"Action", "LoadPersonnelFromFile"},
-                    {"FilePath", @"C:\Users\dreyes\Desktop\Desarrollo\TRS2.0\Load\PERSONAL.txt"}
+                    {"FilePath", filePath}
                 };
                 // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
                 if (await scheduler.CheckExists(jobKey))
@@ -155,12 +159,17 @@ namespace TRS2._0.Controllers
                 var scheduler = await _schedulerFactory.GetScheduler();
                 var jobKey = new JobKey("LoadDataServiceJob");
 
+                // Construye la ruta al archivo dentro del directorio de salida de la aplicación
+                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dataload", "DEDICACIO3.txt");
+
                 // Configura JobDataMap con los parámetros específicos para esta acción
                 var jobDataMap = new JobDataMap
-        {
-            {"Action", "LoadAffiliationsAndDedicationsFromFile"},
-            {"FilePath", @"C:\Users\dreyes\Desktop\Desarrollo\TRS2.0\Load\DEDICACIO3.txt"} // Ajusta la ruta según corresponda
-        };
+                                {
+                                    {"Action", "LoadAffiliationsAndDedicationsFromFile"},
+                                    {"FilePath", filePath}
+                                };
+
+
                 // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
                 if (await scheduler.CheckExists(jobKey))
                 {
