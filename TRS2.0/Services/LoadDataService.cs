@@ -332,10 +332,15 @@ namespace TRS2._0.Services
         // Carga las afiliaciones y dedicaciones desde un archivo
         public async Task LoadAffiliationsAndDedicationsFromFileAsync(string filePath)
         {
-            var logger = new LoggerConfiguration()
-        .MinimumLevel.Debug()
-        .WriteTo.File("CargaAfiliacionesYDedicacionesLog.txt", rollingInterval: RollingInterval.Day)
-        .CreateLogger();
+        var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "CargaAfiliacionesYDedicacionesLog.txt");
+
+        var logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+            .CreateLogger();
+        var personIds = await _context.Personnel.Select(p => p.Id).ToListAsync();
+
+        List<string> lineasFallidas = new List<string>();
 
             logger.Information("Iniciando la carga de afiliaciones y dedicaciones desde el archivo: {FilePath}", filePath);
 
@@ -403,14 +408,12 @@ namespace TRS2._0.Services
                     var affPerson = await _context.AffxPersons
                     .FirstOrDefaultAsync(ap => ap.PersonId == personId && ap.LineId == lineId);
 
-                    //Codigo a eliminar - Busqueda del id de persona que no encontramos
-                    logger.Debug("Buscando PersonId: {PersonId} en la base de datos.", personId);
-                    var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == personId);
-                    if (person == null)
+                    if (!personIds.Contains(personId))
                     {
-                        logger.Warning("  {PersonId}. Saltando la línea.", personId);
+                        lineasFallidas.Add($"NO SE HAN AÑADIDO LA LINEA \"{line}\" ya que el usuario con id {personId} no se encuentra en la base de datos de personal en la TRS.");
                         continue;
                     }
+
                     if (affPerson == null)
                     {
                         affPerson = new AffxPerson
@@ -465,7 +468,10 @@ namespace TRS2._0.Services
 
                 // Asegurar que las dedicaciones con Type > 1 se mantengan con Exist = 1
                 await _context.Dedications.Where(d => d.Type > 1).ForEachAsync(d => d.Exist = true);
-
+                foreach (var msg in lineasFallidas)
+                {
+                    logger.Warning(msg);
+                }
                 await _context.SaveChangesAsync();
                 logger.Information("Carga de afiliaciones y dedicaciones finalizada.");
                 
