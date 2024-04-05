@@ -486,6 +486,289 @@ namespace TRS2._0.Services
             }
         }
 
+        public async Task LoadPersonnelGroupsFromFileAsync(string filePath)
+        {
+            // Asegúrate de que la carpeta 'Logs' exista
+            var logFolderPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs"); 
+            Directory.CreateDirectory(logFolderPath); // Esto creará la carpeta si no existe
+
+            var logFilePath = Path.Combine(logFolderPath, "CargaGruposPersonalLog.txt");
+
+            // Verificar si el archivo de log existe y eliminarlo antes de iniciar el nuevo proceso de logueo
+            if (File.Exists(logFilePath))
+            {
+                try
+                {
+                    File.Delete(logFilePath);
+                }
+                catch (IOException ex)
+                {
+                    // Manejar la excepción si no se puede eliminar el archivo de log, p.ej., porque está siendo usado por otro proceso
+                    Console.WriteLine($"No se pudo eliminar el archivo de log existente: {ex.Message}");
+                    // Considera cómo manejar este caso: detener la ejecución, continuar sin borrar el log, etc.
+                    return; // O manejar de otra manera
+                }
+            }
+
+            // Configuración de Serilog para escribir en el archivo
+            var logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logFilePath, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
+            try
+            {
+                
+                var lines = await File.ReadAllLinesAsync(filePath);
+
+                foreach (var line in lines)
+                {
+                    var fields = line.Split('\t');
+
+                    if (fields.Length < 2)
+                    {
+                        logger.Warning("Línea ignorada debido a falta de campos: {Line}", line);
+                        continue;
+                    }
+
+                    if (!int.TryParse(fields[0], out var id))
+                    {
+                        logger.Warning("Línea ignorada debido a ID inválido: {Line}", line);
+                        continue;
+                    }
+
+                    var groupName = fields[1];
+                    var existingGroup = await _context.Personnelgroups.FirstOrDefaultAsync(pg => pg.Id == id);
+
+                    if (existingGroup == null)
+                    {
+                        var newGroup = new Personnelgroup { Id = id, GroupName = groupName };
+                        _context.Personnelgroups.Add(newGroup);
+                        logger.Information("Insertando nuevo PersonnelGroup con Id: {Id} y GroupName: {GroupName}", id, groupName);
+                    }
+                    else
+                    {
+                        existingGroup.GroupName = groupName;
+                        logger.Information("PersonnelGroup existente con Id: {Id}. Actualizando GroupName: {GroupName}", id, groupName);
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                logger.Information("Proceso de carga de PersonnelGroup completado.");
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Ocurrió un error durante la carga de PersonnelGroup.");
+            }
+            finally
+            {
+                logger.Dispose(); // Asegúrate de desechar el logger para liberar recursos y cerrar el archivo de log correctamente
+            }
+        }
+
+        public async Task LoadLeadersFromFileAsync(string filePath)
+        {
+            var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "CargaLeadersLog.txt");
+
+            var logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
+            logger.Information("Iniciando la carga de líderes desde el archivo: {FilePath}", filePath);
+
+            try
+            {
+                var lines = await File.ReadAllLinesAsync(filePath);
+                logger.Information("Archivo leído con {LineCount} líneas.", lines.Length);
+
+                foreach (var line in lines)
+                {
+                    logger.Debug("Procesando línea: {Line}", line);
+                    var fields = line.Split('\t');
+
+                    if (fields.Length < 4)
+                    {
+                        logger.Error("Línea incompleta: {Line}", line);
+                        continue;
+                    }
+
+                    if (!int.TryParse(fields[0], out int id) ||
+                        !int.TryParse(fields[2], out int grupoDepartamento) ||
+                        !int.TryParse(fields[3], out int leaderId))
+                    {
+                        logger.Error("Error al parsear campos esenciales de la línea: {Line}", line);
+                        continue;
+                    }
+
+                    var tipo = fields[1];
+                    if (tipo != "G" && tipo != "D")
+                    {
+                        logger.Error("Tipo inválido (debe ser 'G' o 'D'): {Tipo}", tipo);
+                        continue;
+                    }
+
+                    // Verificar si el líder ya existe para evitar duplicados
+                    var existingLeader = await _context.Leaders
+                        .FirstOrDefaultAsync(l => l.Id == id);
+
+                    if (existingLeader == null)
+                    {
+                        var newLeader = new Leader
+                        {
+                            //Id = id,//
+                            Tipo = tipo,
+                            GrupoDepartamento = grupoDepartamento,
+                            LeaderId = leaderId
+                        };
+                        _context.Leaders.Add(newLeader);
+                        logger.Information("Insertando nuevo líder con Id: {Id}, Tipo: {Tipo}, GrupoDepartamento: {GrupoDepartamento}, LeaderId: {LeaderId}", id, tipo, grupoDepartamento, leaderId);
+                    }
+                    else
+                    {
+                        existingLeader.Tipo = tipo;
+                        existingLeader.GrupoDepartamento = grupoDepartamento;
+                        existingLeader.LeaderId = leaderId;
+                        logger.Information("El líder con Id: {Id} ya existe, actualizando campos.", id);
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                logger.Information("Carga de líderes finalizada.");
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Ocurrió un error durante la carga de líderes.");
+            }
+            finally
+            {
+                logger.Dispose();
+            }
+        }
+
+        public async Task LoadProjectsFromFileAsync(string filePath)
+        {
+            var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "CargaProjectsLog.txt");
+
+            var logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
+            logger.Information("Iniciando la carga de proyectos desde el archivo: {FilePath}", filePath);
+
+            try
+            {
+                var lines = await File.ReadAllLinesAsync(filePath);
+                logger.Information("Archivo leído con {LineCount} líneas.", lines.Length);
+
+                foreach (var line in lines)
+                {
+                    logger.Debug("Procesando línea: {Line}", line);
+                    var fields = line.Split('\t');
+
+                    if (fields.Length < 16)
+                    {
+                        logger.Error("Línea incompleta: {Line}", line);
+                        continue;
+                    }
+
+                    var sapCode = fields[0];
+                    var acronim = fields[1];
+                    var title = fields[2];
+                    var type = fields[3];
+                    var sType = fields[4];
+                    var contract = fields[5];
+                    var start = DateTime.TryParse(fields[6], out DateTime startDate) ? startDate : (DateTime?)null;
+                    var end = DateTime.TryParse(fields[7], out DateTime endDate) ? endDate : (DateTime?)null;
+                    var pm = int.TryParse(fields[8], out int pmId) ? pmId : (int?)null;
+                    var pi = int.TryParse(fields[9], out int piId) ? piId : (int?)null;
+                    var st1 = fields[10];
+                    var st2 = fields[11];
+                    var tpsUpc = fields[12] == "Y" ? (short?)1 : (short?)0;
+                    var tpsIcrea = fields[13] == "Y" ? (short?)1 : (short?)0;
+                    var tpsCsic = fields[14] == "Y" ? (short?)1 : (short?)0;
+                    var visible = fields[15] == "Y" ? (short)1 : (short)0;
+
+                    // Calcular EndReportDate
+                    DateTime endReportDate = endDate != default(DateTime) ? endDate : DateTime.Now;
+                    if (fields[15] == "Y" && (type == "EU-H2020" || type == "EU-OTROS"))
+                    {
+                        endReportDate = endReportDate.AddMonths(3);
+                    }
+
+                    // Suponiendo que 'fields' contiene los datos de una línea del archivo como antes
+
+                    var project = await _context.Projects.FirstOrDefaultAsync(p => p.SapCode == sapCode);
+
+                    if (project == null)
+                    {
+                        // Crear un nuevo proyecto si no existe
+                        project = new Project
+                        {
+                            // No establecemos ProjId si es generado automáticamente por la base de datos
+                            SapCode = sapCode,
+                            Acronim = acronim,
+                            Title = title,
+                            Contract = contract,
+                            Start = start,
+                            End = end,
+                            TpsUpc = tpsUpc,
+                            TpsIcrea = tpsIcrea,
+                            TpsCsic = tpsCsic,
+                            Pi = pi,
+                            Pm = pm,
+                            Type = type,
+                            SType = sType,
+                            St1 = st1,
+                            St2 = st2,
+                            EndReportDate = endReportDate,
+                            Visible = visible
+                        };
+                        _context.Projects.Add(project);
+                        logger.Information("Insertando nuevo proyecto con SapCode: {SapCode}", sapCode);
+                    }
+                    else
+                    {
+                        // Actualizar los campos del proyecto existente, excepto ProjId y SapCode
+                        project.Acronim = acronim;
+                        project.Title = title;
+                        project.Contract = contract;
+                        project.Start = start;
+                        project.End = end;
+                        project.TpsUpc = tpsUpc;
+                        project.TpsIcrea = tpsIcrea;
+                        project.TpsCsic = tpsCsic;
+                        project.Pi = pi;
+                        project.Pm = pm;
+                        project.Type = type;
+                        project.SType = sType;
+                        project.St1 = st1;
+                        project.St2 = st2;
+                        project.EndReportDate = endReportDate;
+                        project.Visible = visible;
+                        logger.Information("Actualizando proyecto existente con SapCode: {SapCode}", sapCode);
+                    }
+
+                    await _context.SaveChangesAsync();
+
+
+                    logger.Information("Procesado proyecto {SapCode}", sapCode);
+                }
+
+                logger.Information("Carga de proyectos finalizada.");
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Ocurrió un error durante la carga de proyectos.");
+            }
+            finally
+            {
+                logger.Dispose();
+            }
+        }
+
+
         public async Task Execute(IJobExecutionContext context)
         {
             var dataMap = context.MergedJobDataMap; // Obtener el JobDataMap
@@ -512,6 +795,21 @@ namespace TRS2._0.Services
                 case "LoadAffiliationsAndDedicationsFromFile": // Nuevo caso para la acción de carga de afiliaciones y dedicaciones
                     var filePath3 = dataMap.GetString("FilePath"); // Obtener la ruta del archivo desde JobDataMap
                     await LoadAffiliationsAndDedicationsFromFileAsync(filePath3);
+                    break;
+
+                case "LoadPersonnelGroupsFromFile": // Nuevo caso para la acción de carga de grupos de personal
+                    var filePath4 = dataMap.GetString("FilePath"); // Obtener la ruta del archivo desde JobDataMap
+                    await LoadPersonnelGroupsFromFileAsync(filePath4);
+                    break;
+
+                case "LoadLeadersFromFile": // Nuevo caso para la acción de carga de líderes
+                    var filePath5 = dataMap.GetString("FilePath"); // Obtener la ruta del archivo desde JobDataMap
+                    await LoadLeadersFromFileAsync(filePath5);
+                    break;
+
+                case "LoadProjectsFromFile": // Nuevo caso para la acción de carga de proyectos
+                    var filePath6 = dataMap.GetString("FilePath"); // Obtener la ruta del archivo desde JobDataMap
+                    await LoadProjectsFromFileAsync(filePath6);
                     break;
 
                 default:

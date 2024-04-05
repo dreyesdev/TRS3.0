@@ -187,5 +187,116 @@ namespace TRS2._0.Controllers
                 return StatusCode(500, $"Error al iniciar el trabajo de carga de afiliaciones y dedicaciones: {ex.Message}");
             }
         }
+
+        [HttpGet("/CargaGruposPersonas")]
+
+        public async Task<IActionResult> TriggerLoadPersonGroupsJob()
+        {
+            try
+            {
+                var scheduler = await _schedulerFactory.GetScheduler();
+                var jobKey = new JobKey("LoadDataServiceJob");
+
+                // Construye la ruta al archivo dentro del directorio de salida de la aplicación
+                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dataload", "GRUPS.txt");
+
+                // Configura JobDataMap con los parámetros específicos para esta acción
+                var jobDataMap = new JobDataMap
+                {
+                    {"Action", "LoadPersonnelGroupsFromFile"},
+                    {"FilePath", filePath}
+                };
+
+                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
+                if (await scheduler.CheckExists(jobKey))
+                {
+                    await scheduler.TriggerJob(jobKey,jobDataMap);
+                    return Ok("El trabajo de carga de grupos de personas se ha iniciado.");
+                }
+                else
+                {
+                    return NotFound("El trabajo de carga de grupos de personas no se encontró.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Maneja adecuadamente la excepción
+                return StatusCode(500, $"Error al iniciar el trabajo de carga de grupos de personas: {ex.Message}");
+            }
+        }
+
+        [HttpGet("/CargaLideres")]
+
+        public async Task<IActionResult> TriggerLoadLeadersJob()
+        {
+            try
+            {
+                var scheduler = await _schedulerFactory.GetScheduler();
+                var jobKey = new JobKey("LoadDataServiceJob");
+
+                // Construye la ruta al archivo dentro del directorio de salida de la aplicación
+                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dataload", "Leaders.txt");
+
+                // Configura JobDataMap con los parámetros específicos para esta acción
+                var jobDataMap = new JobDataMap
+                {
+                    {"Action", "LoadLeadersFromFile"},
+                    {"FilePath", filePath}
+                };
+
+                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
+                if (await scheduler.CheckExists(jobKey))
+                {
+                    await scheduler.TriggerJob(jobKey,jobDataMap);
+                    return Ok("El trabajo de carga de líderes se ha iniciado.");
+                }
+                else
+                {
+                    return NotFound("El trabajo de carga de líderes no se encontró.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Maneja adecuadamente la excepción
+                return StatusCode(500, $"Error al iniciar el trabajo de carga de líderes: {ex.Message}");
+            }
+        }
+
+        [HttpGet("/CargaProyectos")]
+
+        public async Task<IActionResult> TriggerLoadProjectsJob()
+        {
+            try
+            {
+                var scheduler = await _schedulerFactory.GetScheduler();
+                var jobKey = new JobKey("LoadDataServiceJob");
+
+                // Construye la ruta al archivo dentro del directorio de salida de la aplicación
+                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dataload", "PROJECTES.txt");
+
+                // Configura JobDataMap con los parámetros específicos para esta acción
+                var jobDataMap = new JobDataMap
+                {
+                    {"Action", "LoadProjectsFromFile"},
+                    {"FilePath", filePath}
+                };
+
+                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
+                if (await scheduler.CheckExists(jobKey))
+                {
+                    await scheduler.TriggerJob(jobKey,jobDataMap);
+                    return Ok("El trabajo de carga de proyectos se ha iniciado.");
+                }
+                else
+                {
+                    return NotFound("El trabajo de carga de proyectos no se encontró.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Maneja adecuadamente la excepción
+                return StatusCode(500, $"Error al iniciar el trabajo de carga de proyectos: {ex.Message}");
+            }
+        }
     }
 }

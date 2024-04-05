@@ -13,11 +13,10 @@
 12 UPC?
 13 ICREA?
 14 CSIC?
-15 Projecto en la TRS
+15 Projecto en la TRS?
 
 Como calcular EndReportDate
 :1. Project en la TRS debe ser Y
 :2. Siempre EndReportDate = EndDate
 :3. Si el Tipo es EU-H2020 o EU-OTROS, EndReportDate = EndDate + 3 meses
 
-Si el tipo acaba con otro tipo de esp
