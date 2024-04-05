@@ -1,0 +1,365 @@
+2024-04-05 09:56:35.252 +02:00 [ERR] Ocurrió un error durante la carga de PersonnelGroup.
+System.IO.FileNotFoundException: Could not find file 'C:\Users\Admin\source\repos\trs3.0\TRS2.0\bin\Debug\net7.0\Dataload\GRUPS.txt'.
+File name: 'C:\Users\Admin\source\repos\trs3.0\TRS2.0\bin\Debug\net7.0\Dataload\GRUPS.txt'
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, Int64 preallocationSize)
+   at System.IO.File.AsyncStreamReader(String path, Encoding encoding)
+   at System.IO.File.InternalReadAllLinesAsync(String path, Encoding encoding, CancellationToken cancellationToken)
+   at TRS2._0.Services.LoadDataService.LoadPersonnelGroupsFromFileAsync(String filePath) in C:\Users\Admin\source\repos\trs3.0\TRS2.0\Services\LoadDataService.cs:line 506
+2024-04-05 09:58:12.830 +02:00 [ERR] Ocurrió un error durante la carga de PersonnelGroup.
+System.IO.FileNotFoundException: Could not find file 'C:\Users\Admin\source\repos\trs3.0\TRS2.0\bin\Debug\net7.0\Dataload\GRUPS.txt'.
+File name: 'C:\Users\Admin\source\repos\trs3.0\TRS2.0\bin\Debug\net7.0\Dataload\GRUPS.txt'
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, Int64 preallocationSize)
+   at System.IO.File.AsyncStreamReader(String path, Encoding encoding)
+   at System.IO.File.InternalReadAllLinesAsync(String path, Encoding encoding, CancellationToken cancellationToken)
+   at TRS2._0.Services.LoadDataService.LoadPersonnelGroupsFromFileAsync(String filePath) in C:\Users\Admin\source\repos\trs3.0\TRS2.0\Services\LoadDataService.cs:line 506
+2024-04-05 10:00:15.835 +02:00 [INF] PersonnelGroup existente con Id: -2 y GroupName: Sucursal pral., ignorando.
+2024-04-05 10:00:15.885 +02:00 [INF] PersonnelGroup existente con Id: 1 y GroupName: Proyectos (Obsoleto), ignorando.
+2024-04-05 10:00:15.907 +02:00 [INF] PersonnelGroup existente con Id: 2 y GroupName: INTERNO, ignorando.
+2024-04-05 10:00:15.929 +02:00 [INF] PersonnelGroup existente con Id: 3 y GroupName: EXTERNO, ignorando.
+2024-04-05 10:00:15.951 +02:00 [INF] PersonnelGroup existente con Id: 4 y GroupName: Administration and Finances, ignorando.
+2024-04-05 10:00:15.974 +02:00 [INF] PersonnelGroup existente con Id: 5 y GroupName: Computational Genomics, ignorando.
+2024-04-05 10:00:15.997 +02:00 [INF] PersonnelGroup existente con Id: 6 y GroupName: Heterogeneous Architectures, ignorando.
+2024-04-05 10:00:16.019 +02:00 [INF] PersonnelGroup existente con Id: 7 y GroupName: INB Computational Node 2, ignorando.
+2024-04-05 10:00:16.041 +02:00 [INF] PersonnelGroup existente con Id: 8 y GroupName: Molecular Modelling and Bioinformatics, ignorando.
+2024-04-05 10:00:16.063 +02:00 [INF] PersonnelGroup existente con Id: 9 y GroupName: Operating System / Computer Architecture Interface, ignorando.
+2024-04-05 10:00:16.085 +02:00 [INF] PersonnelGroup existente con Id: 10 y GroupName: Performance Tools, ignorando.
+2024-04-05 10:00:16.108 +02:00 [INF] PersonnelGroup existente con Id: 11 y GroupName: Programming Models, ignorando.
+2024-04-05 10:00:16.129 +02:00 [INF] PersonnelGroup existente con Id: 12 y GroupName: Protein Interactions and Docking, ignorando.
+2024-04-05 10:00:16.159 +02:00 [INF] PersonnelGroup existente con Id: 13 y GroupName: Storage Systems, ignorando.
+2024-04-05 10:00:16.182 +02:00 [INF] PersonnelGroup existente con Id: 14 y GroupName: System Administration, ignorando.
+2024-04-05 10:00:16.204 +02:00 [INF] PersonnelGroup existente con Id: 15 y GroupName: User Support, ignorando.
+2024-04-05 10:00:16.229 +02:00 [INF] PersonnelGroup existente con Id: 17 y GroupName: Air Quality, ignorando.
+2024-04-05 10:00:16.261 +02:00 [INF] PersonnelGroup existente con Id: 18 y GroupName: Autonomic Systems and e-Business Platforms, ignorando.
+2024-04-05 10:00:16.292 +02:00 [INF] PersonnelGroup existente con Id: 20 y GroupName: Computer Architecture for Parallel Paradigms, ignorando.
+2024-04-05 10:00:16.322 +02:00 [INF] PersonnelGroup existente con Id: 21 y GroupName: Electronic and Atomic Protein Modelling, ignorando.
+2024-04-05 10:00:16.344 +02:00 [INF] PersonnelGroup existente con Id: 22 y GroupName: Workflows and Distributed Computing, ignorando.
+2024-04-05 10:00:16.366 +02:00 [INF] PersonnelGroup existente con Id: 24 y GroupName: Accelerators for High Performance Computing, ignorando.
+2024-04-05 10:00:16.391 +02:00 [INF] PersonnelGroup existente con Id: 26 y GroupName: Communication, ignorando.
+2024-04-05 10:00:16.413 +02:00 [INF] PersonnelGroup existente con Id: 27 y GroupName: Atmospheric Modelling, ignorando.
+2024-04-05 10:00:16.435 +02:00 [INF] PersonnelGroup existente con Id: 28 y GroupName: Mineral Dust, ignorando.
+2024-04-05 10:00:16.457 +02:00 [INF] PersonnelGroup existente con Id: 29 y GroupName: Unconventional Computer Architecture and Networks, ignorando.
+2024-04-05 10:00:16.479 +02:00 [INF] PersonnelGroup existente con Id: 31 y GroupName: Physical and Numerical Modelling, ignorando.
+2024-04-05 10:00:16.502 +02:00 [INF] PersonnelGroup existente con Id: 32 y GroupName: Project Management Office, ignorando.
+2024-04-05 10:00:16.524 +02:00 [INF] PersonnelGroup existente con Id: 33 y GroupName: Climate Modelling, ignorando.
+2024-04-05 10:00:16.546 +02:00 [INF] PersonnelGroup existente con Id: 34 y GroupName: Computer Architecture / OS Interface (CAOS), ignorando.
+2024-04-05 10:00:16.568 +02:00 [INF] PersonnelGroup existente con Id: 35 y GroupName: Extreme Computing, ignorando.
+2024-04-05 10:00:16.589 +02:00 [INF] PersonnelGroup existente con Id: 36 y GroupName: High Performance Computational Mechanics, ignorando.
+2024-04-05 10:00:16.612 +02:00 [INF] PersonnelGroup existente con Id: 37 y GroupName: Facility Management, ignorando.
+2024-04-05 10:00:16.634 +02:00 [INF] PersonnelGroup existente con Id: 38 y GroupName: Environmental Simulations, ignorando.
+2024-04-05 10:00:16.656 +02:00 [INF] PersonnelGroup existente con Id: 39 y GroupName: Geosciences Applications, ignorando.
+2024-04-05 10:00:16.678 +02:00 [INF] PersonnelGroup existente con Id: 40 y GroupName: Data Pre&Post Processing, ignorando.
+2024-04-05 10:00:16.699 +02:00 [INF] PersonnelGroup existente con Id: 41 y GroupName: H. A. Mobile and embedded-based HPC, ignorando.
+2024-04-05 10:00:16.721 +02:00 [INF] PersonnelGroup existente con Id: 42 y GroupName: H. A. Memory technologies, ignorando.
+2024-04-05 10:00:16.743 +02:00 [INF] PersonnelGroup existente con Id: 43 y GroupName: H. A. Architecture simulation environments, ignorando.
+2024-04-05 10:00:16.765 +02:00 [INF] PersonnelGroup existente con Id: 44 y GroupName: H. A. Microserver architectures & system software, ignorando.
+2024-04-05 10:00:16.787 +02:00 [INF] PersonnelGroup existente con Id: 45 y GroupName: General Directors, ignorando.
+2024-04-05 10:00:16.808 +02:00 [INF] PersonnelGroup existente con Id: 46 y GroupName: General Operations, ignorando.
+2024-04-05 10:00:16.831 +02:00 [INF] PersonnelGroup existente con Id: 47 y GroupName: General Management, ignorando.
+2024-04-05 10:00:16.853 +02:00 [INF] PersonnelGroup existente con Id: 48 y GroupName: General CS, ignorando.
+2024-04-05 10:00:16.874 +02:00 [INF] PersonnelGroup existente con Id: 49 y GroupName: General LS, ignorando.
+2024-04-05 10:00:16.896 +02:00 [INF] PersonnelGroup existente con Id: 50 y GroupName: General ES, ignorando.
+2024-04-05 10:00:16.918 +02:00 [INF] PersonnelGroup existente con Id: 51 y GroupName: General CASE, ignorando.
+2024-04-05 10:00:16.940 +02:00 [INF] PersonnelGroup existente con Id: 52 y GroupName: RRHH, ignorando.
+2024-04-05 10:00:16.963 +02:00 [INF] PersonnelGroup existente con Id: 53 y GroupName: Education & Training, ignorando.
+2024-04-05 10:00:16.994 +02:00 [INF] PersonnelGroup existente con Id: 54 y GroupName: Information System & Services, ignorando.
+2024-04-05 10:00:17.019 +02:00 [INF] PersonnelGroup existente con Id: 55 y GroupName: Smart Cities, ignorando.
+2024-04-05 10:00:17.041 +02:00 [INF] PersonnelGroup existente con Id: 56 y GroupName: Fusion, ignorando.
+2024-04-05 10:00:17.071 +02:00 [INF] PersonnelGroup existente con Id: 57 y GroupName: Social Simulation, ignorando.
+2024-04-05 10:00:17.093 +02:00 [INF] PersonnelGroup existente con Id: 58 y GroupName: HPC Software Engineering, ignorando.
+2024-04-05 10:00:17.115 +02:00 [INF] PersonnelGroup existente con Id: 59 y GroupName: Runtime Aware Architectures, ignorando.
+2024-04-05 10:00:17.137 +02:00 [INF] PersonnelGroup existente con Id: 60 y GroupName: Atmospheric Composition, ignorando.
+2024-04-05 10:00:17.158 +02:00 [INF] PersonnelGroup existente con Id: 61 y GroupName: Climate Variability and Change, ignorando.
+2024-04-05 10:00:17.180 +02:00 [INF] PersonnelGroup existente con Id: 62 y GroupName: Computational Earth Sciences, ignorando.
+2024-04-05 10:00:17.202 +02:00 [INF] PersonnelGroup existente con Id: 63 y GroupName: Earth System Services, ignorando.
+2024-04-05 10:00:17.224 +02:00 [INF] PersonnelGroup existente con Id: 64 y GroupName: Human Resources, ignorando.
+2024-04-05 10:00:17.245 +02:00 [INF] PersonnelGroup existente con Id: 65 y GroupName: Strategy Support, ignorando.
+2024-04-05 10:00:17.267 +02:00 [INF] PersonnelGroup existente con Id: 66 y GroupName: Technology Transfer, ignorando.
+2024-04-05 10:00:17.288 +02:00 [INF] PersonnelGroup existente con Id: 67 y GroupName: Finance & Accounting, ignorando.
+2024-04-05 10:00:17.319 +02:00 [INF] PersonnelGroup existente con Id: 68 y GroupName: Administration, ignorando.
+2024-04-05 10:00:17.340 +02:00 [INF] PersonnelGroup existente con Id: 69 y GroupName: Data Centric Computing Area, ignorando.
+2024-04-05 10:00:17.362 +02:00 [INF] PersonnelGroup existente con Id: 72 y GroupName: Research Support, Transfer and Communication, ignorando.
+2024-04-05 10:00:17.384 +02:00 [INF] PersonnelGroup existente con Id: 73 y GroupName: RSTD - Project Management Office, ignorando.
+2024-04-05 10:00:17.406 +02:00 [INF] PersonnelGroup existente con Id: 74 y GroupName: RSTD - Communication, ignorando.
+2024-04-05 10:00:17.428 +02:00 [INF] PersonnelGroup existente con Id: 75 y GroupName: RSTD - Technology Transfer, ignorando.
+2024-04-05 10:00:17.449 +02:00 [INF] PersonnelGroup existente con Id: 76 y GroupName: RSTD - Strategy Support, ignorando.
+2024-04-05 10:00:17.471 +02:00 [INF] PersonnelGroup existente con Id: 77 y GroupName: Media Relations, ignorando.
+2024-04-05 10:00:17.501 +02:00 [INF] PersonnelGroup existente con Id: 78 y GroupName: European Relations, ignorando.
+2024-04-05 10:00:17.523 +02:00 [INF] PersonnelGroup existente con Id: 79 y GroupName: Latin American Relations, ignorando.
+2024-04-05 10:00:17.544 +02:00 [INF] PersonnelGroup existente con Id: 80 y GroupName: Assistants, ignorando.
+2024-04-05 10:00:17.566 +02:00 [INF] PersonnelGroup existente con Id: 81 y GroupName: Research Fellow, ignorando.
+2024-04-05 10:00:17.588 +02:00 [INF] PersonnelGroup existente con Id: 82 y GroupName: Severo Ochoa, ignorando.
+2024-04-05 10:00:17.609 +02:00 [INF] PersonnelGroup existente con Id: 83 y GroupName: RSTD - Dissemination, ignorando.
+2024-04-05 10:00:17.630 +02:00 [INF] PersonnelGroup existente con Id: 84 y GroupName: Purchasing, ignorando.
+2024-04-05 10:00:17.652 +02:00 [INF] PersonnelGroup existente con Id: 85 y GroupName: Finance Projects, ignorando.
+2024-04-05 10:00:17.673 +02:00 [INF] PersonnelGroup existente con Id: 86 y GroupName: Research Support, Transfer and Dissemination, ignorando.
+2024-04-05 10:00:17.695 +02:00 [INF] PersonnelGroup existente con Id: 87 y GroupName: Computational Biology, ignorando.
+2024-04-05 10:00:17.716 +02:00 [INF] PersonnelGroup existente con Id: 88 y GroupName: Runtime Systems for parallel programming models, ignorando.
+2024-04-05 10:00:17.739 +02:00 [INF] PersonnelGroup existente con Id: 89 y GroupName: Geometry and Meshing for simulations, ignorando.
+2024-04-05 10:00:17.761 +02:00 [INF] PersonnelGroup existente con Id: 90 y GroupName: Genome Informatics, ignorando.
+2024-04-05 10:00:17.784 +02:00 [INF] PersonnelGroup existente con Id: 91 y GroupName: INB, ignorando.
+2024-04-05 10:00:17.806 +02:00 [INF] PersonnelGroup existente con Id: 92 y GroupName: Social Link Analytics, ignorando.
+2024-04-05 10:00:17.827 +02:00 [INF] PersonnelGroup existente con Id: 93 y GroupName: Text mining, ignorando.
+2024-04-05 10:00:17.852 +02:00 [INF] PersonnelGroup existente con Id: 94 y GroupName: QUANTIC, ignorando.
+2024-04-05 10:00:17.874 +02:00 [INF] PersonnelGroup existente con Id: 95 y GroupName: High Performance Artificial Intelligence, ignorando.
+2024-04-05 10:00:17.895 +02:00 [INF] PersonnelGroup existente con Id: 96 y GroupName: Controlling, ignorando.
+2024-04-05 10:00:17.917 +02:00 [INF] PersonnelGroup existente con Id: 97 y GroupName: Helpdesk, ignorando.
+2024-04-05 10:00:17.939 +02:00 [INF] PersonnelGroup existente con Id: 98 y GroupName: HPC Modeling and Simulation for Social Sciences, ignorando.
+2024-04-05 10:00:17.961 +02:00 [INF] PersonnelGroup existente con Id: 99 y GroupName: Natural Language Processing, ignorando.
+2024-04-05 10:00:17.982 +02:00 [INF] PersonnelGroup existente con Id: 100 y GroupName: Bioinformatics Coordination Unit, ignorando.
+2024-04-05 10:00:18.014 +02:00 [INF] PersonnelGroup existente con Id: 101 y GroupName: Data Management, ignorando.
+2024-04-05 10:00:18.036 +02:00 [INF] PersonnelGroup existente con Id: 102 y GroupName: Transcriptomics and functional genomics lab, ignorando.
+2024-04-05 10:00:18.058 +02:00 [INF] PersonnelGroup existente con Id: 103 y GroupName: Integrative Computational Network Biology (ICONBI), ignorando.
+2024-04-05 10:00:18.079 +02:00 [INF] PersonnelGroup existente con Id: 104 y GroupName: Emerging Technologies for Artificial Intelligence, ignorando.
+2024-04-05 10:00:18.101 +02:00 [INF] PersonnelGroup existente con Id: 105 y GroupName: Data-driven Scientific Computing, ignorando.
+2024-04-05 10:00:18.122 +02:00 [INF] PersonnelGroup existente con Id: 106 y GroupName: Distributed Object Management, ignorando.
+2024-04-05 10:00:18.144 +02:00 [INF] PersonnelGroup existente con Id: 107 y GroupName: Predictable Parallel Computing, ignorando.
+2024-04-05 10:00:18.165 +02:00 [INF] PersonnelGroup existente con Id: 108 y GroupName: Best Practices for Performance and Programmability, ignorando.
+2024-04-05 10:00:18.187 +02:00 [INF] PersonnelGroup existente con Id: 109 y GroupName: Natural Hazards and Risk Analysis, ignorando.
+2024-04-05 10:00:18.208 +02:00 [INF] PersonnelGroup existente con Id: 110 y GroupName: Comparative genomics, ignorando.
+2024-04-05 10:00:18.230 +02:00 [INF] PersonnelGroup existente con Id: 111 y GroupName: Sysadmin, ignorando.
+2024-04-05 10:00:18.251 +02:00 [INF] PersonnelGroup existente con Id: 112 y GroupName: Propulsion Technologies Group, ignorando.
+2024-04-05 10:00:18.273 +02:00 [INF] PersonnelGroup existente con Id: 113 y GroupName: Large-Scale Computational Fluid Dynamics, ignorando.
+2024-04-05 10:00:18.295 +02:00 [INF] PersonnelGroup existente con Id: 114 y GroupName: Legal, ignorando.
+2024-04-05 10:00:18.317 +02:00 [INF] PersonnelGroup existente con Id: 115 y GroupName: System software for Energy Management in HPC, ignorando.
+2024-04-05 10:00:18.338 +02:00 [INF] PersonnelGroup existente con Id: 116 y GroupName: European Exascale Accelerator, ignorando.
+2024-04-05 10:00:18.359 +02:00 [INF] PersonnelGroup existente con Id: 117 y GroupName: RISC-V development in EPI project, ignorando.
+2024-04-05 10:00:18.381 +02:00 [INF] PersonnelGroup existente con Id: 118 y GroupName: Infrastructure Access Policy Unit, ignorando.
+2024-04-05 10:00:18.415 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 119 y GroupName: First level user support
+2024-04-05 10:00:18.436 +02:00 [INF] PersonnelGroup existente con Id: 120 y GroupName: Network & Security, ignorando.
+2024-04-05 10:00:18.458 +02:00 [INF] PersonnelGroup existente con Id: 121 y GroupName: Soft. R&D vehicles for New Architec. (SONAR), ignorando.
+2024-04-05 10:00:18.479 +02:00 [INF] PersonnelGroup existente con Id: 122 y GroupName: High Performance Domain-Specific Architectures, ignorando.
+2024-04-05 10:00:18.501 +02:00 [INF] PersonnelGroup existente con Id: 123 y GroupName: Compilers and Toolchains for HPC, ignorando.
+2024-04-05 10:00:18.522 +02:00 [INF] PersonnelGroup existente con Id: 124 y GroupName: Resilience in Distributed Systems, ignorando.
+2024-04-05 10:00:18.544 +02:00 [INF] PersonnelGroup existente con Id: 125 y GroupName: Artificial Intelligence Research, ignorando.
+2024-04-05 10:00:18.566 +02:00 [INF] PersonnelGroup existente con Id: 126 y GroupName: Validation, ignorando.
+2024-04-05 10:00:18.587 +02:00 [INF] PersonnelGroup existente con Id: 127 y GroupName: Material Sciences, ignorando.
+2024-04-05 10:00:18.609 +02:00 [INF] PersonnelGroup existente con Id: 128 y GroupName: Dual Technologies, ignorando.
+2024-04-05 10:00:18.630 +02:00 [INF] PersonnelGroup existente con Id: 129 y GroupName: Machine Learning for Biomedical Research, ignorando.
+2024-04-05 10:00:18.652 +02:00 [INF] PersonnelGroup existente con Id: 130 y GroupName: System Tools and Advances Runtimes, ignorando.
+2024-04-05 10:00:18.673 +02:00 [INF] PersonnelGroup existente con Id: 131 y GroupName: Synthesis and Physical design of ICs, ignorando.
+2024-04-05 10:00:18.695 +02:00 [INF] PersonnelGroup existente con Id: 132 y GroupName: Global Health Resilience, ignorando.
+2024-04-05 10:00:18.716 +02:00 [INF] PersonnelGroup existente con Id: 133 y GroupName: High Performance Computing for Earth Sciences, ignorando.
+2024-04-05 10:00:18.738 +02:00 [INF] PersonnelGroup existente con Id: 134 y GroupName: Earth Data and Diagnostics, ignorando.
+2024-04-05 10:00:18.759 +02:00 [INF] PersonnelGroup existente con Id: 135 y GroupName: Earth Models and Workflows, ignorando.
+2024-04-05 10:00:18.781 +02:00 [INF] PersonnelGroup existente con Id: 136 y GroupName: UNCORE: Cache hierarchy and interconnects, ignorando.
+2024-04-05 10:00:18.805 +02:00 [INF] PersonnelGroup existente con Id: 137 y GroupName: Knowledge Integration, ignorando.
+2024-04-05 10:00:18.827 +02:00 [INF] PersonnelGroup existente con Id: 138 y GroupName: Climate Services, ignorando.
+2024-04-05 10:00:18.848 +02:00 [INF] PersonnelGroup existente con Id: 139 y GroupName: Air Quality Services, ignorando.
+2024-04-05 10:00:18.870 +02:00 [INF] PersonnelGroup existente con Id: 140 y GroupName: NLP for Biomedical Information Analysis, ignorando.
+2024-04-05 10:00:18.892 +02:00 [INF] PersonnelGroup existente con Id: 141 y GroupName: Language Technologies, ignorando.
+2024-04-05 10:00:18.915 +02:00 [INF] PersonnelGroup existente con Id: 142 y GroupName: Wave Phenomena, ignorando.
+2024-04-05 10:00:18.937 +02:00 [INF] PersonnelGroup existente con Id: 143 y GroupName: SIM: Simulation Infrastructure and Methodologies, ignorando.
+2024-04-05 10:00:18.959 +02:00 [INF] PersonnelGroup existente con Id: 144 y GroupName: Project Innovation Management Unit, ignorando.
+2024-04-05 10:00:18.981 +02:00 [INF] PersonnelGroup existente con Id: 145 y GroupName: Innovation and Business Development, ignorando.
+2024-04-05 10:00:19.006 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 146 y GroupName: Life Sciences Scientific Coordination unit
+2024-04-05 10:00:19.028 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 147 y GroupName: Project Management, Innovation & Dissemination
+2024-04-05 10:00:19.055 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 148 y GroupName: PMID - Project Management
+2024-04-05 10:00:19.084 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 149 y GroupName: PMID - Technology Transfer
+2024-04-05 10:00:19.106 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 150 y GroupName: PMID - Dissemination
+2024-04-05 10:00:19.128 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 151 y GroupName: PMID - Innovation
+2024-04-05 10:00:19.151 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 152 y GroupName: Computational Social Sciences Programme
+2024-04-05 10:00:19.173 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 153 y GroupName: Microarchitecture Design and Implementation
+2024-04-05 10:00:19.195 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 154 y GroupName: Emissions
+2024-04-05 10:00:19.216 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 155 y GroupName: Atmospheric Chemistry and Air Quality
+2024-04-05 10:00:19.238 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 156 y GroupName: Data, Assimilation, Forecasting and Applications
+2024-04-05 10:00:19.260 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 157 y GroupName: Aerosols, Dust and Climate
+2024-04-05 10:00:19.281 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 158 y GroupName: Technical Management HW eng
+2024-04-05 10:00:19.303 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 159 y GroupName: Integration
+2024-04-05 10:00:19.324 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 160 y GroupName: VPU
+2024-04-05 10:00:19.346 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 161 y GroupName: CORE
+2024-04-05 10:00:19.368 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 162 y GroupName: FPGA Technologies
+2024-04-05 10:00:19.395 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 163 y GroupName: Business Development
+2024-04-05 10:00:19.611 +02:00 [ERR] Ocurrió un error durante la carga de PersonnelGroup.
+Microsoft.EntityFrameworkCore.DbUpdateException: An error occurred while saving the entity changes. See the inner exception for details.
+ ---> Microsoft.Data.SqlClient.SqlException (0x80131904): Infracción de la restricción PRIMARY KEY 'PK_personnelgroup_Id'. No se puede insertar una clave duplicada en el objeto 'dbo.personnelgroup'. El valor de la clave duplicada es (119).
+Se terminó la instrucción.
+   at Microsoft.Data.SqlClient.SqlCommand.<>c.<ExecuteDbDataReaderAsync>b__209_0(Task`1 result)
+   at System.Threading.Tasks.ContinuationResultTaskFromResultTask`2.InnerInvoke()
+   at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+ClientConnectionId:62326850-89ec-4bce-a2d2-e55118d4b8c2
+Error Number:2627,State:1,Class:14
+   --- End of inner exception stack trace ---
+   at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.SqlServer.Update.Internal.SqlServerModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal.SqlServerExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+   at TRS2._0.Services.LoadDataService.LoadPersonnelGroupsFromFileAsync(String filePath) in C:\Users\Admin\source\repos\trs3.0\TRS2.0\Services\LoadDataService.cs:line 539
+2024-04-05 10:06:53.301 +02:00 [INF] PersonnelGroup existente con Id: -2. Actualizando GroupName: Sucursal pral.
+2024-04-05 10:06:53.354 +02:00 [INF] PersonnelGroup existente con Id: 1. Actualizando GroupName: Proyectos (Obsoleto)
+2024-04-05 10:06:53.386 +02:00 [INF] PersonnelGroup existente con Id: 2. Actualizando GroupName: INTERNO
+2024-04-05 10:06:53.408 +02:00 [INF] PersonnelGroup existente con Id: 3. Actualizando GroupName: EXTERNO
+2024-04-05 10:06:53.430 +02:00 [INF] PersonnelGroup existente con Id: 4. Actualizando GroupName: Administration and Finances
+2024-04-05 10:06:53.453 +02:00 [INF] PersonnelGroup existente con Id: 5. Actualizando GroupName: Computational Genomics
+2024-04-05 10:06:53.478 +02:00 [INF] PersonnelGroup existente con Id: 6. Actualizando GroupName: Heterogeneous Architectures
+2024-04-05 10:06:53.501 +02:00 [INF] PersonnelGroup existente con Id: 7. Actualizando GroupName: INB Computational Node 2
+2024-04-05 10:06:53.523 +02:00 [INF] PersonnelGroup existente con Id: 8. Actualizando GroupName: Molecular Modelling and Bioinformatics
+2024-04-05 10:06:53.546 +02:00 [INF] PersonnelGroup existente con Id: 9. Actualizando GroupName: Operating System / Computer Architecture Interface
+2024-04-05 10:06:53.569 +02:00 [INF] PersonnelGroup existente con Id: 10. Actualizando GroupName: Performance Tools
+2024-04-05 10:06:53.846 +02:00 [INF] PersonnelGroup existente con Id: 11. Actualizando GroupName: Programming Models
+2024-04-05 10:06:53.869 +02:00 [INF] PersonnelGroup existente con Id: 12. Actualizando GroupName: Protein Interactions and Docking
+2024-04-05 10:06:53.891 +02:00 [INF] PersonnelGroup existente con Id: 13. Actualizando GroupName: Storage Systems
+2024-04-05 10:06:53.914 +02:00 [INF] PersonnelGroup existente con Id: 14. Actualizando GroupName: System Administration
+2024-04-05 10:06:53.936 +02:00 [INF] PersonnelGroup existente con Id: 15. Actualizando GroupName: User Support
+2024-04-05 10:06:53.958 +02:00 [INF] PersonnelGroup existente con Id: 17. Actualizando GroupName: Air Quality
+2024-04-05 10:06:53.987 +02:00 [INF] PersonnelGroup existente con Id: 18. Actualizando GroupName: Autonomic Systems and e-Business Platforms
+2024-04-05 10:06:54.009 +02:00 [INF] PersonnelGroup existente con Id: 20. Actualizando GroupName: Computer Architecture for Parallel Paradigms
+2024-04-05 10:06:54.031 +02:00 [INF] PersonnelGroup existente con Id: 21. Actualizando GroupName: Electronic and Atomic Protein Modelling
+2024-04-05 10:06:54.054 +02:00 [INF] PersonnelGroup existente con Id: 22. Actualizando GroupName: Workflows and Distributed Computing
+2024-04-05 10:06:54.082 +02:00 [INF] PersonnelGroup existente con Id: 24. Actualizando GroupName: Accelerators for High Performance Computing
+2024-04-05 10:06:54.108 +02:00 [INF] PersonnelGroup existente con Id: 26. Actualizando GroupName: Communication
+2024-04-05 10:06:54.130 +02:00 [INF] PersonnelGroup existente con Id: 27. Actualizando GroupName: Atmospheric Modelling
+2024-04-05 10:06:54.153 +02:00 [INF] PersonnelGroup existente con Id: 28. Actualizando GroupName: Mineral Dust
+2024-04-05 10:06:54.175 +02:00 [INF] PersonnelGroup existente con Id: 29. Actualizando GroupName: Unconventional Computer Architecture and Networks
+2024-04-05 10:06:54.209 +02:00 [INF] PersonnelGroup existente con Id: 31. Actualizando GroupName: Physical and Numerical Modelling
+2024-04-05 10:06:54.231 +02:00 [INF] PersonnelGroup existente con Id: 32. Actualizando GroupName: Project Management Office
+2024-04-05 10:06:54.253 +02:00 [INF] PersonnelGroup existente con Id: 33. Actualizando GroupName: Climate Modelling
+2024-04-05 10:06:54.274 +02:00 [INF] PersonnelGroup existente con Id: 34. Actualizando GroupName: Computer Architecture / OS Interface (CAOS)
+2024-04-05 10:06:54.296 +02:00 [INF] PersonnelGroup existente con Id: 35. Actualizando GroupName: Extreme Computing
+2024-04-05 10:06:54.319 +02:00 [INF] PersonnelGroup existente con Id: 36. Actualizando GroupName: High Performance Computational Mechanics
+2024-04-05 10:06:54.340 +02:00 [INF] PersonnelGroup existente con Id: 37. Actualizando GroupName: Facility Management
+2024-04-05 10:06:54.362 +02:00 [INF] PersonnelGroup existente con Id: 38. Actualizando GroupName: Environmental Simulations
+2024-04-05 10:06:54.384 +02:00 [INF] PersonnelGroup existente con Id: 39. Actualizando GroupName: Geosciences Applications
+2024-04-05 10:06:54.406 +02:00 [INF] PersonnelGroup existente con Id: 40. Actualizando GroupName: Data Pre&Post Processing
+2024-04-05 10:06:54.430 +02:00 [INF] PersonnelGroup existente con Id: 41. Actualizando GroupName: H. A. Mobile and embedded-based HPC
+2024-04-05 10:06:54.452 +02:00 [INF] PersonnelGroup existente con Id: 42. Actualizando GroupName: H. A. Memory technologies
+2024-04-05 10:06:54.475 +02:00 [INF] PersonnelGroup existente con Id: 43. Actualizando GroupName: H. A. Architecture simulation environments
+2024-04-05 10:06:54.497 +02:00 [INF] PersonnelGroup existente con Id: 44. Actualizando GroupName: H. A. Microserver architectures & system software
+2024-04-05 10:06:54.519 +02:00 [INF] PersonnelGroup existente con Id: 45. Actualizando GroupName: General Directors
+2024-04-05 10:06:54.541 +02:00 [INF] PersonnelGroup existente con Id: 46. Actualizando GroupName: General Operations
+2024-04-05 10:06:54.562 +02:00 [INF] PersonnelGroup existente con Id: 47. Actualizando GroupName: General Management
+2024-04-05 10:06:54.585 +02:00 [INF] PersonnelGroup existente con Id: 48. Actualizando GroupName: General CS
+2024-04-05 10:06:54.607 +02:00 [INF] PersonnelGroup existente con Id: 49. Actualizando GroupName: General LS
+2024-04-05 10:06:54.630 +02:00 [INF] PersonnelGroup existente con Id: 50. Actualizando GroupName: General ES
+2024-04-05 10:06:54.653 +02:00 [INF] PersonnelGroup existente con Id: 51. Actualizando GroupName: General CASE
+2024-04-05 10:06:54.678 +02:00 [INF] PersonnelGroup existente con Id: 52. Actualizando GroupName: RRHH
+2024-04-05 10:06:54.709 +02:00 [INF] PersonnelGroup existente con Id: 53. Actualizando GroupName: Education & Training
+2024-04-05 10:06:54.740 +02:00 [INF] PersonnelGroup existente con Id: 54. Actualizando GroupName: Information System & Services
+2024-04-05 10:06:54.765 +02:00 [INF] PersonnelGroup existente con Id: 55. Actualizando GroupName: Smart Cities
+2024-04-05 10:06:54.789 +02:00 [INF] PersonnelGroup existente con Id: 56. Actualizando GroupName: Fusion
+2024-04-05 10:06:54.811 +02:00 [INF] PersonnelGroup existente con Id: 57. Actualizando GroupName: Social Simulation
+2024-04-05 10:06:54.833 +02:00 [INF] PersonnelGroup existente con Id: 58. Actualizando GroupName: HPC Software Engineering
+2024-04-05 10:06:54.854 +02:00 [INF] PersonnelGroup existente con Id: 59. Actualizando GroupName: Runtime Aware Architectures
+2024-04-05 10:06:54.876 +02:00 [INF] PersonnelGroup existente con Id: 60. Actualizando GroupName: Atmospheric Composition
+2024-04-05 10:06:54.900 +02:00 [INF] PersonnelGroup existente con Id: 61. Actualizando GroupName: Climate Variability and Change
+2024-04-05 10:06:54.924 +02:00 [INF] PersonnelGroup existente con Id: 62. Actualizando GroupName: Computational Earth Sciences
+2024-04-05 10:06:54.945 +02:00 [INF] PersonnelGroup existente con Id: 63. Actualizando GroupName: Earth System Services
+2024-04-05 10:06:54.967 +02:00 [INF] PersonnelGroup existente con Id: 64. Actualizando GroupName: Human Resources
+2024-04-05 10:06:54.991 +02:00 [INF] PersonnelGroup existente con Id: 65. Actualizando GroupName: Strategy Support
+2024-04-05 10:06:55.013 +02:00 [INF] PersonnelGroup existente con Id: 66. Actualizando GroupName: Technology Transfer
+2024-04-05 10:06:55.038 +02:00 [INF] PersonnelGroup existente con Id: 67. Actualizando GroupName: Finance & Accounting
+2024-04-05 10:06:55.059 +02:00 [INF] PersonnelGroup existente con Id: 68. Actualizando GroupName: Administration
+2024-04-05 10:06:55.081 +02:00 [INF] PersonnelGroup existente con Id: 69. Actualizando GroupName: Data Centric Computing Area
+2024-04-05 10:06:55.114 +02:00 [INF] PersonnelGroup existente con Id: 72. Actualizando GroupName: Research Support, Transfer and Communication
+2024-04-05 10:06:55.136 +02:00 [INF] PersonnelGroup existente con Id: 73. Actualizando GroupName: RSTD - Project Management Office
+2024-04-05 10:06:55.162 +02:00 [INF] PersonnelGroup existente con Id: 74. Actualizando GroupName: RSTD - Communication
+2024-04-05 10:06:55.193 +02:00 [INF] PersonnelGroup existente con Id: 75. Actualizando GroupName: RSTD - Technology Transfer
+2024-04-05 10:06:55.215 +02:00 [INF] PersonnelGroup existente con Id: 76. Actualizando GroupName: RSTD - Strategy Support
+2024-04-05 10:06:55.238 +02:00 [INF] PersonnelGroup existente con Id: 77. Actualizando GroupName: Media Relations
+2024-04-05 10:06:55.259 +02:00 [INF] PersonnelGroup existente con Id: 78. Actualizando GroupName: European Relations
+2024-04-05 10:06:55.281 +02:00 [INF] PersonnelGroup existente con Id: 79. Actualizando GroupName: Latin American Relations
+2024-04-05 10:06:55.302 +02:00 [INF] PersonnelGroup existente con Id: 80. Actualizando GroupName: Assistants
+2024-04-05 10:06:55.324 +02:00 [INF] PersonnelGroup existente con Id: 81. Actualizando GroupName: Research Fellow
+2024-04-05 10:06:55.345 +02:00 [INF] PersonnelGroup existente con Id: 82. Actualizando GroupName: Severo Ochoa
+2024-04-05 10:06:55.367 +02:00 [INF] PersonnelGroup existente con Id: 83. Actualizando GroupName: RSTD - Dissemination
+2024-04-05 10:06:55.388 +02:00 [INF] PersonnelGroup existente con Id: 84. Actualizando GroupName: Purchasing
+2024-04-05 10:06:55.410 +02:00 [INF] PersonnelGroup existente con Id: 85. Actualizando GroupName: Finance Projects
+2024-04-05 10:06:55.432 +02:00 [INF] PersonnelGroup existente con Id: 86. Actualizando GroupName: Research Support, Transfer and Dissemination
+2024-04-05 10:06:55.455 +02:00 [INF] PersonnelGroup existente con Id: 87. Actualizando GroupName: Computational Biology
+2024-04-05 10:06:55.480 +02:00 [INF] PersonnelGroup existente con Id: 88. Actualizando GroupName: Runtime Systems for parallel programming models
+2024-04-05 10:06:55.502 +02:00 [INF] PersonnelGroup existente con Id: 89. Actualizando GroupName: Geometry and Meshing for simulations
+2024-04-05 10:06:55.523 +02:00 [INF] PersonnelGroup existente con Id: 90. Actualizando GroupName: Genome Informatics
+2024-04-05 10:06:55.545 +02:00 [INF] PersonnelGroup existente con Id: 91. Actualizando GroupName: INB
+2024-04-05 10:06:55.567 +02:00 [INF] PersonnelGroup existente con Id: 92. Actualizando GroupName: Social Link Analytics
+2024-04-05 10:06:55.591 +02:00 [INF] PersonnelGroup existente con Id: 93. Actualizando GroupName: Text mining
+2024-04-05 10:06:55.613 +02:00 [INF] PersonnelGroup existente con Id: 94. Actualizando GroupName: QUANTIC
+2024-04-05 10:06:55.635 +02:00 [INF] PersonnelGroup existente con Id: 95. Actualizando GroupName: High Performance Artificial Intelligence
+2024-04-05 10:06:55.656 +02:00 [INF] PersonnelGroup existente con Id: 96. Actualizando GroupName: Controlling
+2024-04-05 10:06:55.678 +02:00 [INF] PersonnelGroup existente con Id: 97. Actualizando GroupName: Helpdesk
+2024-04-05 10:06:55.700 +02:00 [INF] PersonnelGroup existente con Id: 98. Actualizando GroupName: HPC Modeling and Simulation for Social Sciences
+2024-04-05 10:06:55.726 +02:00 [INF] PersonnelGroup existente con Id: 99. Actualizando GroupName: Natural Language Processing
+2024-04-05 10:06:55.747 +02:00 [INF] PersonnelGroup existente con Id: 100. Actualizando GroupName: Bioinformatics Coordination Unit
+2024-04-05 10:06:55.769 +02:00 [INF] PersonnelGroup existente con Id: 101. Actualizando GroupName: Data Management
+2024-04-05 10:06:55.791 +02:00 [INF] PersonnelGroup existente con Id: 102. Actualizando GroupName: Transcriptomics and functional genomics lab
+2024-04-05 10:06:55.813 +02:00 [INF] PersonnelGroup existente con Id: 103. Actualizando GroupName: Integrative Computational Network Biology (ICONBI)
+2024-04-05 10:06:55.835 +02:00 [INF] PersonnelGroup existente con Id: 104. Actualizando GroupName: Emerging Technologies for Artificial Intelligence
+2024-04-05 10:06:55.857 +02:00 [INF] PersonnelGroup existente con Id: 105. Actualizando GroupName: Data-driven Scientific Computing
+2024-04-05 10:06:55.879 +02:00 [INF] PersonnelGroup existente con Id: 106. Actualizando GroupName: Distributed Object Management
+2024-04-05 10:06:55.900 +02:00 [INF] PersonnelGroup existente con Id: 107. Actualizando GroupName: Predictable Parallel Computing
+2024-04-05 10:06:55.922 +02:00 [INF] PersonnelGroup existente con Id: 108. Actualizando GroupName: Best Practices for Performance and Programmability
+2024-04-05 10:06:55.943 +02:00 [INF] PersonnelGroup existente con Id: 109. Actualizando GroupName: Natural Hazards and Risk Analysis
+2024-04-05 10:06:55.965 +02:00 [INF] PersonnelGroup existente con Id: 110. Actualizando GroupName: Comparative genomics
+2024-04-05 10:06:55.986 +02:00 [INF] PersonnelGroup existente con Id: 111. Actualizando GroupName: Sysadmin
+2024-04-05 10:06:56.014 +02:00 [INF] PersonnelGroup existente con Id: 112. Actualizando GroupName: Propulsion Technologies Group
+2024-04-05 10:06:56.035 +02:00 [INF] PersonnelGroup existente con Id: 113. Actualizando GroupName: Large-Scale Computational Fluid Dynamics
+2024-04-05 10:06:56.057 +02:00 [INF] PersonnelGroup existente con Id: 114. Actualizando GroupName: Legal
+2024-04-05 10:06:56.078 +02:00 [INF] PersonnelGroup existente con Id: 115. Actualizando GroupName: System software for Energy Management in HPC
+2024-04-05 10:06:56.099 +02:00 [INF] PersonnelGroup existente con Id: 116. Actualizando GroupName: European Exascale Accelerator
+2024-04-05 10:06:56.121 +02:00 [INF] PersonnelGroup existente con Id: 117. Actualizando GroupName: RISC-V development in EPI project
+2024-04-05 10:06:56.142 +02:00 [INF] PersonnelGroup existente con Id: 118. Actualizando GroupName: Infrastructure Access Policy Unit
+2024-04-05 10:06:56.163 +02:00 [INF] PersonnelGroup existente con Id: 119. Actualizando GroupName: First level user support
+2024-04-05 10:06:56.186 +02:00 [INF] PersonnelGroup existente con Id: 120. Actualizando GroupName: Network & Security
+2024-04-05 10:06:56.208 +02:00 [INF] PersonnelGroup existente con Id: 121. Actualizando GroupName: Soft. R&D vehicles for New Architec. (SONAR)
+2024-04-05 10:06:56.230 +02:00 [INF] PersonnelGroup existente con Id: 122. Actualizando GroupName: High Performance Domain-Specific Architectures
+2024-04-05 10:06:56.251 +02:00 [INF] PersonnelGroup existente con Id: 123. Actualizando GroupName: Compilers and Toolchains for HPC
+2024-04-05 10:06:56.273 +02:00 [INF] PersonnelGroup existente con Id: 124. Actualizando GroupName: Resilience in Distributed Systems
+2024-04-05 10:06:56.296 +02:00 [INF] PersonnelGroup existente con Id: 125. Actualizando GroupName: Artificial Intelligence Research
+2024-04-05 10:06:56.317 +02:00 [INF] PersonnelGroup existente con Id: 126. Actualizando GroupName: Validation
+2024-04-05 10:06:56.339 +02:00 [INF] PersonnelGroup existente con Id: 127. Actualizando GroupName: Material Sciences
+2024-04-05 10:06:56.360 +02:00 [INF] PersonnelGroup existente con Id: 128. Actualizando GroupName: Dual Technologies
+2024-04-05 10:06:56.382 +02:00 [INF] PersonnelGroup existente con Id: 129. Actualizando GroupName: Machine Learning for Biomedical Research
+2024-04-05 10:06:56.403 +02:00 [INF] PersonnelGroup existente con Id: 130. Actualizando GroupName: System Tools and Advances Runtimes
+2024-04-05 10:06:56.425 +02:00 [INF] PersonnelGroup existente con Id: 131. Actualizando GroupName: Synthesis and Physical design of ICs
+2024-04-05 10:06:56.446 +02:00 [INF] PersonnelGroup existente con Id: 132. Actualizando GroupName: Global Health Resilience
+2024-04-05 10:06:56.481 +02:00 [INF] PersonnelGroup existente con Id: 133. Actualizando GroupName: High Performance Computing for Earth Sciences
+2024-04-05 10:06:56.503 +02:00 [INF] PersonnelGroup existente con Id: 134. Actualizando GroupName: Earth Data and Diagnostics
+2024-04-05 10:06:56.525 +02:00 [INF] PersonnelGroup existente con Id: 135. Actualizando GroupName: Earth Models and Workflows
+2024-04-05 10:06:56.546 +02:00 [INF] PersonnelGroup existente con Id: 136. Actualizando GroupName: UNCORE: Cache hierarchy and interconnects
+2024-04-05 10:06:56.568 +02:00 [INF] PersonnelGroup existente con Id: 137. Actualizando GroupName: Knowledge Integration
+2024-04-05 10:06:56.589 +02:00 [INF] PersonnelGroup existente con Id: 138. Actualizando GroupName: Climate Services
+2024-04-05 10:06:56.611 +02:00 [INF] PersonnelGroup existente con Id: 139. Actualizando GroupName: Air Quality Services
+2024-04-05 10:06:56.632 +02:00 [INF] PersonnelGroup existente con Id: 140. Actualizando GroupName: NLP for Biomedical Information Analysis
+2024-04-05 10:06:56.654 +02:00 [INF] PersonnelGroup existente con Id: 141. Actualizando GroupName: Language Technologies
+2024-04-05 10:06:56.675 +02:00 [INF] PersonnelGroup existente con Id: 142. Actualizando GroupName: Wave Phenomena
+2024-04-05 10:06:56.697 +02:00 [INF] PersonnelGroup existente con Id: 143. Actualizando GroupName: SIM: Simulation Infrastructure and Methodologies
+2024-04-05 10:06:56.718 +02:00 [INF] PersonnelGroup existente con Id: 144. Actualizando GroupName: Project Innovation Management Unit
+2024-04-05 10:06:56.740 +02:00 [INF] PersonnelGroup existente con Id: 145. Actualizando GroupName: Innovation and Business Development
+2024-04-05 10:06:56.772 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 146 y GroupName: Life Sciences Scientific Coordination unit
+2024-04-05 10:06:56.794 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 147 y GroupName: Project Management, Innovation & Dissemination
+2024-04-05 10:06:56.815 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 148 y GroupName: PMID - Project Management
+2024-04-05 10:06:56.837 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 149 y GroupName: PMID - Technology Transfer
+2024-04-05 10:06:56.859 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 150 y GroupName: PMID - Dissemination
+2024-04-05 10:06:56.880 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 151 y GroupName: PMID - Innovation
+2024-04-05 10:06:56.902 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 152 y GroupName: Computational Social Sciences Programme
+2024-04-05 10:06:56.923 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 153 y GroupName: Microarchitecture Design and Implementation
+2024-04-05 10:06:56.945 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 154 y GroupName: Emissions
+2024-04-05 10:06:56.967 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 155 y GroupName: Atmospheric Chemistry and Air Quality
+2024-04-05 10:06:56.988 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 156 y GroupName: Data, Assimilation, Forecasting and Applications
+2024-04-05 10:06:57.019 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 157 y GroupName: Aerosols, Dust and Climate
+2024-04-05 10:06:57.041 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 158 y GroupName: Technical Management HW eng
+2024-04-05 10:06:57.062 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 159 y GroupName: Integration
+2024-04-05 10:06:57.084 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 160 y GroupName: VPU
+2024-04-05 10:06:57.105 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 161 y GroupName: CORE
+2024-04-05 10:06:57.127 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 162 y GroupName: FPGA Technologies
+2024-04-05 10:06:57.148 +02:00 [INF] Insertando nuevo PersonnelGroup con Id: 163 y GroupName: Business Development
+2024-04-05 10:06:57.361 +02:00 [INF] Proceso de carga de PersonnelGroup completado.
