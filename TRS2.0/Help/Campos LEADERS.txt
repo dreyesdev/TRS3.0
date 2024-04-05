@@ -1,0 +1,4 @@
+﻿0. Id PK
+1. Tipo (Valores posibles G o D)
+2. Grupo o Departamento (Si el tipo es G, se refiere a un grupo, si el tipo es D, se refiere a un departamento)
+3. Leader (Clave Foranea de la tabla Personnel)
