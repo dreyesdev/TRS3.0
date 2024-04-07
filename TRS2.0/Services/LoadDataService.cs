@@ -655,6 +655,8 @@ namespace TRS2._0.Services
                 .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
+            var failedLines = new List<string>();
+
             logger.Information("Iniciando la carga de proyectos desde el archivo: {FilePath}", filePath);
 
             try
@@ -664,13 +666,15 @@ namespace TRS2._0.Services
 
                 foreach (var line in lines)
                 {
-                    logger.Debug("Procesando línea: {Line}", line);
+                    try
+                    {
+
+                        logger.Debug("Procesando línea: {Line}", line);
                     var fields = line.Split('\t');
 
                     if (fields.Length < 16)
                     {
-                        logger.Error("Línea incompleta: {Line}", line);
-                        continue;
+                            throw new FormatException("Línea incompleta.");
                     }
 
                     var sapCode = fields[0];
@@ -754,9 +758,27 @@ namespace TRS2._0.Services
 
 
                     logger.Information("Procesado proyecto {SapCode}", sapCode);
+
+                    }
+                    catch (Exception ex)
+                    {
+                        failedLines.Add($"Error procesando la línea '{line}': {ex.Message}");
+                        logger.Error(ex, "Error al procesar la línea: {Line}", line);
+                    }
                 }
 
-                logger.Information("Carga de proyectos finalizada.");
+                if (failedLines.Any())
+                {
+                    logger.Error("Resumen de líneas con errores:");
+                    foreach (var failedLine in failedLines)
+                    {
+                        logger.Error(failedLine);
+                    }
+                }
+                else
+                {
+                    logger.Information("Todos los proyectos fueron procesados exitosamente.");
+                }
             }
             catch (Exception ex)
             {
