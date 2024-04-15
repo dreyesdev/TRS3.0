@@ -870,7 +870,7 @@ namespace TRS2._0.Controllers
                                 });
 
                                 // Añadir manualmente cada color a la tabla
-                                legendCol.Item().DirectContent().Background("#FFD700").Height(20).Row(row =>
+                                legendCol.Item().Background("#FFD700").Height(20).Row(row =>
                                 {
                                     row.RelativeItem().Text("Holiday");
                                 });
@@ -935,9 +935,9 @@ namespace TRS2._0.Controllers
             });
 
             using var stream = new MemoryStream();
-            document.ShowInPreviewer(); // Remover esta línea si se quiere generar directamente el PDF sin previsualización
+            //document.ShowInPreviewer(); // Remover esta línea si se quiere generar directamente el PDF sin previsualización
 
-            //document.GeneratePdf(stream); // Descomentar para generar el PDF
+            document.GeneratePdf(stream); // Descomentar para generar el PDF
             stream.Seek(0, SeekOrigin.Begin);
 
             var pdfFileName = $"Timesheet_{personId}_{year}_{month}.pdf";

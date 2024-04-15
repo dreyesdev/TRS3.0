@@ -449,14 +449,25 @@ public class WorkCalendarService
 
     public async Task<Dictionary<DateTime, bool>> IsOutOfContractForMonths(int personId, List<DateTime> months)
     {
-        var startDates = months.Select(m => new DateTime(m.Year, m.Month, 1));
-        var endDates = months.Select(m => new DateTime(m.Year, m.Month, DateTime.DaysInMonth(m.Year, m.Month)));
+        var startDates = months.Select(m => new DateTime(m.Year, m.Month, 1)).ToList();
+        var endDates = months.Select(m => new DateTime(m.Year, m.Month, DateTime.DaysInMonth(m.Year, m.Month))).ToList();
+
+        Console.WriteLine($"Min Start Date: {startDates.Min()}");
+        Console.WriteLine($"Max End Date: {endDates.Max()}");
+
+        if (!startDates.Any() || !endDates.Any())
+        {
+            return new Dictionary<DateTime, bool>(); // Retorna un diccionario vacío si no hay fechas de inicio o fin.
+        }
+
+        var minStartDate = startDates.Min();
+        var maxEndDate = endDates.Max();
+
 
         var contracts = await _context.Dedications
-            .Where(d => d.PersId == personId &&
-                        d.End >= startDates.Min() &&
-                        d.Start <= endDates.Max())
-            .ToListAsync();
+                        .Where(d => d.PersId == personId && d.End >= minStartDate && d.Start <= maxEndDate)
+                        .ToListAsync();
+
 
         var outOfContract = new Dictionary<DateTime, bool>();
         foreach (var month in months)

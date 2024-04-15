@@ -22,7 +22,7 @@ public partial class Dedication
     [ForeignKey("PersId")]
     public virtual Personnel Pers { get; set; } = null!;
 
-    public int LineId { get; set; }
+    public int? LineId { get; set; }
     public bool Exist { get; set; }
 
 }
