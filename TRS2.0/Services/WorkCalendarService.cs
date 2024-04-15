@@ -687,7 +687,10 @@ public class WorkCalendarService
                 
             }
 
-            decimal adjustedDailyHours = currentAffiliationHours * (1 - currentDedication.Value);
+            // Si no se encuentra dedicación específica o Reduc es 0.00, asume una jornada completa
+            decimal dedicationFactor = currentDedication.HasValue ? currentDedication.Value : 0.00M;
+
+            decimal adjustedDailyHours = currentAffiliationHours * (1 - dedicationFactor);
 
             dailyWorkHours.Add(currentDate, adjustedDailyHours);
         }
