@@ -719,170 +719,240 @@ namespace TRS2._0.Controllers
                             AlignCenter().Text($"{totaldaysWorkedOnProject}");
                         });
                     });
-
-                    page.Content().PaddingVertical(10).Row(mainRow =>
+                    page.Content().Column(contentColumn =>
                     {
-                        mainRow.RelativeItem().Column(col1 =>
+                        contentColumn.Item().PaddingVertical(10).Row(mainRow =>
                         {
-                            col1.Item().Column(col2 =>
+                            mainRow.RelativeItem().Column(col1 =>
                             {
-                                col2.Item().Text("Personnel Data").Underline().Bold();
-
-                                col2.Item().Text(txt =>
+                                col1.Item().Column(col2 =>
                                 {
-                                    txt.Span("Name of Beneficiary: ").SemiBold().FontSize(10);
-                                    txt.Span("BARCELONA SUPERCOMPUTING CENTER - CENTRO NACIONAL DE SUPERCOMPUTACIÓN").FontSize(10);
+                                    col2.Item().Text("Personnel Data").Underline().Bold();
+
+                                    col2.Item().Text(txt =>
+                                    {
+                                        txt.Span("Name of Beneficiary: ").SemiBold().FontSize(10);
+                                        txt.Span("BARCELONA SUPERCOMPUTING CENTER - CENTRO NACIONAL DE SUPERCOMPUTACIÓN").FontSize(10);
+                                    });
+
+                                    col2.Item().Text(txt =>
+                                    {
+                                        txt.Span("Name of staff member: ").SemiBold().FontSize(10);
+                                        txt.Span($"{model.Person.Name} {model.Person.Surname}").FontSize(10);
+                                    });
+
+                                    col2.Item().Text(txt =>
+                                    {
+                                        txt.Span("Job Title: ").SemiBold().FontSize(10);
+                                        txt.Span($"{model.Person.Category}").FontSize(10);
+                                    });
                                 });
 
-                                col2.Item().Text(txt =>
+                                col1.Item().LineHorizontal(0.5f);
+
+                                col1.Item().Table(tabla =>
                                 {
-                                    txt.Span("Name of staff member: ").SemiBold().FontSize(10);
-                                    txt.Span($"{model.Person.Name} {model.Person.Surname}").FontSize(10);
+                                    tabla.ColumnsDefinition(columns =>
+                                    {
+                                        columns.RelativeColumn(3); // Para "Proyecto"
+                                                                   // Agrega una columna por cada día del mes
+                                        var daysInMonth = DateTime.DaysInMonth(year, month);
+                                        for (int day = 1; day <= daysInMonth; day++)
+                                        {
+                                            columns.RelativeColumn(); // Una columna por día
+                                        }
+                                        columns.RelativeColumn(); // Additional column for "Total"
+                                    });
+
+                                    // Encabezado de la tabla
+                                    tabla.Header(header =>
+                                    {
+                                        // Primera columna fija
+                                        header.Cell().Background("#0055A4").Padding(2).AlignCenter().Text("Work Packages").Bold().FontColor("#fff").FontSize(10);
+
+                                        // Columnas para cada día del mes
+                                        var daysInMonth = DateTime.DaysInMonth(year, month);
+                                        for (int day = 1; day <= daysInMonth; day++)
+                                        {
+                                            var date = new DateTime(year, month, day);
+                                            var dayAbbreviation = date.ToString("ddd", CultureInfo.CreateSpecificCulture("en")); // Obtiene la abreviatura del día en inglés
+                                            header.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{dayAbbreviation} {day:00}").ExtraBold().FontColor("#fff").FontSize(8);
+                                        }
+                                        // Add "Total" column header
+                                        header.Cell().Background("#0055A4").Padding(2).AlignMiddle().AlignCenter().Text("Total").Bold().FontColor("#FFFFFF").FontSize(8);
+                                    });
+
+
+                                    foreach (var wp in model.WorkPackages)
+                                    {
+
+                                        // For each work package, add a new cell for the WP name
+                                        tabla.Cell().Border(1).BorderColor("#00BFFF").AlignCenter().Text($"{wp.WpName}").Bold().FontSize(8);
+
+                                        // Then, for each day of the month, add a new cell with either the timesheet entry hours or "0"
+                                        foreach (var day in Enumerable.Range(1, DateTime.DaysInMonth(year, month)).Select(day => new DateTime(year, month, day)))
+                                        {
+                                            var date = new DateTime(year, month, day.Day);
+                                            var timesheetEntry = wp.Timesheets.FirstOrDefault(ts => ts.Day.Date == date);
+                                            var isWeekend = day.DayOfWeek == DayOfWeek.Saturday || day.DayOfWeek == DayOfWeek.Sunday;
+                                            var leave = model.LeavesthisMonth.FirstOrDefault(l => l.Day.Date == day.Date);
+                                            var hasTravel = model.TravelsthisMonth.Any(t => day.Date >= t.StartDate && day.Date <= t.EndDate);
+                                            var isFuture = day.Date > DateTime.Now.Date;
+                                            var isHoliday = model.Holidays.Any(h => h.Date == day.Date);
+
+                                            var cellBackground = "#fff"; // Color por defecto
+
+                                            if (isHoliday)
+                                            {
+                                                cellBackground = "#FFD700";
+                                            }
+                                            else if (hasTravel && !isFuture)
+                                            {
+                                                cellBackground = "#90EE90"; // lightgreen
+                                            }
+                                            else if (isWeekend || isFuture)
+                                            {
+                                                cellBackground = "#6c757d";
+                                            }
+                                            else if (leave != null)
+                                            {
+                                                switch (leave.Type)
+                                                {
+                                                    case 1:
+                                                        cellBackground = "#FFA07A"; // lightsalmon
+                                                        break;
+                                                    case 2:
+                                                        cellBackground = "#ADD8E6"; // lightblue
+                                                        break;
+                                                    case 3:
+                                                        cellBackground = "#800080"; // purple
+                                                        break;
+                                                }
+                                            }
+                                            // Directly add cells for each day within the same iteration that adds the work package name
+                                            tabla.Cell().Background(cellBackground).Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").Bold().FontSize(8);
+                                        }
+
+                                        // Calculate the total hours for this WP and add a cell for it
+                                        var totalHours = wp.Timesheets.Sum(ts => ts.Hours);
+                                        tabla.Cell().Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(totalHours.ToString("0.##")).Bold().FontSize(8);
+
+                                    }
+
+                                    // Fila de "Total" al final
+                                    tabla.Footer(footer =>
+                                    {                                        
+
+                                        // En la fila final, añadimos el texto "Total Hours" en la primera celda
+                                        footer.Cell().ColumnSpan(1).Background("#0055A4").Padding(2).AlignMiddle().AlignCenter().Text("Total Hours").Bold().FontColor("#FFFFFF").FontSize(8);
+
+                                        // Luego agregamos las celdas para cada día del mes con los totales de horas trabajadas
+                                        for (int day = 1; day <= DateTime.DaysInMonth(year, month); day++)
+                                        {
+                                            var totalHoursForDay = model.WorkPackages.Sum(wp => wp.Timesheets.FirstOrDefault(ts => ts.Day.Day == day)?.Hours ?? 0);
+                                            decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay * 2, MidpointRounding.AwayFromZero) / 2;
+                                            footer.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursForDay}").ExtraBold().FontColor("#FFFFFF").FontSize(8);
+                                        }
+
+                                        // En la última celda de esta fila, mostramos el total de horas trabajadas en el proyecto
+                                        footer.Cell().Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursWorkedOnProject}").ExtraBold().FontColor("#FFFFFF").Bold().FontSize(8);
+                                    });
                                 });
 
-                                col2.Item().Text(txt =>
-                                {
-                                    txt.Span("Job Title: ").SemiBold().FontSize(10);
-                                    txt.Span($"{model.Person.Category}").FontSize(10);
-                                });
-                            });
+                            // Puedes continuar con más contenido si es necesario
+                            });                 
 
-                            col1.Item().LineHorizontal(0.5f);
+                        });
 
-                            col1.Item().Table(tabla =>
+                        contentColumn.Item().PaddingVertical(10).Row(legendRow =>
+                        {
+                            // Leyenda de Work Packages en la mitad izquierda
+                            legendRow.RelativeItem().Column(legendWpCol =>
                             {
-                                tabla.ColumnsDefinition(columns =>
-                                {
-                                    columns.RelativeColumn(3); // Para "Proyecto"
-                                                               // Agrega una columna por cada día del mes
-                                    var daysInMonth = DateTime.DaysInMonth(year, month);
-                                    for (int day = 1; day <= daysInMonth; day++)
-                                    {
-                                        columns.RelativeColumn(); // Una columna por día
-                                    }
-                                    columns.RelativeColumn(); // Additional column for "Total"
-                                });
-
-                                // Encabezado de la tabla
-                                tabla.Header(header =>
-                                {
-                                    // Primera columna fija
-                                    header.Cell().Background("#0055A4").Padding(2).AlignCenter().Text("Work Packages").Bold().FontColor("#fff").FontSize(10);
-
-                                    // Columnas para cada día del mes
-                                    var daysInMonth = DateTime.DaysInMonth(year, month);
-                                    for (int day = 1; day <= daysInMonth; day++)
-                                    {
-                                        var date = new DateTime(year, month, day);
-                                        var dayAbbreviation = date.ToString("ddd", CultureInfo.CreateSpecificCulture("en")); // Obtiene la abreviatura del día en inglés
-                                        header.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{dayAbbreviation} {day:00}").ExtraBold().FontColor("#fff").FontSize(8);
-                                    }
-                                    // Add "Total" column header
-                                    header.Cell().Background("#0055A4").Padding(2).AlignMiddle().AlignCenter().Text("Total").Bold().FontColor("#FFFFFF").FontSize(8);
-                                });
-
+                                legendWpCol.Item().Text("Work Packages Title").Bold().Underline().FontSize(10);
 
                                 foreach (var wp in model.WorkPackages)
                                 {
-
-                                    // For each work package, add a new cell for the WP name
-                                    tabla.Cell().Border(1).BorderColor("#00BFFF").AlignCenter().Text($"{wp.WpName} - {wp.WpTitle}").Bold().FontSize(8);
-
-                                    // Then, for each day of the month, add a new cell with either the timesheet entry hours or "0"
-                                    foreach (var day in Enumerable.Range(1, DateTime.DaysInMonth(year, month)).Select(day => new DateTime(year, month, day)))
+                                    legendWpCol.Item().PaddingVertical(1).Row(row =>
                                     {
-                                        var date = new DateTime(year, month, day.Day);
-                                        var timesheetEntry = wp.Timesheets.FirstOrDefault(ts => ts.Day.Date == date);
-                                        var isWeekend = day.DayOfWeek == DayOfWeek.Saturday || day.DayOfWeek == DayOfWeek.Sunday;
-                                        var leave = model.LeavesthisMonth.FirstOrDefault(l => l.Day.Date == day.Date);
-                                        var hasTravel = model.TravelsthisMonth.Any(t => day.Date >= t.StartDate && day.Date <= t.EndDate);
-                                        var isFuture = day.Date > DateTime.Now.Date;
-                                        var isHoliday = model.Holidays.Any(h => h.Date == day.Date);
-
-                                        var cellBackground = "#fff"; // Color por defecto
-
-                                        if (isHoliday)
-                                        {
-                                            cellBackground = "#FFD700";
-                                        }
-                                        else if (hasTravel && !isFuture)
-                                        {
-                                            cellBackground = "#90EE90"; // lightgreen
-                                        }
-                                        else if (isWeekend || isFuture)
-                                        {
-                                            cellBackground = "#6c757d";
-                                        }
-                                        else if (leave != null)
-                                        {
-                                            switch (leave.Type)
-                                            {
-                                                case 1:
-                                                    cellBackground = "#FFA07A"; // lightsalmon
-                                                    break;
-                                                case 2:
-                                                    cellBackground = "#ADD8E6"; // lightblue
-                                                    break;
-                                                case 3:
-                                                    cellBackground = "#800080"; // purple
-                                                    break;
-                                            }
-                                        }
-                                        // Directly add cells for each day within the same iteration that adds the work package name
-                                        tabla.Cell().Background(cellBackground).Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").Bold().FontSize(8);
-                                    }
-
-                                    // Calculate the total hours for this WP and add a cell for it
-                                    var totalHours = wp.Timesheets.Sum(ts => ts.Hours);
-                                    tabla.Cell().Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(totalHours.ToString("0.##")).Bold().FontSize(8);
-
+                                        row.RelativeItem().Text($"{wp.WpName} - {wp.WpTitle}").FontSize(8);
+                                    });
                                 }
-
-                                // Fila de "Total" al final
-                                tabla.Footer(footer =>
-                                {
-                                    footer.Cell().ColumnSpan((uint)DateTime.DaysInMonth(year, month) + 2).BorderHorizontal(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignMiddle().AlignCenter().Text("Total Hours worked on project").Bold().FontColor("#FFFFFF").FontSize(8);
-                                    footer.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text("").FontColor("#FFFFFF").FontSize(8);
-                                    for (int day = 1; day <= DateTime.DaysInMonth(year, month); day++)
-                                    {
-                                        var totalHoursForDay = model.WorkPackages.Sum(wp => wp.Timesheets.FirstOrDefault(ts => ts.Day.Day == day)?.Hours ?? 0);
-                                        decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay * 2, MidpointRounding.AwayFromZero) / 2;
-                                        footer.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursForDay}").ExtraBold().FontColor("#FFFFFF").FontSize(8);
-                                    }
-
-                                    footer.Cell().Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursWorkedOnProject}").ExtraBold().FontColor("#FFFFFF").Bold().FontSize(8);
-                                });
                             });
 
-                            // Puedes continuar con más contenido si es necesario
-                        });
-
-                        mainRow.RelativeItem().Width(250).Column(legendCol =>
-                        {
-                            legendCol.Item().AlignCenter().Text("Legend").Underline().Bold();
-
-                            legendCol.Item().Table(table =>
+                            // Leyenda de Colores y Tabla "Travels" en la mitad derecha
+                            legendRow.RelativeItem().Column(legendColorTravelsCol =>
                             {
-                                table.ColumnsDefinition(columns =>
+                                // Leyenda de colores
+                                legendColorTravelsCol.Item().Border(1).BorderColor("#000").Padding(5).Column(col =>
                                 {
-                                    columns.ConstantColumn(20); // Espacio para el color
-                                    columns.RelativeColumn();   // Descripción del color
-                                });
+                                    col.Item().AlignCenter().Text("Leyend").Bold().FontSize(10);
 
-                                // Añadir manualmente cada color a la tabla
-                                legendCol.Item().Background("#FFD700").Height(20).Row(row =>
-                                {
-                                    row.RelativeItem().Text("Holiday");
+                                    var colors = new Dictionary<string, string>
+                                                {
+                                                    { "#FFA07A", "Absence" },
+                                                    { "#ADD8E6", "Vacation" },
+                                                    { "#800080", "Out of Contract" },
+                                                    { "#90EE90", "Travel Days" },
+                                                    { "#FFD700", "National Holidays" }
+                                                };
+
+                                    col.Item().Row(row =>
+                                    {
+                                        foreach (var color in colors)
+                                        {
+                                            row.RelativeItem().Row(colorRow =>
+                                            {
+                                                colorRow.AutoItem().MaxHeight(10).MaxWidth(20).Background(color.Key).Border(1).BorderColor("#000").Width(10);
+                                                colorRow.RelativeItem().PaddingLeft(2).Text(color.Value).FontSize(8);
+                                            });
+                                        }
+                                    });
                                 });
-                                
-                                // Repetir para cada color en tu leyenda
+                                legendColorTravelsCol.Spacing(5); 
+                                // Tabla "Travels" debajo de la leyenda de colores
+                                legendColorTravelsCol.Item().Background(Colors.Grey.Lighten3).Padding(10).Column(column =>
+                                {
+                                    column.Item().AlignCenter().Text("Travels").Bold().FontSize(10);
+                                    column.Spacing(5);
+
+                                    // Inicia la definición de la tabla para "Travels"
+                                    column.Item().Table(table =>
+                                    {
+                                        // Definición de columnas
+                                        table.ColumnsDefinition(columns =>
+                                        {
+                                            columns.RelativeColumn(); // Liq Id
+                                            columns.RelativeColumn(); // Project
+                                            columns.RelativeColumn(); // Dedication
+                                            columns.RelativeColumn(); // StartDate
+                                            columns.RelativeColumn(); // EndDate
+                                        });
+
+                                        // Encabezados de la tabla
+                                        table.Header(header =>
+                                        {
+                                            header.Cell().Background("#004488").Padding(2).AlignCenter().Text("Liq Id").FontColor("#fff").FontSize(8);
+                                            header.Cell().Background("#004488").Padding(2).AlignCenter().Text("Project").FontColor("#fff").FontSize(8);
+                                            header.Cell().Background("#004488").Padding(2).AlignCenter().Text("Dedication").FontColor("#fff").FontSize(8);
+                                            header.Cell().Background("#004488").Padding(2).AlignCenter().Text("StartDate").FontColor("#fff").FontSize(8);
+                                            header.Cell().Background("#004488").Padding(2).AlignCenter().Text("EndDate").FontColor("#fff").FontSize(8);
+                                        });
+
+                                        // Filas de la tabla con los datos de viaje
+                                        foreach (var travel in model.TravelsthisMonth)
+                                        {
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.LiqId}").FontSize(8);
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.ProjectSAPCode} - {travel.ProjectAcronimo}").FontSize(8);
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.Dedication:0.0}%").FontSize(8);
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.StartDate:dd/MM/yyyy}").FontSize(8);
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.EndDate:dd/MM/yyyy}").FontSize(8);
+                                        }
+                                    });
+                                });
                             });
                         });
-
-
-
                     });
-
                     page.Footer().Row(footer =>
                     {
                         // Cuadro de firma para el Responsable
@@ -935,9 +1005,9 @@ namespace TRS2._0.Controllers
             });
 
             using var stream = new MemoryStream();
-            //document.ShowInPreviewer(); // Remover esta línea si se quiere generar directamente el PDF sin previsualización
+            document.ShowInPreviewer(); // Remover esta línea si se quiere generar directamente el PDF sin previsualización
 
-            document.GeneratePdf(stream); // Descomentar para generar el PDF
+            //document.GeneratePdf(stream); // Descomentar para generar el PDF
             stream.Seek(0, SeekOrigin.Begin);
 
             var pdfFileName = $"Timesheet_{personId}_{year}_{month}.pdf";
