@@ -373,7 +373,7 @@ namespace TRS2._0.Controllers
                             var monthName = new DateTime(year, month, 1).ToString("MMMM", CultureInfo.CreateSpecificCulture("en"));
                             col.Item().AlignCenter().Text($"{model.Person.Name} {model.Person.Surname} Timesheet").Bold().FontSize(14);
                             col.Item().AlignCenter().Text($"{monthName} {year}").FontSize(12);
-                            col.Item().AlignCenter().Text($"{model.ProjectData.SapCode} - {model.ProjectData.Acronim}").Bold().FontSize(14);
+                            col.Item().AlignCenter().Text($"{model.ProjectData.Contract} - {model.ProjectData.Acronim}").Bold().FontSize(14);
                         });
 
                         row.ConstantItem(180).Column(col =>
@@ -690,7 +690,7 @@ namespace TRS2._0.Controllers
                             var monthName = new DateTime(year, month, 1).ToString("MMMM", CultureInfo.CreateSpecificCulture("en"));
                             col.Item().AlignCenter().Text($"{model.Person.Name} {model.Person.Surname} Timesheet").Bold().FontSize(14);
                             col.Item().AlignCenter().Text($"{monthName} {year}").FontSize(12);
-                            col.Item().AlignCenter().Text($"{model.ProjectData.SapCode} - {model.ProjectData.Acronim}").Bold().FontSize(14);
+                            col.Item().AlignCenter().Text($"{model.ProjectData.Contract} - {model.ProjectData.Acronim}").Bold().FontSize(14);
                         });
 
                         row.ConstantItem(180).Column(col =>
@@ -755,7 +755,6 @@ namespace TRS2._0.Controllers
                                     tabla.ColumnsDefinition(columns =>
                                     {
                                         columns.RelativeColumn(3); // Para "Proyecto"
-                                                                   // Agrega una columna por cada día del mes
                                         var daysInMonth = DateTime.DaysInMonth(year, month);
                                         for (int day = 1; day <= daysInMonth; day++)
                                         {
@@ -767,29 +766,22 @@ namespace TRS2._0.Controllers
                                     // Encabezado de la tabla
                                     tabla.Header(header =>
                                     {
-                                        // Primera columna fija
-                                        header.Cell().Background("#0055A4").Padding(2).AlignCenter().Text("Work Packages").Bold().FontColor("#fff").FontSize(10);
+                                        header.Cell().Background("#0055A4").Padding(2).AlignCenter().Text("Work Packages").Bold().FontColor("#FFFFFF").FontSize(10);
 
-                                        // Columnas para cada día del mes
                                         var daysInMonth = DateTime.DaysInMonth(year, month);
                                         for (int day = 1; day <= daysInMonth; day++)
                                         {
                                             var date = new DateTime(year, month, day);
-                                            var dayAbbreviation = date.ToString("ddd", CultureInfo.CreateSpecificCulture("en")); // Obtiene la abreviatura del día en inglés
-                                            header.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{dayAbbreviation} {day:00}").ExtraBold().FontColor("#fff").FontSize(8);
+                                            var dayAbbreviation = date.ToString("ddd", CultureInfo.CreateSpecificCulture("en"));
+                                            header.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{dayAbbreviation} {day:00}").ExtraBold().FontColor("#FFFFFF").FontSize(8);
                                         }
-                                        // Add "Total" column header
                                         header.Cell().Background("#0055A4").Padding(2).AlignMiddle().AlignCenter().Text("Total").Bold().FontColor("#FFFFFF").FontSize(8);
                                     });
 
-
                                     foreach (var wp in model.WorkPackages)
                                     {
-
-                                        // For each work package, add a new cell for the WP name
                                         tabla.Cell().Border(1).BorderColor("#00BFFF").AlignCenter().Text($"{wp.WpName}").Bold().FontSize(8);
 
-                                        // Then, for each day of the month, add a new cell with either the timesheet entry hours or "0"
                                         foreach (var day in Enumerable.Range(1, DateTime.DaysInMonth(year, month)).Select(day => new DateTime(year, month, day)))
                                         {
                                             var date = new DateTime(year, month, day.Day);
@@ -800,66 +792,58 @@ namespace TRS2._0.Controllers
                                             var isFuture = day.Date > DateTime.Now.Date;
                                             var isHoliday = model.Holidays.Any(h => h.Date == day.Date);
 
-                                            var cellBackground = "#fff"; // Color por defecto
+                                            var cellBackground = "#FFFFFF"; // Color por defecto más claro para mejorar contraste
 
                                             if (isHoliday)
                                             {
-                                                cellBackground = "#FFD700";
+                                                cellBackground = "#FFD700"; // Gold
                                             }
                                             else if (hasTravel && !isFuture)
                                             {
-                                                cellBackground = "#90EE90"; // lightgreen
+                                                cellBackground = "#90EE90"; // Light green
                                             }
                                             else if (isWeekend || isFuture)
                                             {
-                                                cellBackground = "#6c757d";
+                                                cellBackground = "#D3D3D3"; // Light Grey for better readability
                                             }
                                             else if (leave != null)
                                             {
                                                 switch (leave.Type)
                                                 {
                                                     case 1:
-                                                        cellBackground = "#FFA07A"; // lightsalmon
+                                                        cellBackground = "#FFA07A"; // Light salmon
                                                         break;
                                                     case 2:
-                                                        cellBackground = "#ADD8E6"; // lightblue
+                                                        cellBackground = "#ADD8E6"; // Light blue
                                                         break;
                                                     case 3:
-                                                        cellBackground = "#800080"; // purple
+                                                        cellBackground = "#DDA0DD"; // Plum, lighter than purple
                                                         break;
                                                 }
                                             }
-                                            // Directly add cells for each day within the same iteration that adds the work package name
                                             tabla.Cell().Background(cellBackground).Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").Bold().FontSize(8);
                                         }
 
-                                        // Calculate the total hours for this WP and add a cell for it
                                         var totalHours = wp.Timesheets.Sum(ts => ts.Hours);
                                         tabla.Cell().Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(totalHours.ToString("0.##")).Bold().FontSize(8);
-
                                     }
 
-                                    // Fila de "Total" al final
                                     tabla.Footer(footer =>
-                                    {                                        
-
-                                        // En la fila final, añadimos el texto "Total Hours" en la primera celda
+                                    {
                                         footer.Cell().ColumnSpan(1).Background("#0055A4").Padding(2).AlignMiddle().AlignCenter().Text("Total Hours").Bold().FontColor("#FFFFFF").FontSize(8);
 
-                                        // Luego agregamos las celdas para cada día del mes con los totales de horas trabajadas
                                         for (int day = 1; day <= DateTime.DaysInMonth(year, month); day++)
                                         {
                                             var totalHoursForDay = model.WorkPackages.Sum(wp => wp.Timesheets.FirstOrDefault(ts => ts.Day.Day == day)?.Hours ?? 0);
                                             decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay * 2, MidpointRounding.AwayFromZero) / 2;
                                             footer.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursForDay}").ExtraBold().FontColor("#FFFFFF").FontSize(8);
                                         }
-
-                                        // En la última celda de esta fila, mostramos el total de horas trabajadas en el proyecto
                                         footer.Cell().Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursWorkedOnProject}").ExtraBold().FontColor("#FFFFFF").Bold().FontSize(8);
                                     });
                                 });
 
-                            // Puedes continuar con más contenido si es necesario
+
+                                // Puedes continuar con más contenido si es necesario
                             });                 
 
                         });
@@ -939,15 +923,24 @@ namespace TRS2._0.Controllers
                                             header.Cell().Background("#004488").Padding(2).AlignCenter().Text("EndDate").FontColor("#fff").FontSize(8);
                                         });
 
-                                        // Filas de la tabla con los datos de viaje
-                                        foreach (var travel in model.TravelsthisMonth)
+                                        // Añadiendo filas de ejemplo
+                                        for (int i = 1; i <= 4; i++)
                                         {
-                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.LiqId}").FontSize(8);
-                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.ProjectSAPCode} - {travel.ProjectAcronimo}").FontSize(8);
-                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.Dedication:0.0}%").FontSize(8);
-                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.StartDate:dd/MM/yyyy}").FontSize(8);
-                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.EndDate:dd/MM/yyyy}").FontSize(8);
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"Liq-{i}").FontSize(8);
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"Project-{i}").FontSize(8);
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{i * 10.0}%").FontSize(8);
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"2024-01-{i:02}").FontSize(8);
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"2024-01-{i + 1:02}").FontSize(8);
                                         }
+                                        // Filas de la tabla con los datos de viaje
+                                        //foreach (var travel in model.TravelsthisMonth)
+                                        //{
+                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.LiqId}").FontSize(8);
+                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.ProjectSAPCode} - {travel.ProjectAcronimo}").FontSize(8);
+                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.Dedication:0.0}%").FontSize(8);
+                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.StartDate:dd/MM/yyyy}").FontSize(8);
+                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.EndDate:dd/MM/yyyy}").FontSize(8);
+                                        //}
                                     });
                                 });
                             });
