@@ -7,6 +7,9 @@ using TRS2._0.Data;
 using TRS2._0.Models.DataModels;
 using TRS2._0.Services;
 using Quartz;
+using GSS.Authentication.CAS.AspNetCore;
+
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,6 +47,24 @@ builder.Services.AddQuartz(q =>
         .StoreDurably()); // Marca el trabajo como durable
 });
 
+
+// Configuración de servicios de autenticación CAS
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = "Cookies";
+    options.DefaultChallengeScheme = "CAS";
+})
+.AddCookie("Cookies")
+.AddCAS(options =>
+{
+    options.CasServerUrlBase = "https://cas.example.com/cas";  // Ajusta a la URL de tu servidor CAS
+    options.SaveTokens = true;
+    options.Events.OnCreatingTicket = context =>
+    {
+        // Configura aquí cómo se manejan los tickets y los atributos de usuario
+        return Task.CompletedTask;
+    };
+});
 
 
 builder.Services.AddQuartzHostedService(
