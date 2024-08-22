@@ -298,5 +298,69 @@ namespace TRS2._0.Controllers
                 return StatusCode(500, $"Error al iniciar el trabajo de carga de proyectos: {ex.Message}");
             }
         }
+
+        [HttpGet("/FetchAndSaveAgreementEvents")]
+        public async Task<IActionResult> TriggerFetchAndSaveAgreementEventsJob()
+        {
+            try
+            {
+                var scheduler = await _schedulerFactory.GetScheduler();
+                var jobKey = new JobKey("LoadDataServiceJob");
+
+                // Configura JobDataMap con los parámetros específicos para esta acción
+                var jobDataMap = new JobDataMap
+                {
+                    {"Action", "FetchAndSaveAgreementEvents"}
+                };
+
+                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
+                if (await scheduler.CheckExists(jobKey))
+                {
+                    await scheduler.TriggerJob(jobKey, jobDataMap);
+                    return Ok("El trabajo de obtención y guardado de eventos de acuerdos se ha iniciado.");
+                }
+                else
+                {
+                    return NotFound("El trabajo de obtención y guardado de eventos de acuerdos no se encontró.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Maneja adecuadamente la excepción
+                return StatusCode(500, $"Error al iniciar el trabajo de obtención y guardado de eventos de acuerdos: {ex.Message}");
+            }
+        }
+
+        [HttpGet("/UpdatePersonnelUserIds")]
+        public async Task<IActionResult> TriggerUpdatePersonnelUserIdsJob()
+        {
+            try
+            {
+                var scheduler = await _schedulerFactory.GetScheduler();
+                var jobKey = new JobKey("LoadDataServiceJob");
+
+                // Configura JobDataMap con los parámetros específicos para esta acción
+                var jobDataMap = new JobDataMap
+            {
+                {"Action", "UpdatePersonnelUserIds"}
+            };
+
+                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
+                if (await scheduler.CheckExists(jobKey))
+                {
+                    await scheduler.TriggerJob(jobKey, jobDataMap);
+                    return Ok("El trabajo de actualización de UserIds se ha iniciado.");
+                }
+                else
+                {
+                    return NotFound("El trabajo de actualización de UserIds no se encontró.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Maneja adecuadamente la excepción
+                return StatusCode(500, $"Error al iniciar el trabajo de actualización de UserIds: {ex.Message}");
+            }
+        }
     }
 }

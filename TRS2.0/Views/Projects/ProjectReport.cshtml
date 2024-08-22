@@ -232,54 +232,59 @@
 </div>
 </div>
 <div id="detallesPeriodoContainer"></div>
-   
-        <script>
-        function loadReportPeriodForm() {
-            $.ajax({
-                url: '@Url.Action("ReportPeriodForm", "Projects", new { projId = ViewBag.projId })',
-                type: 'GET',
-                success: function (result) {
-                    $('#reportPeriodsSection').html(result);
-                    $('#addReportPeriodBtn').hide(); // Oculta el botón de añadir
-                    $('#cancelReportPeriodBtn').show(); // Muestra el botón de cancelar
-                }
-            });
-        }
 
-        function cancelReportPeriodForm() {
-            $('#reportPeriodsSection').html(''); // Limpia la sección de la vista parcial
-            $('#cancelReportPeriodBtn').hide(); // Oculta el botón de cancelar
-            $('#addReportPeriodBtn').show(); // Muestra nuevamente el botón de "Add Reporting Periods"
-        }
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script>
 
-        function deleteReportPeriod(id) {
-            if (confirm('Are you sure you want to delete this period?')) {
-                $.post('/Projects/DeleteReportPeriod', { id: id }, function (data) {
-                    if (data.success) {
-                        alert('Report period deleted successfully.');
-                        // Actualizar la vista o recargar la página aquí si es necesario
-                        location.reload();
-                    } else {
-                        alert(data.message || 'An error occurred.');
-                    }
-                });
-            }
-        }
-
+    $(document).ready(function () {
         $(document).on('click', '.periodo', function () {
             var periodoId = $(this).data('periodo-id');
-            var projectId = @ViewBag.projId; // Asume que el ID del proyecto está disponible en la vista
+            var projectId = @ViewBag.projId;
             $.ajax({
-                url: '/Projects/PeriodDetails', // URL a tu acción del controlador que devuelve la vista parcial
+                url: '/Projects/PeriodDetails',
                 data: { id: periodoId, projectId: projectId },
                 success: function (data) {
-                    $('#detallesPeriodoContainer').html(data); // Asegúrate de tener un contenedor para los detalles
+                    $('#detallesPeriodoContainer').html(data);
                     $('#detallesPeriodoContainer').show();
                 }
             });
         });
+    });
 
-        </script>
+    function loadReportPeriodForm() {
+        $.ajax({
+            url: '@Url.Action("ReportPeriodForm", "Projects", new { projId = ViewBag.projId })',
+            type: 'GET',
+            success: function (result) {
+                $('#reportPeriodsSection').html(result);
+                $('#addReportPeriodBtn').hide(); // Oculta el botón de añadir
+                $('#cancelReportPeriodBtn').show(); // Muestra el botón de cancelar
+            }
+        });
+    }
+
+    function cancelReportPeriodForm() {
+        $('#reportPeriodsSection').html(''); // Limpia la sección de la vista parcial
+        $('#cancelReportPeriodBtn').hide(); // Oculta el botón de cancelar
+        $('#addReportPeriodBtn').show(); // Muestra nuevamente el botón de "Add Reporting Periods"
+    }
+
+    function deleteReportPeriod(id) {
+        if (confirm('Are you sure you want to delete this period?')) {
+            $.post('/Projects/DeleteReportPeriod', { id: id }, function (data) {
+                if (data.success) {
+                    alert('Report period deleted successfully.');
+                    // Actualizar la vista o recargar la página aquí si es necesario
+                    location.reload();
+                } else {
+                    alert(data.message || 'An error occurred.');
+                }
+            });
+        }
+    }   
+
+</script>
+
 
 
     <style>

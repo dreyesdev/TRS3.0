@@ -11,6 +11,7 @@ using QuestPDF.Helpers;
 using QuestPDF.Previewer;
 using System.Drawing;
 using Microsoft.CodeAnalysis.Options;
+using System.Security.Claims;
 
 
 
@@ -37,8 +38,27 @@ namespace TRS2._0.Controllers
             return View(await tRSDBContext.ToListAsync());
         }
 
-        public async Task<IActionResult> GetTimeSheetsForPerson(int personId, int? year, int? month)
+        public async Task<IActionResult> GetTimeSheetsForPerson(int? personId, int? year, int? month)
         {
+            // Si no se proporciona un personId, obtiene el personId del usuario logueado
+            if (!personId.HasValue)
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var user = await _context.Users
+                                         .Include(u => u.Personnel)
+                                         .SingleOrDefaultAsync(u => u.Id == userId);
+
+                if (user == null || user.Personnel == null)
+                {
+                    _logger.LogError($"No se encontró el usuario o no está asociado a un personal con el ID {userId}");
+                    return NotFound();
+                }
+
+                personId = user.PersonnelId;
+            }
+
+            // Asegurarse de que personId no es nulo
+            int validPersonId = personId.Value;
 
             // Determina el año y mes actual si no se proporcionan
             var currentYear = year ?? DateTime.Now.Year;
@@ -49,8 +69,8 @@ namespace TRS2._0.Controllers
             var startDate = new DateTime(currentYear, currentMonth, 1);
             var endDate = startDate.AddMonths(1).AddDays(-1);
 
-            var leavesthismonth = await _workCalendarService.GetLeavesForPerson(personId, currentYear, currentMonth);
-            var travelsthismonth = await _workCalendarService.GetTravelsForThisMonth(personId, currentYear, currentMonth);
+            var leavesthismonth = await _workCalendarService.GetLeavesForPerson(validPersonId, currentYear, currentMonth);
+            var travelsthismonth = await _workCalendarService.GetTravelsForThisMonth(validPersonId, currentYear, currentMonth);
             var person = await _context.Personnel.FindAsync(personId);
 
             if (person == null)
@@ -95,10 +115,10 @@ namespace TRS2._0.Controllers
                                     .Where(pe => pe.WpxPersonNavigation.Person == personId && pe.Month >= startDate && pe.Month <= endDate)
                                     .ToListAsync();
 
-            var dailyworkhours = await _workCalendarService.CalculateDailyWorkHours(personId, currentYear, currentMonth);
+            var dailyworkhours = await _workCalendarService.CalculateDailyWorkHours(validPersonId, currentYear, currentMonth);
             var totalWorkHours = dailyworkhours.Sum(entry => entry.Value);
             decimal percentageUsed = totalWorkHours > 0 ? hoursUsed / totalWorkHours * 100 : 0;
-            var hoursPerDayWithDedication = await _workCalendarService.CalculateDailyWorkHoursWithDedication(personId, currentYear, currentMonth);
+            var hoursPerDayWithDedication = await _workCalendarService.CalculateDailyWorkHoursWithDedication(validPersonId, currentYear, currentMonth);
             var totalWorkHoursWithDedication = timesheets
                     .GroupBy(ts => ts.Day)
                     .ToDictionary(
@@ -645,9 +665,9 @@ namespace TRS2._0.Controllers
             });
 
             using var stream = new MemoryStream();
-            document.ShowInPreviewer();
+            //document.ShowInPreviewer();
 
-            //document.GeneratePdf(stream);
+            document.GeneratePdf(stream);
             stream.Seek(0, SeekOrigin.Begin);
 
             var pdfFileName = $"Timesheet_{personId}_{year}_{month}.pdf";
@@ -998,9 +1018,9 @@ namespace TRS2._0.Controllers
             });
 
             using var stream = new MemoryStream();
-            document.ShowInPreviewer(); // Remover esta línea si se quiere generar directamente el PDF sin previsualización
+            //document.ShowInPreviewer(); // Remover esta línea si se quiere generar directamente el PDF sin previsualización
 
-            //document.GeneratePdf(stream); // Descomentar para generar el PDF
+            document.GeneratePdf(stream); // Descomentar para generar el PDF
             stream.Seek(0, SeekOrigin.Begin);
 
             var pdfFileName = $"Timesheet_{personId}_{year}_{month}.pdf";

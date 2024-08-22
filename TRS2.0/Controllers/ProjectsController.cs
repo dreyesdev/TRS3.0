@@ -14,9 +14,11 @@ using TRS2._0.Services;
 using System.Text.RegularExpressions;
 using static TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel;
 using System.Diagnostics;
+using Microsoft.AspNetCore.Authorization;
 
 namespace TRS2._0.Controllers
 {
+    
     public class ProjectsController : Controller
     {
         private readonly TRSDBContext _context;
@@ -32,13 +34,16 @@ namespace TRS2._0.Controllers
 
         // GET: Projects
 
+        
         [Route("Proyectos/InitialRedirect")]
+        [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public IActionResult InitialRedirect()
         {
             int currentYear = DateTime.Now.Year;
             return RedirectToAction("Index", new { selectedYear = currentYear });
         }
 
+        [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public IActionResult Index(int? selectedYear)
         {
             // Obtén la lista de años únicos de los proyectos
@@ -64,6 +69,7 @@ namespace TRS2._0.Controllers
 
 
         // GET: Projects/Details/5
+        [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null || _context.Projects == null)
@@ -112,6 +118,7 @@ namespace TRS2._0.Controllers
 
 
         // GET: Projects/Create
+        
         public IActionResult Create()
         {
             return View();
@@ -122,6 +129,7 @@ namespace TRS2._0.Controllers
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
+        
         public async Task<IActionResult> Create([Bind("ProjId,SapCode,Acronim,Title,Contract,Start,End,TpsUpc,TpsIcrea,TpsCsic,Pi,Pm,Type,SType,St1,St2,EndReportDate,Visible")] Project project)
         {
             if (ModelState.IsValid)
@@ -134,6 +142,7 @@ namespace TRS2._0.Controllers
         }
 
         // GET: Projects/Edit/5
+        
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null || _context.Projects == null)
@@ -154,6 +163,7 @@ namespace TRS2._0.Controllers
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
+        
         public async Task<IActionResult> Edit(int id, [Bind("ProjId,SapCode,Acronim,Title,Contract,Start,End,TpsUpc,TpsIcrea,TpsCsic,Pi,Pm,Type,SType,St1,St2,EndReportDate,Visible")] Project project)
         {
             if (id != project.ProjId)
@@ -185,6 +195,7 @@ namespace TRS2._0.Controllers
         }
 
         // GET: Projects/Delete/5
+        
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null || _context.Projects == null)
@@ -205,6 +216,7 @@ namespace TRS2._0.Controllers
         // POST: Projects/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
+        
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             if (_context.Projects == null)
@@ -228,7 +240,7 @@ namespace TRS2._0.Controllers
 
         [HttpGet]
         [Route("Projects/EffortPlan/{projId}")]
-
+        [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public IActionResult EffortPlan(int projId)
         {
             var project = _context.Projects
@@ -310,6 +322,8 @@ namespace TRS2._0.Controllers
 
         [HttpGet]
         [Route("Projects/PersonnelSelection/{projId}")]
+        [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
+
         // Método para la selección de personal dentro del contexto de un proyecto específico
         public async Task<IActionResult> PersonnelSelection(int projId)
         {
@@ -353,6 +367,7 @@ namespace TRS2._0.Controllers
 
 
         [HttpPost]
+        
         public async Task<IActionResult> AddPersonToProject(int projectId, int personId)
         {
             // Primero, verificar si la persona ya está asociada al proyecto
@@ -379,6 +394,7 @@ namespace TRS2._0.Controllers
         }
 
         [HttpPost]
+        
         public async Task<IActionResult> RemovePersonFromProject(int projectId, int personId)
         {
             // Eliminar la persona del proyecto
@@ -401,6 +417,7 @@ namespace TRS2._0.Controllers
 
 
         [HttpPost]
+        
         public async Task<IActionResult> UpdateWorkPackageAssignments([FromBody] List<WpPersonChange> changes)
         {
             
@@ -431,6 +448,7 @@ namespace TRS2._0.Controllers
 
         [HttpGet]
         [Route("Projects/PersonnelEffortPlan/{projId}/{wpId?}")]
+        [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public async Task<IActionResult> PersonnelEffortPlan(int projId, int? wpId = null)
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew(); // Inicia el cronómetro
@@ -765,6 +783,7 @@ namespace TRS2._0.Controllers
 
         [HttpGet]
         [Route("Projects/GetPersonnelEffortsByPerson/{projId}/{personId}")]
+        [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public async Task<IActionResult> GetPersonnelEffortsByPerson(int projId, int personId)
         {
 
@@ -942,7 +961,7 @@ namespace TRS2._0.Controllers
 
         [HttpGet]
         [Route("Projects/ProjectReport/{projId}")]
-
+        [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public async Task<IActionResult> ProjectReport(int projId)
         {
 

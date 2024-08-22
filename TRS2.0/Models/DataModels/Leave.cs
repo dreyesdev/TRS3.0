@@ -22,6 +22,9 @@ namespace TRS2._0.Models.DataModels
         [Column(TypeName = "decimal(5, 2)")]
         public decimal LeaveReduction { get; set; }
 
+        [Column(TypeName = "decimal(5, 2)")]
+        public decimal? Hours { get; set; }
+
         public virtual Personnel PersonNavigation { get; set; }
     }
 }

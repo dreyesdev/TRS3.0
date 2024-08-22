@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
 
 namespace TRS2._0.Models.DataModels;
 
-public partial class TRSDBContext : DbContext
+public partial class TRSDBContext : IdentityDbContext<ApplicationUser>
 {
     public TRSDBContext()
     {
@@ -62,12 +64,16 @@ public partial class TRSDBContext : DbContext
 
     public DbSet<Leader> Leaders { get; set; }
 
+    public DbSet<AgreementEvent> AgreementEvents { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseSqlServer("data source = OPSTRS03.BSC.ES; initial catalog = TRSBDD; user id = admin; password = seidor; Trusted_Connection = True;TrustServerCertificate=True;Integrated Security=False;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
         modelBuilder.Entity<Dedication>(entity =>
         {
             entity.HasOne(d => d.Pers).WithMany().HasConstraintName("dedication$deidcationx1");
@@ -96,6 +102,8 @@ public partial class TRSDBContext : DbContext
             entity.HasOne(d => d.DepartmentNavigation).WithMany(p => p.Personnel)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("personnel$X1");
+            entity.Property(e => e.Password).HasMaxLength(255).IsRequired(false);
+            entity.Property(e => e.PermissionLevel).HasMaxLength(50).IsRequired(false).HasDefaultValue("User");
         });
 
         modelBuilder.Entity<Personnelgroup>(entity =>
@@ -234,6 +242,16 @@ public partial class TRSDBContext : DbContext
 
         modelBuilder.Entity<AffCodification>()
             .HasKey(c => new { c.Contract, c.Dist });
+
+        modelBuilder.Entity<Personnel>()
+                .HasOne(p => p.ApplicationUser)
+                .WithOne(u => u.Personnel)
+                .HasForeignKey<ApplicationUser>(u => u.PersonnelId);
+
+        modelBuilder.Entity<AgreementEvent>()
+        .ToTable("AgreementEvents") // Asegúrate de que el nombre coincida exactamente
+        .Property(a => a.AgreementEventId);
+        
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);

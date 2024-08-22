@@ -1,100 +1,169 @@
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
-using TRS2._0.Data;
 using TRS2._0.Models.DataModels;
 using TRS2._0.Services;
 using Quartz;
-using GSS.Authentication.CAS.AspNetCore;
-
-
+using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
+using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configuración de Serilog
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+    .Enrich.FromLogContext()    
+    .WriteTo.File("logs/log-.txt", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
 
-// Add services to the container.
+
+
+// Configuración de Kestrel para usar HTTPS
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.ListenAnyIP(5000); // HTTP
+    serverOptions.ListenAnyIP(5001, listenOptions =>
+    {
+        listenOptions.UseHttps("C:\\Users\\dreyes\\Desktop\\Desarrollo\\TRS2.0\\TRS2.0\\Resources\\opstrs03.bsc.es.pfx", "seidor");
+    });
+});
+
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<TRSDBContext>(options =>
     options.UseSqlServer(connectionString));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
-builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
-    .AddEntityFrameworkStores<TRSDBContext>();
-builder.Services.AddControllersWithViews();
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+{
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireNonAlphanumeric = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequiredLength = 6;
+    options.Password.RequiredUniqueChars = 1;
+})
+    .AddEntityFrameworkStores<TRSDBContext>()
+    .AddDefaultTokenProviders();
 
-// Añadir tu servicio personalizado aquí
+builder.Services.Configure<IdentityOptions>(options =>
+{
+    options.SignIn.RequireConfirmedEmail = false;
+});
+
+builder.Services.AddControllersWithViews();
+builder.Services.AddRazorPages();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("ProjectManagerOrAdminPolicy", policy =>
+        policy.RequireRole("ProjectManager", "Admin"));
+    options.AddPolicy("AdminPolicy", policy =>
+        policy.RequireRole("Admin"));
+});
+
 builder.Services.AddScoped<WorkCalendarService>();
 builder.Services.AddScoped<LoadDataService>();
-builder.Services.AddLogging(loggingBuilder =>
-{
-    loggingBuilder.ClearProviders(); // Opcional, elimina los proveedores existentes
-    loggingBuilder.AddConsole(); // Agrega logging a la consola
-});
+
+// Envio de Correos
+builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("Smtp"));
+builder.Services.AddTransient<IEmailSender, EmailSender>();
 
 // Configuración de Quartz
 builder.Services.AddQuartz(q =>
 {
     q.UseMicrosoftDependencyInjectionJobFactory();
 
-    // Define un JobKey único para tu trabajo
     var jobKey = new JobKey("LoadDataServiceJob");
-
-    // Registra el trabajo como durable
     q.AddJob<LoadDataService>(opts => opts
         .WithIdentity(jobKey)
-        .StoreDurably()); // Marca el trabajo como durable
+        .StoreDurably());
 });
-
-
-// Configuración de servicios de autenticación CAS
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultScheme = "Cookies";
-    options.DefaultChallengeScheme = "CAS";
-})
-.AddCookie("Cookies")
-.AddCAS(options =>
-{
-    options.CasServerUrlBase = "https://cas.example.com/cas";  // Ajusta a la URL de tu servidor CAS
-    options.SaveTokens = true;
-    options.Events.OnCreatingTicket = context =>
-    {
-        // Configura aquí cómo se manejan los tickets y los atributos de usuario
-        return Task.CompletedTask;
-    };
-});
-
 
 builder.Services.AddQuartzHostedService(
     q => q.WaitForJobsToComplete = true);
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+try
 {
-    app.UseMigrationsEndPoint();
+    using (var scope = app.Services.CreateScope())
+    {
+        var services = scope.ServiceProvider;
+        var context = services.GetRequiredService<TRSDBContext>();
+        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+
+        context.Database.Migrate();
+        SeedData.Initialize(context, userManager, roleManager).Wait();
+    }
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        app.UseExceptionHandler("/Home/Error");
+        app.UseHsts();
+    }
+
+    app.UseHttpsRedirection();
+    app.UseStaticFiles();
+
+    app.UseRouting();
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.UseStatusCodePagesWithReExecute("/Error/AccessDenied", "?statusCode={0}");
+
+    app.MapControllerRoute(
+        name: "default",
+        pattern: "{controller=Home}/{action=Index}/{id?}");
+
+    app.Run();
 }
-else
+catch (Exception ex)
 {
-    app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
+    Log.Fatal(ex, "Host terminated unexpectedly");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
 }
 
-app.UseHttpsRedirection();
-app.UseStaticFiles();
+public static class SeedData
+{
+    public static async Task Initialize(TRSDBContext context, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
+    {
+        string[] roles = new string[] { "Admin", "ProjectManager", "Researcher", "User" };
 
+        foreach (string role in roles)
+        {
+            if (!await roleManager.RoleExistsAsync(role))
+            {
+                await roleManager.CreateAsync(new IdentityRole(role));
+            }
+        }
 
-app.UseRouting();
+        var adminUser = new ApplicationUser
+        {
+            UserName = "iss",
+            Email = "iss@bsc.es",
+            PersonnelId = 1,
+            EmailConfirmed = true
+        };
 
-app.UseAuthorization();
-
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
-app.MapRazorPages();
-
-app.Run();
+        if (userManager.Users.All(u => u.Id != adminUser.Id))
+        {
+            var user = await userManager.FindByEmailAsync(adminUser.Email);
+            if (user == null)
+            {
+                await userManager.CreateAsync(adminUser, "Admin123!");
+                await userManager.AddToRoleAsync(adminUser, "Admin");
+            }
+        }
+    }
+}

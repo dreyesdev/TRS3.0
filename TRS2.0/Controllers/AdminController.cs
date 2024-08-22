@@ -1,41 +1,77 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using TRS2._0.Models.DataModels;
 using TRS2._0.Services;
+using System.Linq;
+using System.Threading.Tasks;
+using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
+using TRS2._0.Models.ViewModels;
 
 namespace TRS2._0.Controllers
 {
+    [Authorize(Roles = "Admin")]
     public class AdminController : Controller
     {
         private readonly WorkCalendarService _workCalendarService;
         private readonly TRSDBContext _context;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly RoleManager<IdentityRole> _roleManager;
 
-        // Inyecta los servicios
-        public AdminController(WorkCalendarService workCalendarService, TRSDBContext context)
+        public AdminController(WorkCalendarService workCalendarService, TRSDBContext context, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
         {
             _workCalendarService = workCalendarService;
             _context = context;
+            _userManager = userManager;
+            _roleManager = roleManager;
         }
+
         public async Task<IActionResult> Index()
         {
             var pmValues = await _context.DailyPMValues.ToListAsync();
 
             if (pmValues == null)
             {
-                pmValues = new List<DailyPMValue>(); // Crea una lista vacía si el resultado es null
+                pmValues = new List<DailyPMValue>();
             }
-            
+
             var people = await _context.Personnel
                 .OrderBy(p => p.Name)
                 .Select(p => new SelectListItem
+                {
+                    Value = p.Id.ToString(),
+                    Text = p.Name
+                }).ToListAsync();
+
+            var users = await _userManager.Users.ToListAsync();
+            var roles = await _roleManager.Roles.ToListAsync();
+
+            var model = new AdminIndexViewModel
             {
-                Value = p.Id.ToString(),
-                Text = p.Name // Asegúrate de tener una propiedad FullName o ajusta según tu modelo
-            }).ToListAsync();
+                DailyPMValues = pmValues,
+                People = people,
+                Users = users.Select(u => new SelectListItem { Value = u.Id, Text = u.UserName }).ToList(),
+                Roles = roles.Select(r => new SelectListItem { Value = r.Name, Text = r.Name }).ToList()
+            };
 
             ViewBag.People = people;
-            return View(pmValues);
+            return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> AssignRole(string userId, string role)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user != null)
+            {
+                var currentRoles = await _userManager.GetRolesAsync(user);
+                await _userManager.RemoveFromRolesAsync(user, currentRoles);
+                await _userManager.AddToRoleAsync(user, role);
+            }
+
+            return RedirectToAction("Index");
         }
 
         [HttpPost]
@@ -43,13 +79,9 @@ namespace TRS2._0.Controllers
         {
             try
             {
-                // Calcula los días laborables del mes
                 int workingDays = await _workCalendarService.CalculateWorkingDays(year, month);
-
-                // Calcula el valor de PM por día (asumiendo que el valor de PM mensual es siempre 1)
                 decimal pmValuePerDay = workingDays > 0 ? Math.Round((decimal)(1.0 / workingDays), 4) : 0;
 
-                // Guarda la nueva entrada de DailyPMValue en la base de datos
                 var newDailyPMValue = new DailyPMValue
                 {
                     Year = year,
@@ -78,13 +110,9 @@ namespace TRS2._0.Controllers
 
                 for (int month = 1; month <= 12; month++)
                 {
-                    // Calcula los días laborables del mes
                     int workingDays = await _workCalendarService.CalculateWorkingDays(year, month);
-
-                    // Calcula el valor de PM por día (asumiendo que el valor de PM mensual es siempre 1)
                     decimal pmValuePerDay = workingDays > 0 ? Math.Round((decimal)(1.0 / workingDays), 6) : 0;
 
-                    // Crea la nueva entrada de DailyPMValue
                     var newDailyPMValue = new DailyPMValue
                     {
                         Year = year,
@@ -96,7 +124,6 @@ namespace TRS2._0.Controllers
                     dailyPMValues.Add(newDailyPMValue);
                 }
 
-                // Guarda todas las nuevas entradas en la base de datos de una sola vez
                 _context.DailyPMValues.AddRange(dailyPMValues);
                 await _context.SaveChangesAsync();
 
@@ -108,14 +135,12 @@ namespace TRS2._0.Controllers
             }
         }
 
-
         public async Task<IActionResult> DailyPMValuesList()
         {
             var values = await _context.DailyPMValues.ToListAsync();
             return PartialView("_DailyPMValuesList", values);
         }
 
-        // Acciones para calcular PM diario y mensual
         [HttpPost]
         public async Task<IActionResult> CalculateDailyPM(int personId, DateTime date)
         {

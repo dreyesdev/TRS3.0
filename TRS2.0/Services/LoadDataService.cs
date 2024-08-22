@@ -5,6 +5,8 @@ using Quartz;
 using System.Threading.Tasks;
 using System.Globalization;
 using Serilog;
+using Newtonsoft.Json;
+using System.Net.Http.Headers;
 
 namespace TRS2._0.Services
 {
@@ -790,6 +792,89 @@ namespace TRS2._0.Services
             }
         }
 
+        public async Task FetchAndSaveAgreementEventsAsync()
+        {
+            try
+            {
+                var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiI5NDUyNTYxNC0xZDMxLTRmZmQtOWFmMC1hNmFkNjY1ZThlYjEiLCJ1bmlxdWVfbmFtZSI6InRyc0Bic2MuZXMiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL2FjY2Vzc2NvbnRyb2xzZXJ2aWNlLzIwMTAvMDcvY2xhaW1zL2lkZW50aXR5cHJvdmlkZXIiOiJBU1AuTkVUIElkZW50aXR5IiwiQXNwTmV0LklkZW50aXR5LlNlY3VyaXR5U3RhbXAiOiIxYTU1ZTYwZC1hYmU4LTRjMzgtYmQwYS04YjIwNWI4ZWM4ZWQiLCJDb21wYW55SWQiOiIyMzU1MyIsIlVzZXJJZCI6IjI0NjE4NTIiLCJqdGkiOiI3OWZiZDQ4OC04NGU1LTQ2MTUtYWY3MC04OTU0MmJkYjFjM2YiLCJuYmYiOjE3MjI0MTk0MjEsImV4cCI6MTczMDE5NTQyMSwiaWF0IjoxNzIyNDE5NDIxLCJpc3MiOiJMT0NBTCBBVVRIT1JJVFkiLCJhdWQiOiJodHRwczovL3dvZmZ1LmNvbS8ifQ.-i4k6h7dK8v3NnL6p696-t6nxSWQm01UwRHLrBg_n4s");
+
+                var response = await httpClient.GetAsync("https://app.woffu.com/api/v1/users/2160572/agreements/events");
+                response.EnsureSuccessStatusCode();
+
+                var content = await response.Content.ReadAsStringAsync();
+                var eventDtos = JsonConvert.DeserializeObject<List<AgreementEventDto>>(content);
+
+                if (eventDtos != null)
+                {
+                    var agreementEvents = eventDtos.Select(dto => new AgreementEvent
+                    {
+                        AgreementEventId = dto.AgreementEventId,
+                        Name = dto.Name
+                    }).ToList();
+
+                    using (var transaction = await _context.Database.BeginTransactionAsync())
+                    {
+                        await _context.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT AgreementEvents ON");
+                        _context.AgreementEvents.AddRange(agreementEvents);
+                        await _context.SaveChangesAsync();
+                        await _context.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT AgreementEvents OFF");
+                        await transaction.CommitAsync();
+                    }
+
+                    Console.WriteLine($"Se agregaron {agreementEvents.Count} eventos de acuerdo.");
+                    Console.WriteLine("Los cambios se guardaron en la base de datos.");
+                }
+                else
+                {
+                    Console.WriteLine("No se encontraron eventos de acuerdo.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ocurrió una excepción: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
+            }
+        }
+
+        public async Task UpdatePersonnelUserIdsAsync()
+        {
+            try
+            {
+                var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiI5NDUyNTYxNC0xZDMxLTRmZmQtOWFmMC1hNmFkNjY1ZThlYjEiLCJ1bmlxdWVfbmFtZSI6InRyc0Bic2MuZXMiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL2FjY2Vzc2NvbnRyb2xzZXJ2aWNlLzIwMTAvMDcvY2xhaW1zL2lkZW50aXR5cHJvdmlkZXIiOiJBU1AuTkVUIElkZW50aXR5IiwiQXNwTmV0LklkZW50aXR5LlNlY3VyaXR5U3RhbXAiOiIxYTU1ZTYwZC1hYmU4LTRjMzgtYmQwYS04YjIwNWI4ZWM4ZWQiLCJDb21wYW55SWQiOiIyMzU1MyIsIlVzZXJJZCI6IjI0NjE4NTIiLCJqdGkiOiI3OWZiZDQ4OC04NGU1LTQ2MTUtYWY3MC04OTU0MmJkYjFjM2YiLCJuYmYiOjE3MjI0MTk0MjEsImV4cCI6MTczMDE5NTQyMSwiaWF0IjoxNzIyNDE5NDIxLCJpc3MiOiJMT0NBTCBBVVRIT1JJVFkiLCJhdWQiOiJodHRwczovL3dvZmZ1LmNvbS8ifQ.-i4k6h7dK8v3NnL6p696-t6nxSWQm01UwRHLrBg_n4s");
+
+                var response = await httpClient.GetAsync("https://app.woffu.com/api/v1/users");
+                response.EnsureSuccessStatusCode();
+
+                var content = await response.Content.ReadAsStringAsync();
+                var users = JsonConvert.DeserializeObject<List<WoffuUser>>(content);
+
+                if (users != null)
+                {
+                    foreach (var user in users)
+                    {
+                        var personnel = _context.Personnel.FirstOrDefault(p => p.Email == user.Email);
+                        if (personnel != null)
+                        {
+                            personnel.UserId = user.UserId;
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("UserIds actualizados correctamente.");
+                }
+                else
+                {
+                    _logger.LogWarning("No se encontraron usuarios en la respuesta de la API.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Ocurrió una excepción: {ex.Message}");
+                _logger.LogError(ex.StackTrace);
+            }
+        }
 
         public async Task Execute(IJobExecutionContext context)
         {
@@ -832,6 +917,14 @@ namespace TRS2._0.Services
                 case "LoadProjectsFromFile": // Nuevo caso para la acción de carga de proyectos
                     var filePath6 = dataMap.GetString("FilePath"); // Obtener la ruta del archivo desde JobDataMap
                     await LoadProjectsFromFileAsync(filePath6);
+                    break;
+
+                case "FetchAndSaveAgreementEvents":
+                    await FetchAndSaveAgreementEventsAsync();
+                    break;
+
+                case "UpdatePersonnelUserIds":
+                    await UpdatePersonnelUserIdsAsync();
                     break;
 
                 default:
