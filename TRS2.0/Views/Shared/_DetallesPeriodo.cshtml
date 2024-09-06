@@ -1,8 +1,6 @@
 ﻿@model TRS2._0.Models.ViewModels.PeriodDetailsViewModel
 @using System.Globalization
 
-
-
 <div class="table-responsive mx-3 mb-4">
     <table class="table table-bordered table-striped table-hover">
         <thead class="thead-dark">
@@ -28,13 +26,14 @@
                         decimal declaredHours = person.DeclaredHours.ContainsKey(monthDate) ? person.DeclaredHours[monthDate] : 0;
                         decimal hoursInProject = person.HoursinProyect.ContainsKey(monthDate) ? person.HoursinProyect[monthDate] : 0;
                         decimal completionPercentage = person.CompletionPercentage.ContainsKey(monthDate) ? person.CompletionPercentage[monthDate] : 0;
+                        decimal totalEffort = person.TotalEffortinProyect.ContainsKey(monthDate) ? person.TotalEffortinProyect[monthDate] : 0;
 
                         var statusKey = $"{monthDate.Year}-{monthDate.Month:D2}";
                         var status = person.PersonStatusByMonth.ContainsKey(statusKey) ? person.PersonStatusByMonth[statusKey] : (OutOfContract: false, Overloaded: false);
                         var isLocked = person.LockStatusByMonth.ContainsKey(statusKey) && person.LockStatusByMonth[statusKey];
                         var backgroundColor = status.OutOfContract ? "#FF8C00" : (status.Overloaded ? "#FFFF00" : "");
 
-                        <td style="background-color: @backgroundColor; padding: 4px; vertical-align: top;">
+                        <td style="background-color: @backgroundColor; padding: 4px; vertical-align: top;" data-declared-hours="@declaredHours" data-hours-in-project="@hoursInProject" data-total-effort="@totalEffort">
                             <div class="d-flex justify-content-center align-items-center" style="flex-grow: 1; font-size: 0.875rem; font-weight:bold;">
                                 <span>@declaredHours | @hoursInProject</span>
                             </div>
@@ -67,7 +66,7 @@
                                     {
                                         <button class="btn btn-danger w-100 mt-2" onclick="updateLockStatus('@person.Personnel.Id', '@monthDate.Year', '@monthDate.Month', '@ViewBag.ProjectId', '@ViewBag.PeriodId', '/Projects/Unlock')">Desbloquear</button>
                                     }
-                                
+
                                 }
                             }
                             else if (!status.Overloaded && !status.OutOfContract)
@@ -93,16 +92,10 @@
     </table>
 </div>
 
-
-
-
 <style>
-
     .nombre-columna {
         min-width: 200px; /* Ajusta según necesites */
     }
-
-
 </style>
 
 <script>
@@ -135,6 +128,5 @@
             }
         });
     }
-
-
 </script>
+

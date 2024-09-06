@@ -3,6 +3,14 @@
 @using TRS2._0.Models.DataModels
 @using static TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel
 
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"]</title>
+    <!-- Otros elementos del head -->
+</head>
+
 @{
     ViewData["Title"] = "Personnel Effort Plan";
     var personnelInfosList = ViewBag.PersonnelInfos as List<PersonnelInfo>;
@@ -12,6 +20,8 @@
     <h2>Personnel Effort Plan for @Model.Project.Acronim Proyect
         <div style="display: block; margin-top: 5px;">
             <button id="saveAllButton" class="btn btn-primary btn-sm">Save All</button>
+            <button id="exportCsvButton" class="btn btn-secondary btn-sm">Export into CSV</button>
+
         </div>
     </h2>    
     <div class="table-responsive main-effort-plan-table">
@@ -341,8 +351,36 @@ else
                 window.location.href = '/Projects/GetPersonnelEffortsByPerson/' + projId + '/' + personId;
             });
         });
-        
 
+        document.getElementById('exportCsvButton').addEventListener('click', function () {
+            var csvContent = "data:text/csv;charset=utf-8,";
+            var rows = document.querySelectorAll('.main-effort-plan-table table tr');
+
+            rows.forEach(function (row) {
+                var cols = row.querySelectorAll('th, td');
+                var rowData = [];
+                cols.forEach(function (col) {
+                    var input = col.querySelector('input');
+                    if (input) {
+                        rowData.push(input.value.replace(/(\r\n|\n|\r)/gm, "").trim());
+                    } else {
+                        rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim());
+                    }
+                });
+                csvContent += rowData.join(";") + "\r\n";
+            });
+
+            var encodedUri = 'data:text/csv;charset=utf-8;base64,' + btoa(unescape(encodeURIComponent(csvContent)));
+            var link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "personnel_effort_plan.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+
+    
 
     </script>
 }

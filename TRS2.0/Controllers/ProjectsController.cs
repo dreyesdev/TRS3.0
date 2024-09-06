@@ -15,6 +15,7 @@ using System.Text.RegularExpressions;
 using static TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel;
 using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
+using System.Text;
 
 namespace TRS2._0.Controllers
 {
@@ -837,7 +838,8 @@ namespace TRS2._0.Controllers
                                         pme => $"{pme.Month.Year}-{pme.Month.Month:D2}",
                                         pme => pme.Value
                                     );
-                                            var effortsByMonth = await _context.Persefforts
+
+            var effortsByMonth = await _context.Persefforts
                                     .Include(pe => pe.WpxPersonNavigation)
                                     .Where(pe => pe.WpxPersonNavigation.Person == personId &&
                                                  pe.Month >= projectStartDate && pe.Month <= projectEndDate)
@@ -1525,6 +1527,122 @@ namespace TRS2._0.Controllers
             return Json(new { success = false, message = "Datos inválidos." });
         }
 
+
+        [HttpPost]
+        public async Task<IActionResult> ExportPmsperWPtoCSV([FromBody] ExportRequest request)
+        {
+            try
+            {
+                if (request == null || request.ProjectId == 0 || string.IsNullOrEmpty(request.StartDate) || string.IsNullOrEmpty(request.EndDate))
+                {
+                    return BadRequest("Invalid request data.");
+                }
+
+                // Convertir las fechas de string a DateTime
+                DateTime startDate;
+                DateTime endDate;
+                if (!DateTime.TryParseExact(request.StartDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out startDate) ||
+                    !DateTime.TryParseExact(request.EndDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out endDate))
+                {
+                    return BadRequest("Invalid date format.");
+                }
+
+                var project = await _context.Projects
+                    .Include(p => p.Wps)
+                    .ThenInclude(wp => wp.Wpxpeople)
+                    .ThenInclude(wpxp => wpxp.PersonNavigation)
+                    .ThenInclude(person => person.Wpxpeople)
+                    .ThenInclude(wpxp => wpxp.Persefforts)
+                    .FirstOrDefaultAsync(p => p.ProjId == request.ProjectId);
+
+                if (project == null)
+                {
+                    return NotFound("Proyecto no encontrado.");
+                }
+
+                var csv = new StringBuilder();
+
+                // Generar la cabecera con los meses
+                csv.Append("PersonName;WpName");
+                var dateList = new List<DateTime>();
+                for (var date = startDate; date <= endDate; date = date.AddMonths(1))
+                {
+                    csv.Append($";{date.ToString("MMM yyyy", CultureInfo.InvariantCulture)}");
+                    dateList.Add(date);
+                }
+                csv.AppendLine();
+
+                // Generar las filas con los esfuerzos
+                var personEfforts = new Dictionary<string, Dictionary<string, Dictionary<DateTime, double>>>();
+
+                foreach (var wp in project.Wps)
+                {
+                    foreach (var wpxperson in wp.Wpxpeople)
+                    {
+                        if (!personEfforts.ContainsKey(wpxperson.PersonNavigation.Name))
+                        {
+                            personEfforts[wpxperson.PersonNavigation.Name] = new Dictionary<string, Dictionary<DateTime, double>>();
+                        }
+
+                        if (!personEfforts[wpxperson.PersonNavigation.Name].ContainsKey(wp.Name))
+                        {
+                            personEfforts[wpxperson.PersonNavigation.Name][wp.Name] = new Dictionary<DateTime, double>();
+                        }
+
+                        foreach (var perseffort in wpxperson.Persefforts)
+                        {
+                            if (perseffort.Month >= startDate && perseffort.Month <= endDate)
+                            {
+                                personEfforts[wpxperson.PersonNavigation.Name][wp.Name][perseffort.Month] = (double)perseffort.Value;
+                            }
+                        }
+                    }
+                }
+
+                // Ordenar por WpName
+                var orderedPersonEfforts = personEfforts
+                    .SelectMany(person => person.Value.Select(wp => new { PersonName = person.Key, WpName = wp.Key, Efforts = wp.Value }))
+                    .OrderBy(entry => entry.WpName)
+                    .ThenBy(entry => entry.PersonName);
+
+                foreach (var entry in orderedPersonEfforts)
+                {
+                    csv.Append($"{entry.PersonName};{entry.WpName}");
+                    foreach (var date in dateList)
+                    {
+                        if (entry.Efforts.ContainsKey(date))
+                        {
+                            csv.Append($";{entry.Efforts[date].ToString("0.00", CultureInfo.InvariantCulture)}");
+                        }
+                        else
+                        {
+                            csv.Append(";0");
+                        }
+                    }
+                    csv.AppendLine();
+                }
+
+                var bytes = Encoding.UTF8.GetBytes(csv.ToString());
+                return File(bytes, "text/csv", $"PersonnelEffortPlan_{request.ProjectId}_{DateTime.Now:yyyyMMddHHmmss}.csv");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al generar el CSV de Personnel Effort Plan");
+                return StatusCode(500, "Error interno del servidor");
+            }
+        }
+
+
+
+
+
+
+        public class ExportRequest
+        {
+            public int ProjectId { get; set; }
+            public string StartDate { get; set; }
+            public string EndDate { get; set; }
+        }
 
     }
 

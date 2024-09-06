@@ -222,13 +222,21 @@
         </div>
     }
         <div class="text-center my-3">
-            <!-- Aumenta el margen y centra los botones -->
-            <div id="reportPeriodsSection"></div>
-            <!-- Inicialmente visible, este botón se ocultará mediante JavaScript una vez pulsado -->
-            <button type="button" class="btn btn-primary" id="addReportPeriodBtn" onclick="loadReportPeriodForm()">Add Reporting Periods</button>
-            <!-- Este botón estará oculto inicialmente y se mostrará solo después de que se presione "Add Reporting Periods" -->
-            <button type="button" class="btn btn-secondary" id="cancelReportPeriodBtn" onclick="cancelReportPeriodForm()" style="display:none;">Cancel</button>
-        </div>
+    <div id="reportPeriodsSection"></div>
+    <button type="button" class="btn btn-primary" id="addReportPeriodBtn" onclick="loadReportPeriodForm()">Add Reporting Periods</button>
+    <button type="button" class="btn btn-secondary" id="cancelReportPeriodBtn" onclick="cancelReportPeriodForm()" style="display:none;">Cancel</button>
+    <!-- Botón para exportar horas a CSV -->
+    <button type="button" class="btn btn-success" id="exportHoursBtn" onclick="exportHoursToCSV()" style="display:none;">Exportar horas a CSV</button>
+    <!-- Botón para exportar PMs a CSV -->
+    <button type="button" class="btn btn-success" id="exportPMsBtn" onclick="exportPMsToCSV()" style="display:none;">Exportar PMs a CSV</button>
+    <!-- Botón para exportar PMs por WP a CSV -->
+    <button type="button" class="btn btn-success" id="exportPMSforWPToCSV" onclick="exportPMSforWPToCSV()" style="display:none;">Exportar PMs por WP a CSV</button>
+</div>
+
+
+
+
+
 </div>
 </div>
 <div id="detallesPeriodoContainer"></div>
@@ -240,16 +248,29 @@
         $(document).on('click', '.periodo', function () {
             var periodoId = $(this).data('periodo-id');
             var projectId = @ViewBag.projId;
+            var startDate = $(this).closest('tr').find('td:nth-child(2)').text().split(' / ')[0];
+            var endDate = $(this).closest('tr').find('td:nth-child(2)').text().split(' / ')[1];
+
             $.ajax({
                 url: '/Projects/PeriodDetails',
                 data: { id: periodoId, projectId: projectId },
                 success: function (data) {
                     $('#detallesPeriodoContainer').html(data);
                     $('#detallesPeriodoContainer').show();
+                    $('#exportHoursBtn').show(); // Mostrar el botón de exportar horas
+                    $('#exportPMsBtn').show(); // Mostrar el botón de exportar PMs
+                    $('#exportPMSforWPToCSV').show(); // Mostrar el botón de exportar PMs por WP
+
+                    // Guardar las fechas del periodo seleccionado
+                    $('#exportPMSforWPToCSV').data('start-date', startDate);
+                    $('#exportPMSforWPToCSV').data('end-date', endDate);
                 }
             });
         });
     });
+
+
+
 
     function loadReportPeriodForm() {
         $.ajax({
@@ -282,6 +303,102 @@
             });
         }
     }   
+
+    function exportHoursToCSV() {
+        var csvContent = "data:text/csv;charset=utf-8,";
+        var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+
+        rows.forEach(function (row) {
+            var cols = row.querySelectorAll('th, td');
+            var rowData = [];
+            cols.forEach(function (col) {
+                var declaredHours = col.getAttribute('data-declared-hours');
+                var hoursInProject = col.getAttribute('data-hours-in-project');
+                if (declaredHours && hoursInProject) {
+                    rowData.push(`${declaredHours} | ${hoursInProject}`);
+                } else {
+                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim());
+                }
+            });
+            csvContent += rowData.join(";") + "\r\n";
+        });
+
+        var encodedUri = encodeURI(csvContent);
+        var link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "horas_periodo.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportPMsToCSV() {
+        var csvContent = "data:text/csv;charset=utf-8,";
+        var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+
+        rows.forEach(function (row) {
+            var cols = row.querySelectorAll('th, td');
+            var rowData = [];
+            cols.forEach(function (col) {
+                var totalEffort = col.getAttribute('data-total-effort');
+                if (totalEffort) {
+                    rowData.push(totalEffort);
+                } else {
+                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim());
+                }
+            });
+            csvContent += rowData.join(";") + "\r\n";
+        });
+
+        var encodedUri = encodeURI(csvContent);
+        var link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "PMs_periodo.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportPMSforWPToCSV() {
+        var projectId = @ViewBag.projId;
+        var startDate = $('#exportPMSforWPToCSV').data('start-date');
+        var endDate = $('#exportPMSforWPToCSV').data('end-date');
+
+        // Convertir las fechas al formato ISO 8601 (yyyy-MM-dd)
+        var startDateISO = new Date(startDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+        var endDateISO = new Date(endDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+
+        // Verificar los valores antes de enviarlos
+        console.log("Project ID:", projectId);
+        console.log("Start Date (ISO):", startDateISO);
+        console.log("End Date (ISO):", endDateISO);
+
+        fetch('@Url.Action("ExportPmsperWPtoCSV", "Projects")', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ProjectId: projectId, StartDate: startDateISO, EndDate: endDateISO })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                var url = window.URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = `PMsPerWP_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+
 
 </script>
 
