@@ -73,12 +73,12 @@
 
                 <thead class="thead-dark">
                     <tr>
-                        <th>
+                        <th class="sticky-column sticky-header">
                             <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">Proyecto - Acrónimo</div>
                             <div style="text-align: center;">Wp - Título</div>
 
                         </th>
-                        <th>Dedication - Estimated Hours</th>
+                        @* <th>Dedication - Estimated Hours</th> *@
                         @foreach (var day in Model.MonthDays)
                         {
                             <th>
@@ -92,22 +92,24 @@
                             <div style="border-bottom: 1px solid white; margin-bottom: 2px; text-align: center; font-weight: bold">ACTUAL</div>
                             <div style="text-align: center; font-weight: bold;">ESTIMATED HOURS</div>
                         </th> <!-- Columna de Total -->
+                        <th>%</th> <!-- Nueva columna -->
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var wp in Model.WorkPackages)
                     {
                         <tr>
-                            <td class="single-line-cell">
+                            <td class="single-line-cell sticky-column">
                                 
                                 <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">@wp.ProjectSAPCode (@wp.ProjectName)</div>
                                 <div style="text-align: center;">@wp.WpName @wp.WpTitle</div>
 
                             </td>
 
-                            <td class="second-line-cell">
+                            @* <td class="second-line-cell">
                                 Dedication: @String.Format("{0:P1}", wp.Effort) - Estimated Hours: @wp.EstimatedHours
-                            </td>
+                            </td> *@
+
                             <!-- Celdas para cada día del mes -->
                             @foreach (var day in Model.MonthDays)
                             {
@@ -199,14 +201,15 @@
                                     @totalEstimado.ToString("0.#")
                                 </div>
                             </td>
+                            <td>@String.Format("{0:P1}", wp.Effort)</td> <!-- Nueva columna -->
                         </tr>
                     }
                     <!-- Fila de Totales aquí -->
                 </tbody>
                 <tfoot>
                     <tr style="background-color: #343a40; color: white;">                    
-                        <th style="background-color: #343a40; color: white;">Total Daily</th>
-                        <th style="background-color: #343a40; color: white;"></th> <!-- Espacio vacío para la columna de Dedication - Estimated Hours -->
+                        <th class="sticky-column" style="background-color: #343a40; color: white;">Total Daily</th>
+                        @* <th style="background-color: #343a40; color: white;"></th> <!-- Espacio vacío para la columna de Dedication - Estimated Hours --> *@
                         @foreach (var day in Model.MonthDays)
                         {
                             // Calcular el total actual y estimado para el día
@@ -241,6 +244,7 @@
                             </td>
                         }
                         <th style="background-color: #343a40; color: white;"></th> <!-- Espacio vacío para la columna de Total -->
+                        <th style="background-color: #343a40; color: white;"></th> <!-- Nueva columna -->
                     </tr>
                 </tfoot>
 
@@ -372,11 +376,12 @@
             window.location.href = redirectUrl;
         });
 
-           
-        document.getElementById('saveAllButton').addEventListener('click', function () {
-            var changedTimesheets = [];
 
-            document.querySelectorAll('.input-hours').forEach(input => {
+    document.getElementById('saveAllButton').addEventListener('click', function () {
+        var changedTimesheets = [];
+        var invalidInputs = [];
+
+        document.querySelectorAll('.input-hours').forEach(input => {
             // Reemplaza la coma por un punto para asegurar el correcto parsing del valor decimal
             var originalValue = input.getAttribute('data-original-value').replace(',', '.');
             var currentValue = input.value.replace(',', '.');
@@ -385,18 +390,26 @@
             originalValue = parseFloat(originalValue);
             currentValue = parseFloat(currentValue);
 
-                console.log(originalValue, currentValue);
-                if (Math.round(currentValue * 100) / 100 !== Math.round(originalValue * 100) / 100) {                
+            // Validación de que el valor sea entero o decimal con .5
+            if (!Number.isInteger(currentValue) && currentValue % 1 !== 0.5) {
+                invalidInputs.push(input);
+            } else {
+                if (Math.round(currentValue * 100) / 100 !== Math.round(originalValue * 100) / 100) {
                     changedTimesheets.push({
                         ProjectId: parseInt(input.getAttribute('data-projectid'), 10),
                         WpId: parseInt(input.getAttribute('data-wpid'), 10),
                         PersonId: @Model.Person.Id,
                         Day: input.getAttribute('data-day'),
                         Hours: currentValue
-                    });                    
+                    });
                 }
-            });
+            }
+        });
 
+        if (invalidInputs.length > 0) {
+            alert('Algunos valores no son válidos. Solo se permiten valores enteros o decimales con .5.');
+            invalidInputs.forEach(input => input.classList.add('is-invalid'));
+        } else {
             if (changedTimesheets.length > 0) {
                 fetch('@Url.Action("SaveTimesheetHours", "Timesheet")', {
                     method: 'POST',
@@ -419,7 +432,8 @@
             } else {
                 alert('No changes to save.');
             }
-        });
+        }
+    });
 </script>
 
 
@@ -427,7 +441,7 @@
 
 
 
-    <style >
+<style>
     .single-line-cell {
         white-space: nowrap;
         overflow: hidden;
@@ -436,7 +450,7 @@
         text-align: center;
         vertical-align: middle;
         max-width: 500px;
-        max-height : 10px;
+        max-height: 10px;
     }
 
     .second-line-cell {
@@ -491,23 +505,19 @@
         background-color: #343a40;
         border-color: #454d55;
         text-align: center; /* Centra el texto horizontalmente */
-        vertical-align: middle; /* Centra el texto verticalmente */        
+        vertical-align: middle; /* Centra el texto verticalmente */
     }
 
     th, td {
         text-align: center; /* Centra el texto horizontalmente */
         vertical-align: middle; /* Centra el texto verticalmente */
-
     }
 
     .table thead th {
         position: sticky;
         top: 0;
-        
         z-index: 2; /* Asegura que la fila se mantenga sobre el contenido scrolleable */
     }
-
-
 
     .hour-input-cell {
         width: 75px;
@@ -552,14 +562,11 @@
             background-color: inherit; /* Hace que el input sea transparente al color de fondo de la celda */
         }
 
-       
-
     /* Establece un ancho fijo para la primera columna */
     .table .first-column {
         width: 200px; /* Define el ancho fijo */
         max-width: 200px; /* Previene que la celda se expanda más de lo necesario */
     }
-    
 
     .bg-secondary, .leave-absence, .personal-holiday, .out-of-contract, .travel-day {
         pointer-events: none;
@@ -615,8 +622,27 @@
         margin-right: .5rem !important;
     }
 
+    .sticky-column {
+        position: sticky;
+        left: 0;
+        background-color: white;
+        z-index: 4; /* Asegura que la primera columna esté por encima de las demás */
+    }
 
+    
+
+    tfoot th {
+        bottom: 0;
+        top: auto;
+        z-index: 2;
+    }
+
+    .sticky-header {
+        z-index: 5; /* Asegura que la cabecera de la primera columna esté por encima de las demás */
+    }
 </style>
+
+
 
 
 
