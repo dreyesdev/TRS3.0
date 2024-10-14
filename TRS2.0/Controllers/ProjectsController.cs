@@ -91,10 +91,12 @@ namespace TRS2._0.Controllers
             // Recuperar los nombres completos del PM y PI
             var pm = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == project.Pm);
             var pi = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == project.Pi);
+            var fm = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == project.Fm);
 
             // Preparar los datos para la vista
             ViewBag.PmFullName = pm != null ? $"{pm.Name} {pm.Surname}" : "No asignado";
             ViewBag.PiFullName = pi != null ? $"{pi.Name} {pi.Surname}" : "No asignado";
+            ViewBag.FmFullName = fm != null ? $"{fm.Name} {fm.Surname}" : "No asignado";
             ViewBag.ProjId = id;
 
             // Calcular los valores distribuidos y los esfuerzos cubiertos para cada WP

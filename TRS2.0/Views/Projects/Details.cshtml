@@ -85,6 +85,12 @@
                     </dl>
                     <dl class="row detail-item">
                         <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Finance Manager</dt>
+                            <dd class="col-sm-8 d-inline-block">@ViewBag.FmFullName</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
                             <dt class="col-sm-4 text-sm-right">Type</dt>
                             <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.Type)</dd>
                         </div>
@@ -272,7 +278,7 @@
                     </select>
                 </td>                
                 <td><input type="number" class="form-control" id="newWpPms" placeholder="Pms" /></td>
-                <td class="text-center"><button onclick="addNewWp()" class="btn btn-info custom-add-btn">Add</button></td>
+                <td class="text-center"><button onclick="addNewWp()" class="btn btn-primary custom-add-btn">Add</button></td>
             </tr>
         </tfoot>
     </table>
@@ -531,8 +537,8 @@ function cancelEdit(wpId) {
     }
 
     .custom-add-btn{
-        background-color: #005A9C; 
-        border-color: #005A9C;
+        background-color: #007bff;
+        border-color: #007bff;
     }
 
     .custom-update-btn{

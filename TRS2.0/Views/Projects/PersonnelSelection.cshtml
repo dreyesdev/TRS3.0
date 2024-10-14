@@ -160,6 +160,28 @@
                         </tr>
                     </thead>
                     <tbody>
+                        <tbody>
+                            @foreach (var person in Model.ProjectPersonnel.Select(px => px.PersonNavigation).OrderBy(p => p.Name).ThenBy(p => p.Surname))
+                            {
+                                <tr>
+                                    <td>@person.Name @person.Surname</td>
+                                    @foreach (var wp in orderedWorkPackages)
+                                    {
+                                        bool isAssigned = Model.WorkPackagePersonnel.Any(wpx => wpx.Wp == wp.Id && wpx.Person == person.Id);
+                                        <td>
+                                            <input class="wp-checkbox" type="checkbox"
+                                            @(isAssigned ? "checked" : "")
+                                                   data-checked-original="@(isAssigned ? "true" : "false")"
+                                                   data-wp-id="@wp.Id"
+                                                   data-person-id="@person.Id" />
+                                        </td>
+                                    }
+                                    <td>
+                                        <button onclick="removeFromProject(@person.Id)" class="btn btn-danger">Remove</button> <!-- Botón Remove -->
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
                         @foreach (var person in Model.ProjectPersonnel.Select(px => px.PersonNavigation))
                         {
                             <tr>

@@ -47,6 +47,9 @@ public partial class Project
     [Column("PM")]
     public int? Pm { get; set; }
 
+    [Column("FM")]
+    public int? Fm { get; set; }
+
     [StringLength(50)]
     public string Type { get; set; } = null!;
 

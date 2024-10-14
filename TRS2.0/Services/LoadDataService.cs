@@ -7,6 +7,7 @@ using System.Globalization;
 using Serilog;
 using Newtonsoft.Json;
 using System.Net.Http.Headers;
+using Newtonsoft.Json.Linq;
 
 namespace TRS2._0.Services
 {
@@ -15,12 +16,16 @@ namespace TRS2._0.Services
         private readonly TRSDBContext _context;
         private readonly WorkCalendarService _workCalendarService;
         private readonly ILogger<LoadDataService> _logger;
+        private readonly HttpClient _httpClient;
+        private readonly string _bearerToken;
         // Inyectar dependencias necesarias
         public LoadDataService(TRSDBContext context, WorkCalendarService workCalendarService, ILogger<LoadDataService> logger)
         {
             _context = context;
             _workCalendarService = workCalendarService;
             _logger = logger;
+            _httpClient = new HttpClient();
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _bearerToken);
         }
 
         public async Task UpdateMonthlyPMs()
@@ -674,7 +679,7 @@ namespace TRS2._0.Services
                         logger.Debug("Procesando línea: {Line}", line);
                     var fields = line.Split('\t');
 
-                    if (fields.Length < 16)
+                    if (fields.Length < 17)
                     {
                             throw new FormatException("Línea incompleta.");
                     }
@@ -695,9 +700,10 @@ namespace TRS2._0.Services
                     var tpsIcrea = fields[13] == "Y" ? (short?)1 : (short?)0;
                     var tpsCsic = fields[14] == "Y" ? (short?)1 : (short?)0;
                     var visible = fields[15] == "Y" ? (short)1 : (short)0;
+                    var fm = int.TryParse(fields[16], out int fmId) ? fmId : (int?)null;
 
-                    // Calcular EndReportDate
-                    DateTime endReportDate = endDate != default(DateTime) ? endDate : DateTime.Now;
+                        // Calcular EndReportDate
+                        DateTime endReportDate = endDate != default(DateTime) ? endDate : DateTime.Now;
                     if (fields[15] == "Y" && (type == "EU-H2020" || type == "EU-OTROS"))
                     {
                         endReportDate = endReportDate.AddMonths(3);
@@ -729,7 +735,8 @@ namespace TRS2._0.Services
                             St1 = st1,
                             St2 = st2,
                             EndReportDate = endReportDate,
-                            Visible = visible
+                            Visible = visible,
+                            Fm = fm
                         };
                         _context.Projects.Add(project);
                         logger.Information("Insertando nuevo proyecto con SapCode: {SapCode}", sapCode);
@@ -753,6 +760,7 @@ namespace TRS2._0.Services
                         project.St2 = st2;
                         project.EndReportDate = endReportDate;
                         project.Visible = visible;
+                        project.Fm = fm;
                         logger.Information("Actualizando proyecto existente con SapCode: {SapCode}", sapCode);
                     }
 
@@ -875,6 +883,140 @@ namespace TRS2._0.Services
                 _logger.LogError(ex.StackTrace);
             }
         }
+
+
+
+        //public async Task UpdateLeaveTableAsync()
+        //{
+        //    try
+        //    {
+        //        var users = await GetUsersAsync();
+        //        foreach (var user in users)
+        //        {
+        //            var userId = user["UserId"].ToString();
+        //            var requests = await GetUserRequestsAsync(userId);
+        //            foreach (var request in requests)
+        //            {
+        //                if (request["RequestStatus"].ToString() == "Approved")
+        //                {
+        //                    var agreementEventId = request["AgreementEventId"].ToString();
+        //                    if (AgreementEventExists(agreementEventId))
+        //                    {
+        //                        var personId = GetPersonId(userId);
+        //                        var numberDaysRequested = (int)request["NumberDaysRequested"];
+        //                        var startDate = DateTime.Parse(request["StartDate"].ToString());
+        //                        var endDate = DateTime.Parse(request["EndDate"].ToString());
+        //                        var type = GetLeaveType(agreementEventId);
+
+        //                        for (int i = 0; i < numberDaysRequested; i++)
+        //                        {
+        //                            var leaveDate = startDate.AddDays(i).ToString("yyyy-MM-dd");
+        //                            CreateLeaveRecord(personId, type, leaveDate, 0);
+        //                        }
+        //                    }
+        //                }
+        //            }
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.LogError($"Error al actualizar la tabla Leave: {ex.Message}");
+        //    }
+        //}
+
+        //private async Task<JArray> GetUsersAsync()
+        //{
+        //    try
+        //    {
+        //        var response = await _httpClient.GetStringAsync("https://app.woffu.com/api/v1/users");
+        //        return JArray.Parse(response);
+        //    }
+        //    catch (HttpRequestException ex)
+        //    {
+        //        _logger.LogError($"Error al obtener usuarios: {ex.Message}");
+        //        return new JArray();
+        //    }
+        //}
+
+        //private async Task<JArray> GetUserRequestsAsync(string userId)
+        //{
+        //    try
+        //    {
+        //        var response = await _httpClient.GetStringAsync($"https://app.woffu.com/api/v1/users/{userId}/requests");
+        //        return JArray.Parse(response);
+        //    }
+        //    catch (HttpRequestException ex)
+        //    {
+        //        _logger.LogError($"Error al obtener solicitudes del usuario {userId}: {ex.Message}");
+        //        return new JArray();
+        //    }
+        //}
+
+        //private bool AgreementEventExists(string agreementEventId)
+        //{
+        //    try
+        //    {
+        //        return _context.AgreementEvents.Any(ae => ae.AgreementEventId == agreementEventId);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.LogError($"Error al verificar AgreementEventId {agreementEventId}: {ex.Message}");
+        //        return false;
+        //    }
+        //}
+
+        //private int GetPersonId(string userId)
+        //{
+        //    try
+        //    {
+        //        var person = _context.Persons.FirstOrDefault(p => p.UserId == userId);
+        //        return person?.Id ?? 0;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.LogError($"Error al obtener PersonId para UserId {userId}: {ex.Message}");
+        //        return 0;
+        //    }
+        //}
+
+        //private int GetLeaveType(string agreementEventId)
+        //{
+        //    try
+        //    {
+        //        var agreementEvent = _context.AgreementEvents.FirstOrDefault(ae => ae.AgreementEventId == agreementEventId);
+        //        return agreementEvent?.Type ?? 0;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.LogError($"Error al obtener tipo de leave para AgreementEventId {agreementEventId}: {ex.Message}");
+        //        return 0;
+        //    }
+        //}
+
+        //private void CreateLeaveRecord(int personId, int type, string date, int leaveReduction)
+        //{
+        //    try
+        //    {
+        //        var leave = new Leave
+        //        {
+        //            PersonId = personId,
+        //            Type = type,
+        //            Day = date,
+        //            LeaveReduction = leaveReduction
+        //        };
+        //        _context.Leaves.Add(leave);
+        //        _context.SaveChanges();
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.LogError($"Error al crear registro de leave para PersonId {personId} en la fecha {date}: {ex.Message}");
+        //    }
+        //}
+
+
+
+
+
 
         public async Task Execute(IJobExecutionContext context)
         {
