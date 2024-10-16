@@ -62,6 +62,12 @@
                     </dl>
                     <dl class="row detail-item">
                         <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Finance Manager</dt>
+                            <dd class="col-sm-8 d-inline-block">@ViewBag.FmFullName</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
                             <dt class="col-sm-4 text-sm-right">Type</dt>
                             <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.ProjectDetails.Type)</dd>
                         </div>
@@ -141,7 +147,8 @@
 <!-- Código para la sección de asignación de personal a paquetes de trabajo -->
     
 </div>
-
+<!-- Nuevo título "Personnel in Work Packages" -->
+<h3 class="text-center my-style">Personnel in Work Packages</h3>
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-md-12">
@@ -149,47 +156,25 @@
                 <table class="table table-bordered">
                     <thead>
                         <tr>
-                            <th class="sticky-header">People involved in @Model.ProjectDetails.Acronim project</th>
+                            <th class="sticky-header sticky-name-header name-column">People involved in @Model.ProjectDetails.Acronim project</th>
                             @foreach (var wp in orderedWorkPackages)
                             {
-                                <th class="sticky-header">@wp.Name</th> <!-- Encabezados de WP -->
+                                <th class="sticky-header wp-column">@wp.Name</th> <!-- Encabezados de WP -->
                             }
-                            <th class="sticky-header">
+                            <th class="sticky-header action-column">
                                 <button id="updateAllButton" class="btn btn-success" onclick="updateAll()">Update All</button> <!-- Botón Update All -->
                             </th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tbody>
-                            @foreach (var person in Model.ProjectPersonnel.Select(px => px.PersonNavigation).OrderBy(p => p.Name).ThenBy(p => p.Surname))
-                            {
-                                <tr>
-                                    <td>@person.Name @person.Surname</td>
-                                    @foreach (var wp in orderedWorkPackages)
-                                    {
-                                        bool isAssigned = Model.WorkPackagePersonnel.Any(wpx => wpx.Wp == wp.Id && wpx.Person == person.Id);
-                                        <td>
-                                            <input class="wp-checkbox" type="checkbox"
-                                            @(isAssigned ? "checked" : "")
-                                                   data-checked-original="@(isAssigned ? "true" : "false")"
-                                                   data-wp-id="@wp.Id"
-                                                   data-person-id="@person.Id" />
-                                        </td>
-                                    }
-                                    <td>
-                                        <button onclick="removeFromProject(@person.Id)" class="btn btn-danger">Remove</button> <!-- Botón Remove -->
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                        @foreach (var person in Model.ProjectPersonnel.Select(px => px.PersonNavigation))
+                        @foreach (var person in Model.ProjectPersonnel.Select(px => px.PersonNavigation).OrderBy(p => p.Surname))
                         {
                             <tr>
-                                <td>@person.Name @person.Surname</td>
+                                <td class="name-column">@person.Name @person.Surname</td>
                                 @foreach (var wp in orderedWorkPackages)
                                 {
                                     bool isAssigned = Model.WorkPackagePersonnel.Any(wpx => wpx.Wp == wp.Id && wpx.Person == person.Id);
-                                    <td>
+                                    <td class="wp-column">
                                         <input class="wp-checkbox" type="checkbox"
                                         @(isAssigned ? "checked" : "")
                                                data-checked-original="@(isAssigned ? "true" : "false")"
@@ -197,7 +182,7 @@
                                                data-person-id="@person.Id" />
                                     </td>
                                 }
-                                <td>
+                                <td class="action-column">
                                     <button onclick="removeFromProject(@person.Id)" class="btn btn-danger">Remove</button> <!-- Botón Remove -->
                                 </td>
                             </tr>
@@ -208,6 +193,13 @@
         </div>
     </div>
 </div>
+
+
+
+
+
+
+
     @section Scripts {
         <script>
             document.getElementById('personnelSelect').addEventListener('change', function () {
@@ -291,10 +283,10 @@
                     success: function (response) {
                         if (response.success) {
                             // Aquí puedes agregar una notificación o actualizar la vista como necesites
-                            alert("Person added to the project successfully.");
+                            alert(response.message);
                             location.reload();
                         } else {
-                            alert("There was a problem adding the person to the project.");
+                        alert(response.message);
                         }
                     }
                 });
@@ -379,67 +371,80 @@
         </script>
     }
 
-    <style>
-        .person-result {
-            cursor: pointer;
-            padding: 5px;
+<style>
+    .person-result {
+        cursor: pointer;
+        padding: 5px;
+    }
+
+        .person-result:hover {
+            background-color: #eee;
         }
 
-            .person-result:hover {
-                background-color: #eee;
-            }
-
-            .person-result.active {
-                background-color: #4c87c6;
-            }
-
-        .card-detail-label {
-            font-weight: bold;
+        .person-result.active {
+            background-color: #4c87c6;
         }
 
-        .card-title {
-            font-weight: bold;
-        }
+    .card-detail-label {
+        font-weight: bold;
+    }
 
-        .card-header {
-            background-color: #005A9C; /* Azul oscuro, ajusta el código de color según tu logo */
-            color: #FFFFFF; /* Blanco */
-            text-align: center;
-            font-weight: bold;
-            /* Otros estilos que desees mantener, como el padding, etc. */
-        }
+    .card-title {
+        font-weight: bold;
+    }
 
+    .card-header {
+        background-color: #005A9C; /* Azul oscuro, ajusta el código de color según tu logo */
+        color: #FFFFFF; /* Blanco */
+        text-align: center;
+        font-weight: bold;
+        /* Otros estilos que desees mantener, como el padding, etc. */
+    }
 
-        .wp-checkbox {
-            width: 25px; /* Tamaño del checkbox */
-            height: 25px; /* Tamaño del checkbox */
-            cursor: pointer; /* Cambia el cursor a mano al pasar sobre el checkbox */
-            margin: auto; /* Centra el checkbox en la celda */
-        }
+    .wp-checkbox {
+        width: 25px; /* Tamaño del checkbox */
+        height: 25px; /* Tamaño del checkbox */
+        cursor: pointer; /* Cambia el cursor a mano al pasar sobre el checkbox */
+        margin: auto; /* Centra el checkbox en la celda */
+    }
 
+    .table th {
+        background-color: var(--blue-dark); /* Color de fondo para los encabezados */
+        color: white; /* Color del texto para los encabezados */
+        text-align: center;
+    }
+
+    .table td {
+        text-align: center;
+    }
+
+    .table th, .table td {
+        white-space: nowrap; /* Evita el salto de línea en las celdas */
+        vertical-align: middle; /* Alinea el contenido verticalmente */
+        text-align: center; /* Centra el contenido */
+    }
+
+    .table .name-column {
+        width: 200px; /* Ancho fijo para la columna de nombres */
+        position: sticky;
+        left: 0;        
+        z-index: 3; /* Asegura que la columna fija esté sobre el contenido desplazable */
         
+    }
 
-        .table th {
-            background-color: var(--blue-dark); /* Color de fondo para los encabezados */
-            color: white; /* Color del texto para los encabezados */
-            text-align: center;
-        }
+    .table .wp-column {
+        width: 50px; /* Ancho fijo para las columnas de work packages */
+    }
 
-        .table td{
-            text-align: center;
-        }
+    .table .action-column {
+        width: 75px; /* Ancho fijo para la columna de acciones */
+    }
 
-        .table th, .table td {
-            white-space: nowrap; /* Evita el salto de línea en las celdas */
-            vertical-align: middle; /* Alinea el contenido verticalmente */
-            text-align: center; /* Centra el contenido */
-        }
-
-            .detail-item:not(:last-child) {
-                border-bottom: 1px solid #dee2e6; /* Color de la línea */
-                padding-bottom: 5px; /* Espaciado debajo del texto antes de la línea */
-                margin-bottom: 5px; /* Espaciado después de la línea */
-            }
+    .detail-item:not(:last-child) {
+        border-bottom: 1px solid #dee2e6; /* Color de la línea */
+        padding-bottom: 5px; /* Espaciado debajo del texto antes de la línea */
+        margin-bottom: 5px; /* Espaciado después de la línea */
+    }
 
     .custom-table-container {
         padding-left: 15px;
@@ -449,14 +454,24 @@
     .table-responsive {
         max-height: 800px; /* Ajusta esto según la altura deseada */
         overflow-y: auto;
-        overflow-x: hidden;
+        overflow-x: auto; /* Habilita el scroll horizontal */
+        max-width: 1200px; /* Ancho máximo para la tabla */
+        margin: 0 auto; /* Centra la tabla horizontalmente */
     }
 
     .sticky-header {
         position: sticky;
+        top: 0;        
+        z-index: 2; /* Asegura que el encabezado se mantenga sobre el contenido desplazable */        
+    }
+
+    .sticky-name-header {
+        position: sticky;
         top: 0;
-        background-color: #fff; /* Fondo blanco o el color de fondo de tu tabla */
-        z-index: 1; /* Asegura que el encabezado se mantenga sobre el contenido desplazable */
+        left: 0;
+        
+        z-index: 4; /* Asegura que la cabecera fija esté sobre el contenido desplazable */
+        
     }
 
     .card-header {
@@ -464,4 +479,18 @@
         font-weight: bold; /* Texto en negrita */
         text-align: center; /* Texto centrado */
     }
-    </style>
+
+    .my-style {
+        font-size: 2.5rem; /* Ajusta el tamaño de la fuente */
+        font-weight: bold;
+        color: #0056b3; /* Cambia al color que prefieras */
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.2); /* Añade una ligera sombra */
+    }
+</style>
+
+
+
+
+
+
+

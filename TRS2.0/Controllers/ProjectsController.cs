@@ -88,7 +88,7 @@ namespace TRS2._0.Controllers
                 return NotFound();
             }
 
-            // Recuperar los nombres completos del PM y PI
+            // Recuperar los nombres completos del PM, PI y FM
             var pm = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == project.Pm);
             var pi = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == project.Pi);
             var fm = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == project.Fm);
@@ -335,6 +335,7 @@ namespace TRS2._0.Controllers
             // Recuperar los nombres completos del PM y PI
             var pm = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == projectDetails.Pm);
             var pi = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == projectDetails.Pi);
+            var fm = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == projectDetails.Fm);
             var projectPersonnel = await _context.Projectxpeople
                                                 .Where(px => px.ProjId == projId)
                                                 .ToListAsync();
@@ -355,6 +356,7 @@ namespace TRS2._0.Controllers
                                              .ToListAsync();
             ViewBag.PmFullName = pm != null ? $"{pm.Name} {pm.Surname}" : "No asignado";
             ViewBag.PiFullName = pi != null ? $"{pi.Name} {pi.Surname}" : "No asignado";
+            ViewBag.FmFullName = fm != null ? $"{fm.Name} {fm.Surname}" : "No asignado";
             ViewBag.projId = projId;
             var viewModel = new ProjectPersonnelViewModel
             {
@@ -370,7 +372,7 @@ namespace TRS2._0.Controllers
 
 
         [HttpPost]
-        
+
         public async Task<IActionResult> AddPersonToProject(int projectId, int personId)
         {
             // Primero, verificar si la persona ya está asociada al proyecto
@@ -380,6 +382,25 @@ namespace TRS2._0.Controllers
             {
                 // La persona ya está asociada al proyecto
                 return Json(new { success = false, message = "Person is already associated with the project." });
+            }
+
+            // Obtener las fechas del proyecto
+            var project = await _context.Projects
+                                        .FirstOrDefaultAsync(p => p.ProjId == projectId);
+            if (project == null)
+            {
+                return NotFound();
+            }
+
+            // Verificar si la persona tiene un contrato válido en las fechas del proyecto
+            var hasValidContract = await _context.Dedications
+                                                 .AnyAsync(d => d.PersId == personId &&
+                                                                d.Start <= project.EndReportDate &&
+                                                                d.End >= project.Start);
+            if (!hasValidContract)
+            {
+                // La persona no tiene un contrato válido en las fechas del proyecto
+                return Json(new { success = false, message = "The person does not have a valid contract within the project dates." });
             }
 
             // Crear una nueva asociación de Projectxperson
@@ -395,6 +416,7 @@ namespace TRS2._0.Controllers
 
             return Json(new { success = true, message = "Person added to the project successfully." });
         }
+
 
         [HttpPost]
         
