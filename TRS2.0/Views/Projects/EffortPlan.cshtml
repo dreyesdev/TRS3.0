@@ -12,6 +12,7 @@
             <button class="btn btn-primary distribute-linearly-all">Lineal All</button>
             <button class="btn btn-success save-all">Save All</button>
             <button class="btn btn-warning clear-all">Clear All</button>
+            <button id="exportCsvButton" class="btn btn-secondary btn-sm">Export Effort Plan into CSV</button>
         </div>
         <div id="savingIndicator" style="display: none;">Guardando...</div>
     </h2>
@@ -19,12 +20,12 @@
 @if (Model.WorkPackages.Any())
 {
     <div class="scrollable-table-container">
-        <table class="table table-bordered table-striped table-hover">
+            <table class="table table-bordered table-striped table-hover main-effort-plan-table">
             <thead class="thead-dark">
                 <tr>
                         <th>
-                            <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center">Total Effort</div>
-                            <div style="text-align: center">Effort Target</div>
+                            <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center">Effort Target</div>
+                            <div style="text-align: center">Total Effort</div>
                         </th>
                     <th>Actions</th>
                     <th>WP</th>
@@ -48,9 +49,9 @@
                         var effortTargetForThisWp = wp.getPMs(wp.WpId);
                     <tr>
                         <td class="@(wp.TotalEffort != wp.getPMs(wp.WpId) ? "effort-mismatch" : "effort-match")">
-                            
-                                <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center">@wp.TotalEffort</div>
-                                <div style="text-align: center">@wp.getPMs(wp.WpId)</div>
+
+                                <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center">@wp.getPMs(wp.WpId)</div>
+                                <div style="text-align: center">@wp.TotalEffort</div>
                         </td>
                         <td>
                             <div class="button-container">
@@ -485,6 +486,35 @@ else
             return null;
         }
 
+        document.getElementById('exportCsvButton').addEventListener('click', function () {
+            var csvContent = "data:text/csv;charset=utf-8,";
+            var rows = document.querySelectorAll('.main-effort-plan-table tr');
+
+            rows.forEach(function (row, rowIndex) {
+                var cols = row.querySelectorAll('th, td');
+                var rowData = [];
+                cols.forEach(function (col, colIndex) {
+                    // Excluir la columna "Actions" (segunda columna)
+                    if (colIndex !== 1) {
+                        var input = col.querySelector('input');
+                        if (input) {
+                            rowData.push(input.value.replace(/(\r\n|\n|\r)/gm, "").trim());
+                        } else {
+                            rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim());
+                        }
+                    }
+                });
+                csvContent += rowData.join(";") + "\r\n";
+            });
+
+            var encodedUri = 'data:text/csv;charset=utf-8;base64,' + btoa(unescape(encodeURIComponent(csvContent)));
+            var link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "effort_plan.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
 
     </script>
 

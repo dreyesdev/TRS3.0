@@ -319,6 +319,12 @@ namespace TRS2._0.Controllers
                 wpEffort.TotalEffort = (float)Math.Round(sumEffort, 2);
             }
             ViewBag.ProjId = projId;
+
+            // Ordenar por nombre y mover "TRAVELS" al final
+            effortPlanViewModel.WorkPackages = effortPlanViewModel.WorkPackages
+                                      .OrderBy(wp => wp.WpName == "TRAVELS" ? 1 : 0)
+                                      .ThenBy(wp => wp.WpName)
+                                      .ToList();
             return View(effortPlanViewModel); // Pasa el modelo a la vista
         }
 
