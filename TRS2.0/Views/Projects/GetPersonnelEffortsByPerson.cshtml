@@ -33,8 +33,9 @@
                             <div><span style="height: 10px; width: 10px; background-color: lightblue; display: inline-block;"></span> Below Target</div>
                         </th>
                         <th>
-                            <div style="border-bottom: 1px solid #333; margin-bottom: 2px; text-align: center; font-weight: bold">ACTUAL EFFORT</div>
-                            <div style="text-align: center; font-weight: bold;">TARGET EFFORT</div>
+                            <div style="border-bottom: 1px solid white; margin-bottom: 2px; text-align: center; font-weight: bold">ACTUAL EFFORT</div>
+                            <div style="border-bottom: 1px solid white;text-align: center; font-weight: bold;">TOTAL EFFORT</div>
+                            <div style="text-align: center; font-weight: bold;">AVAILABLE</div>
                         </th>
                         <th></th>
                         <!-- Calcula y muestra los PMs disponibles para cada mes -->
@@ -45,16 +46,17 @@
                             // Asegúrate de que pmValue sea 0 si no hay un valor correspondiente en PMValuesPerMonth para el monthKey
                             var pmValue = Math.Round(ViewBag.PMValuesPerMonth.ContainsKey(monthKey) ? ViewBag.PMValuesPerMonth[monthKey] : 0.00M, 2);
                             var dispValue = pmValue - totalEffort; // Calcula el disponible
-                            var dispColor = dispValue > 0 ? "#90EE90" : dispValue == 0 ? "yellow" : "red"; // Decide el color
+                            var dispColor = dispValue > 0 ? "#90EE90" : dispValue == 0 ? "yellow" : "yellow"; // Decide el color
                             // Determinar el color basado en la comparación
                             var color = totalEffort > pmValue ? "yellow" :
                             totalEffort < pmValue ? "lightblue" : "lightgreen";
 
                             <th>
-                                <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center; color: @color">@totalEffort</div>
+                                <div style="border-bottom: 1px solid white; margin-bottom: 2px; margin-top: 8px; text-align: center; color: @color">@totalEffort</div>
                                 <div style="text-align: center; color: @color">@pmValue</div>
+                                <div style="border-top: 1px solid white">
                                 <!-- Muestra el disponible y su color -->
-                                <div style="text-align: center; color: @dispColor">Disp: @dispValue</div>
+                                <div style="text-align: center; color: @color">@dispValue</div>
                             </th>
                         }
                     </tr>
@@ -94,7 +96,7 @@
                                         {
                                             case 1:
                                                 cellClass += " out-of-contract";
-                                                cellStyle = "background-color: orange;";
+                                                cellStyle = "background-color: darkred;";
                                                 break;
                                             case 2:
                                                 cellClass += " overload";
@@ -152,7 +154,7 @@
         <div><span style="height: 20px; width: 20px; background-color: lightsalmon; display: inline-block;"></span> Leave</div>
         <div><span style="height: 20px; width: 20px; background-color: lightblue; display: inline-block;"></span> Holiday</div>
         <div><span style="height: 20px; width: 20px; background-color: yellow; display: inline-block;"></span> Overload</div>
-        <div><span style="height: 20px; width: 20px; background-color: darkorange; display: inline-block;"></span> Out of Contract</div>
+        <div><span style="height: 20px; width: 20px; background-color: darkred; display: inline-block;"></span> Out of Contract</div>
         <div><span style="height: 20px; width: 20px; background-color: purple; display: inline-block;"></span> No Contract Period</div>
         <div><span style="height: 20px; width: 20px; background-color: darkgreen; display: inline-block;"></span> Inside Travel</div>
         <div><span style="height: 20px; width: 20px; background-color: hotpink; display: inline-block;"></span> Outside Travel</div>        
