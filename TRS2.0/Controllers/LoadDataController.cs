@@ -115,6 +115,38 @@ namespace TRS2._0.Controllers
             }
         }
 
+        [HttpGet("/ProcesoLiquidacionesAvd")]
+
+        public async Task<IActionResult> TriggerProcessLiquidationAdvJob()
+        {
+            try
+            {
+                var scheduler = await _schedulerFactory.GetScheduler();
+                var jobKey = new JobKey("LoadDataServiceJob");
+
+                // Configura JobDataMap con los parámetros específicos para esta acción
+                var jobDataMap = new JobDataMap
+                {
+                    {"Action", "ProcessLiquidationsAdvanced"},
+                };
+                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
+                if (await scheduler.CheckExists(jobKey))
+                {
+                    await scheduler.TriggerJob(jobKey, jobDataMap);
+                    return Ok("El trabajo de procesamiento de liquidaciones avanzado se ha iniciado.");
+                }
+                else
+                {
+                    return NotFound("El trabajo de procesamiento de liquidaciones avanzado no se encontró.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Maneja adecuadamente la excepción
+                return StatusCode(500, $"Error al iniciar el trabajo de procesamiento de liquidaciones avanzado: {ex.Message}");
+            }
+        }
+
         [HttpGet("/CargaPersonal")]
 
         public async Task<IActionResult> TriggerLoadPersonnelJob()

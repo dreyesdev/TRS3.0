@@ -13,6 +13,8 @@ namespace TRS2._0.Models.DataModels
         [Required] // Indica que el campo es obligatorio
         [StringLength(255)] // Define la longitud máxima del campo
         public string Name { get; set; }
-        
+
+        public virtual ICollection<AffGlobalHours> AffGlobalHours { get; set; }
+
     }
 }

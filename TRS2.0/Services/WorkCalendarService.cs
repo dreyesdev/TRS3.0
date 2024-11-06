@@ -709,11 +709,16 @@ public class WorkCalendarService
     }
 
     // Función auxiliar para verificar si un día es festivo
-    private async Task<bool> IsHoliday(DateTime date)
+    public async Task<bool> IsHoliday(DateTime date)
     {
         return await _context.NationalHolidays.AnyAsync(h => h.Date == date);
     }
 
+
+    public async Task <bool> IsWeekend(DateTime date)
+    {
+        return date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday;
+    }
 
     public async Task<decimal> CalculateAdjustedMonthlyPM(int personId, int year, int month, DateTime startDate, DateTime endDate)
     {
@@ -809,6 +814,20 @@ public class WorkCalendarService
         }
 
         return months;
+    }
+    public async Task<decimal> GetEffortForPersonInProject(int personId, int projectId, int year, int month)
+    {
+        // Obtener la fecha de inicio y fin del mes
+        DateTime startDate = new DateTime(year, month, 1);
+        DateTime endDate = startDate.AddMonths(1).AddDays(-1);
+
+        // Obtener el esfuerzo mensual de la persona para el proyecto
+        Dictionary<DateTime, decimal> monthlyEffort = await CalculateMonthlyEffortForPersonInProject(personId, startDate, endDate, projectId);
+
+        // Obtener el esfuerzo total para el mes
+        decimal totalEffort = monthlyEffort.Values.Sum();
+
+        return totalEffort;
     }
 
 

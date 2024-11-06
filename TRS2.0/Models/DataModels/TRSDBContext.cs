@@ -66,9 +66,11 @@ public partial class TRSDBContext : IdentityDbContext<ApplicationUser>
 
     public DbSet<AgreementEvent> AgreementEvents { get; set; }
 
+    public DbSet<AffGlobalHours> AffGlobalHours { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("data source = OPSTRS03.BSC.ES; initial catalog = TRSBDD; user id = admin; password = seidor; Trusted_Connection = True;TrustServerCertificate=True;Integrated Security=False;");
+        => optionsBuilder.UseSqlServer("data source = OPSTRS03.BSC.ES; initial catalog = TRSBDDTEST; user id = admin; password = seidor; Trusted_Connection = True;TrustServerCertificate=True;Integrated Security=False;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

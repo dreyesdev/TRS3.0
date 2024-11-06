@@ -15,6 +15,7 @@
   <ItemGroup>
     <PackageReference Include="AspNetCore.Security.CAS" Version="2.0.5" />
     <PackageReference Include="DotNetCasClient" Version="1.3.2" />
+    <PackageReference Include="EPPlus" Version="7.4.1" />
     <PackageReference Include="GSS.Authentication.CAS.AspNetCore" Version="5.5.0" />
     <PackageReference Include="itext7" Version="8.0.3" />
     <PackageReference Include="itext7.bouncy-castle-adapter" Version="8.0.3" />

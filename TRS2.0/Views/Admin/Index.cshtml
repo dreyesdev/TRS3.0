@@ -6,6 +6,8 @@
 
 <h1>Admin Index</h1>
 
+<button id="selectFolderButton" class="btn btn-primary">Seleccionar Carpeta para cargar Excell</button>
+
 <!-- Sección de Generar PM Values -->
 <h2>Generar Valores PM</h2>
 <form asp-action="GeneratePMValues" method="post" class="form-inline">
@@ -181,5 +183,31 @@
                 }
             });
         }
+
+        
+            document.getElementById('selectFolderButton').addEventListener('click', function () {
+                var input = document.createElement('input');
+                input.type = 'file';
+                input.webkitdirectory = true;
+                input.directory = true;
+                input.multiple = true;
+                input.addEventListener('change', function (event) {
+                    var files = event.target.files;
+                    var folderPath = files[0].webkitRelativePath.split('/')[0];
+                    // Enviar la ruta de la carpeta al servidor
+                    fetch('/Admin/ProcessFolder', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ folderPath: folderPath })
+                    }).then(response => response.json())
+                        .then(data => {
+                            console.log(data);
+                        });
+                });
+                input.click();
+            });
+    
     </script>
 }

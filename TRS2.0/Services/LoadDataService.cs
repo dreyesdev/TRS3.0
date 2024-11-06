@@ -7,7 +7,8 @@ using System.Globalization;
 using Serilog;
 using Newtonsoft.Json;
 using System.Net.Http.Headers;
-using Newtonsoft.Json.Linq;
+using static TRS2._0.Services.WorkCalendarService;
+
 
 namespace TRS2._0.Services
 {
@@ -97,243 +98,555 @@ namespace TRS2._0.Services
 
         public async Task LoadLiquidationsFromFileAsync(string filePath)
         {
+            var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "CargaLiquidacionesLog.txt");
+
+            var personalLogger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
             var lines = await File.ReadAllLinesAsync(filePath);
+            int totalLiquidations = 0;
+            int correctLiquidations = 0;
+            int incorrectLiquidations = 0;
+
             foreach (var line in lines)
             {
-                var fields = line.Split('\t');
-                var format = "yyyy-MM-dd HH:mm:ss.fff"; // Define el formato de fecha esperado
-
-                DateTime start, end;
-
-                // Intenta parsear la fecha de inicio
-                if (!DateTime.TryParseExact(fields[6], format, CultureInfo.InvariantCulture, DateTimeStyles.None, out start))
+                try
                 {
-                    _logger.LogError($"Failed to parse Start Date for Liquidation from field: {fields[6]}");
-                    continue; 
+                    var fields = line.Split('\t');
+                    var format = "yyyy-MM-dd HH:mm:ss.fff"; // Define el formato de fecha esperado
+
+                    DateTime start, end;
+
+                    // Intenta parsear la fecha de inicio
+                    if (!DateTime.TryParseExact(fields[6], format, CultureInfo.InvariantCulture, DateTimeStyles.None, out start))
+                    {
+                        personalLogger.Warning($"Failed to parse Start Date for Liquidation from field: {fields[6]}");
+                        incorrectLiquidations++;
+                        continue;
+                    }
+
+                    // Intenta parsear la fecha de fin
+                    if (!DateTime.TryParseExact(fields[7], format, CultureInfo.InvariantCulture, DateTimeStyles.None, out end))
+                    {
+                        personalLogger.Warning($"Failed to parse End Date for Liquidation from field: {fields[7]}");
+                        incorrectLiquidations++;
+                        continue;
+                    }
+
+                    var liquidation = new Liquidation
+                    {
+                        Id = fields[0],
+                        PersId = int.Parse(fields[1]),
+                        Project1 = fields[2],
+                        Dedication1 = decimal.Parse(fields[3], CultureInfo.InvariantCulture),
+                        Project2 = string.IsNullOrWhiteSpace(fields[4]) ? null : fields[4],
+                        Dedication2 = string.IsNullOrWhiteSpace(fields[5]) ? null : decimal.Parse(fields[5], CultureInfo.InvariantCulture),
+                        Start = start,
+                        End = end,
+                        Destiny = fields[8],
+                        Reason = fields[9],
+                        Status = "0" // Estado inicial es un valor "0"
+                    };
+
+                    // Verificar si la liquidación ya existe en el sistema
+                    var existingLiquidation = await _context.Liquidations.FirstOrDefaultAsync(l => l.Id == liquidation.Id);
+                    if (existingLiquidation != null)
+                    {
+                        // Verificar si los datos son iguales
+                        if (existingLiquidation.PersId == liquidation.PersId &&
+                            existingLiquidation.Project1 == liquidation.Project1 &&
+                            existingLiquidation.Dedication1 == liquidation.Dedication1 &&
+                            existingLiquidation.Project2 == liquidation.Project2 &&
+                            existingLiquidation.Dedication2 == liquidation.Dedication2 &&
+                            existingLiquidation.Start == liquidation.Start &&
+                            existingLiquidation.End == liquidation.End)
+                        {
+                            personalLogger.Information($"Liquidation {liquidation.Id} already exists and has the same data. Skipping.");
+                            continue; // Pasar a la siguiente línea
+                        }
+                        else
+                        {
+                            // Actualizar los datos de la liquidación existente
+                            existingLiquidation.PersId = liquidation.PersId;
+                            existingLiquidation.Project1 = liquidation.Project1;
+                            existingLiquidation.Dedication1 = liquidation.Dedication1;
+                            existingLiquidation.Project2 = liquidation.Project2;
+                            existingLiquidation.Dedication2 = liquidation.Dedication2;
+                            existingLiquidation.Start = liquidation.Start;
+                            existingLiquidation.End = liquidation.End;
+                            existingLiquidation.Status = "1"; // Cambiar el estado a "1" si los datos han cambiado
+
+                            personalLogger.Information($"Liquidation {liquidation.Id} already exists but has different data. Updating data and status to 1.");
+                        }
+                    }
+                    else
+                    {
+                        // Dentro de tu bucle de carga
+                        int persId = int.Parse(fields[1]);
+                        var personnelExists = await _context.Personnel.AnyAsync(p => p.Id == persId);
+                        if (!personnelExists)
+                        {
+                            personalLogger.Warning($"Personnel with Id {persId} not found. Skipping liquidation.");
+                            incorrectLiquidations++;
+                            continue; // Salta al siguiente registro
+                        }
+                        // Procede a insertar la liquidación si el personal existe
+
+                        await _context.Liquidations.AddAsync(liquidation);
+                        personalLogger.Information($"Liquidation {liquidation.Id} loaded from file.");
+                    }
+
+                    correctLiquidations++;
+                }
+                catch (Exception ex)
+                {
+                    personalLogger.Error($"An error occurred while processing liquidation: {ex.Message}");
+                    incorrectLiquidations++;
                 }
 
-                // Intenta parsear la fecha de fin
-                if (!DateTime.TryParseExact(fields[7], format, CultureInfo.InvariantCulture, DateTimeStyles.None, out end))
-                {
-                    _logger.LogError($"Failed to parse End Date for Liquidation from field: {fields[7]}");
-                    continue; 
-                }
-
-                var liquidation = new Liquidation
-                {
-                    Id = fields[0],
-                    PersId = int.Parse(fields[1]),
-                    Project1 = fields[2],
-                    Dedication1 = decimal.Parse(fields[3], CultureInfo.InvariantCulture),
-                    Project2 = string.IsNullOrWhiteSpace(fields[4]) ? null : fields[4],
-                    Dedication2 = string.IsNullOrWhiteSpace(fields[5]) ? null : decimal.Parse(fields[5], CultureInfo.InvariantCulture),
-                    Start = start,
-                    End = end,
-                    Destiny = fields[8],
-                    Reason = fields[9],
-                    Status = "0" // Estado inicial es un valor "0"
-                };
-
-                // Dentro de tu bucle de carga
-                int persId = int.Parse(fields[1]);
-                var personnelExists = await _context.Personnel.AnyAsync(p => p.Id == persId);
-                if (!personnelExists)
-                {
-                    _logger.LogWarning($"Personnel with Id {persId} not found. Skipping liquidation.");
-                    continue; // Salta al siguiente registro
-                }
-                // Procede a insertar la liquidación si el personal existe
-
-                await _context.Liquidations.AddAsync(liquidation);
-                _logger.LogInformation($"Liquidation {liquidation.Id} loaded from file.");
+                totalLiquidations++;
             }
 
             await _context.SaveChangesAsync(); // Guardar todos los cambios en la base de datos
+
+            personalLogger.Information($"Total liquidations processed: {totalLiquidations}");
+            personalLogger.Information($"Correct liquidations: {correctLiquidations}");
+            personalLogger.Information($"Incorrect liquidations: {incorrectLiquidations}");
         }
 
 
         public async Task ProcessLiquidationsAsync()
         {
-            // Excluye las liquidaciones en estado 3, 4 y ahora también 5.
-            var liquidations = await _context.Liquidations
-                .Where(l => l.Status != "3" && l.Status != "4" && l.Status != "5")
-                .ToListAsync();
+            var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ProcessLiquidationsLog.txt");
 
-            foreach (var liquidation in liquidations)
+            var personalLogger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
+            try
             {
-                if (liquidation.Destiny == "BARCELONA" || (liquidation.End - liquidation.Start).TotalDays >= 30)
+                int successfulCount = 0;
+                int errorCount = 0;
+
+                // Excluye las liquidaciones en estado 3, 4 y ahora también 5.
+                var liquidations = await _context.Liquidations
+                    .Where(l => l.Status != "3" && l.Status != "4" && l.Status != "5")
+                    .ToListAsync();
+
+                foreach (var liquidation in liquidations)
                 {
-                    liquidation.Status = "4";
-                    continue;
-                }
-
-                // Verifica si Project1 y Project2 son el mismo, lo cual es un error.
-                if (!string.IsNullOrEmpty(liquidation.Project1) && liquidation.Project1 == liquidation.Project2)
-                {
-                    _logger.LogError($"Error en liquidación {liquidation.Id}: Project1 y Project2 son iguales. Marcando como estado 5 y pasando a la siguiente.");
-                    liquidation.Status = "5";
-                    continue;
-                }
-
-                var startDate = liquidation.Start;
-                var endDate = liquidation.End;
-                var daysInTrip = (endDate - startDate).TotalDays + 1;
-
-                for (int i = 0; i < daysInTrip; i++)
-                {
-                    DateTime currentDay = startDate.AddDays(i);
-
-                    foreach (var projectCode in new[] { liquidation.Project1, liquidation.Project2 }.Where(p => !string.IsNullOrEmpty(p)))
+                    try
                     {
-                        var project = await _context.Projects.FirstOrDefaultAsync(p => p.SapCode == projectCode);
-                        if (project == null) continue;
+                        // Eliminar los datos asociados a la liquidacion en la tabla Liqdayxproject
+                        var liqDayProjects = await _context.liqdayxproject
+                            .Where(ldp => ldp.LiqId == liquidation.Id)
+                            .ToListAsync();
 
-                        var pmValue = await _context.DailyPMValues
-                            .Where(pm => pm.Year == currentDay.Year && pm.Month == currentDay.Month)
-                            .Select(pm => pm.PmPerDay)
-                            .FirstOrDefaultAsync();
+                        _context.liqdayxproject.RemoveRange(liqDayProjects);
 
-                        decimal dedication = projectCode == liquidation.Project1 ? liquidation.Dedication1 : liquidation.Dedication2 ?? 0;
-                        decimal adjustedPmValue = pmValue * (dedication / 100);
-
-                        // Comprobación de unicidad antes de añadir la entidad
-                        bool exists = _context.liqdayxproject.Any(ldp => ldp.LiqId == liquidation.Id && ldp.ProjId == project.ProjId && ldp.Day == currentDay);
-                        if (!exists)
+                        if (liquidation.Destiny == "BARCELONA" || (liquidation.End - liquidation.Start).TotalDays >= 30)
                         {
-                            var liqDayProject = new Liqdayxproject
-                            {
-                                LiqId = liquidation.Id,
-                                PersId = liquidation.PersId,
-                                ProjId = project.ProjId,
-                                Day = currentDay,
-                                Dedication = dedication,
-                                PMs = adjustedPmValue,
-                                Status = "0"
-                            };
+                            liquidation.Status = "4";
+                            personalLogger.Information($"Liquidation {liquidation.Id} processed successfully. Status: 4");
+                            successfulCount++;
+                            continue;
+                        }
 
-                            _context.liqdayxproject.Add(liqDayProject);
+                        // Verifica si Project1 y Project2 son el mismo, lo cual es un error.
+                        if (!string.IsNullOrEmpty(liquidation.Project1) && liquidation.Project1 == liquidation.Project2)
+                        {
+                            decimal dedicationSum = liquidation.Dedication1 + (liquidation.Dedication2 ?? 0);
+                            if (dedicationSum > 100)
+                            {
+                                personalLogger.Error($"Error en liquidación {liquidation.Id}: Project1 y Project2 son iguales y la suma de sus dedicaciones es mayor a 100. Marcando como estado 5 y pasando a la siguiente.");
+                                liquidation.Status = "5";
+                                personalLogger.Information($"Liquidation {liquidation.Id} processed successfully. Status: 5");
+                                errorCount++;
+                                continue;
+                            }
+                            else
+                            {
+                                personalLogger.Warning($"Advertencia en liquidación {liquidation.Id}: Project1 y Project2 son iguales pero la suma de sus dedicaciones es menor o igual a 100. Procesando Liquidacion");                                
+                            }
+                        }
+
+                        var startDate = liquidation.Start;
+                        var endDate = liquidation.End;
+                        var daysInTrip = (endDate - startDate).TotalDays + 1;
+
+                        for (int i = 0; i < daysInTrip; i++)
+                        {
+                            DateTime currentDay = startDate.AddDays(i);
+                            bool isWeekend = await _workCalendarService.IsWeekend(currentDay);
+                            bool isHoliday = await _workCalendarService.IsHoliday(currentDay);
+
+                            foreach (var projectCode in new[] { liquidation.Project1, liquidation.Project2 }.Where(p => !string.IsNullOrEmpty(p)))
+                            {
+                                if (projectCode?.Length == 8)
+                                {
+                                    var formattedProjectCode = projectCode.Substring(0, projectCode.Length - 2) + "00";
+                                    var project = await _context.Projects.FirstOrDefaultAsync(p => p.SapCode == formattedProjectCode);
+                                    if (project == null) continue;
+
+                                    decimal dedication = projectCode == liquidation.Project1 ? liquidation.Dedication1 : liquidation.Dedication2 ?? 0;
+                                    decimal adjustedPmValue = 0;
+
+                                    if (!isWeekend && !isHoliday)
+                                    {
+                                        decimal dailyPm = await _workCalendarService.CalculateDailyPM(liquidation.PersId, currentDay);
+                                        adjustedPmValue = dailyPm * (dedication / 100);
+                                    }
+
+                                    var liqDayProject = new Liqdayxproject
+                                    {
+                                        LiqId = liquidation.Id,
+                                        PersId = liquidation.PersId,
+                                        ProjId = project.ProjId,
+                                        Day = currentDay,
+                                        Dedication = dedication,
+                                        PMs = adjustedPmValue,
+                                        Status = "0"
+                                    };
+
+                                    _context.liqdayxproject.Add(liqDayProject);
+                                }
+                            }
+
+                        }
+
+                        liquidation.Status = "3";
+                        personalLogger.Information($"Liquidation {liquidation.Id} processed successfully. Status: 3");
+                        successfulCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        personalLogger.Error($"Error processing liquidation {liquidation.Id}: {ex.Message}");
+                        errorCount++;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+
+                personalLogger.Information($"Process completed. {successfulCount} liquidations processed successfully. {errorCount} liquidations encountered errors.");
+            }
+            catch (Exception ex)
+            {
+                personalLogger.Error($"Error processing liquidations: {ex.Message}");
+            }
+        }
+
+        // Función para el tratamiento de las lineas de Liqdayxproject
+        public async Task ProcessAdvancedLiquidationsAsync()
+        {
+            var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ProcessAdvancedLiquidationsLog.txt");
+
+            var personalLogger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
+            // Registrar el inicio del procesamiento de liquidaciones avanzadas
+            personalLogger.Information("Iniciando Procesamiento de Liquidaciones Avanzadas");
+
+            try
+            {
+                // Agrupar las liquidaciones por código, mes, año y persona
+                var groupedLiquidations = await _context.liqdayxproject
+                    .GroupBy(l => new {l.ProjId, l.Day.Month, l.Day.Year, l.PersId })
+                    .ToListAsync();
+
+                int successfulLines = 0;
+                int failedLines = 0;
+
+                foreach (var group in groupedLiquidations)
+                {
+                    // Registrar la información del grupo
+                    personalLogger.Information($"Procesando liquidaciones para: ProjId={group.Key.ProjId}, Mes={group.Key.Month}, Año={group.Key.Year}, PersId={group.Key.PersId}");
+
+                    // Verificar si algún valor de estado en el grupo es 0
+                    bool shouldProcess = group.Any(l => l.Status == "0");
+
+                    if (shouldProcess)
+                    {
+                        // Sumar todos los PM en el grupo
+                        decimal totalPms = group.Sum(l => l.PMs);
+
+                        // Verificar si la persona está asociada al proyecto
+                        bool isAssociated = await _context.Projectxpeople
+                            .AnyAsync(p => p.ProjId == group.Key.ProjId && p.Person == group.Key.PersId);
+
+                        if (!isAssociated)
+                        {
+                            // Asociar la persona al proyecto
+                            var newProjectxperson = new Projectxperson
+                            {
+                                ProjId = group.Key.ProjId,
+                                Person = group.Key.PersId
+                            };
+                            _context.Projectxpeople.Add(newProjectxperson);
+                            await _context.SaveChangesAsync();
+
+                            // Registrar la asociación de la persona con el proyecto
+                            personalLogger.Information($"Asociada la persona {group.Key.PersId} con el proyecto {group.Key.ProjId}");
+                        }
+
+                        // Obtener el esfuerzo acumulado para la persona en el proyecto
+                        decimal accumulatedEffort = await _workCalendarService.GetEffortForPersonInProject(group.Key.PersId, group.Key.ProjId, group.Key.Year, group.Key.Month);
+
+                        if (accumulatedEffort >= totalPms)
+                        {
+                            // Establecer todas las líneas del grupo con estado 1
+                            foreach (var liquidation in group)
+                            {
+                                liquidation.Status = "1";
+                            }
+
+                            // Registrar el procesamiento exitoso de las liquidaciones
+                            personalLogger.Information($"Procesadas {group.Count()} líneas exitosamente");
+                            successfulLines += group.Count();
                         }
                         else
                         {
-                               _logger.LogWarning($"Duplicate entry for Liquidation {liquidation.Id} and Project {project.SapCode} on {currentDay:yyyy-MM-dd}. Skipping entry.");
+                            // Verificar si existe el WP de viajes para el proyecto
+                            var wpTravels = await _context.Wps.FirstOrDefaultAsync(w => w.ProjId == group.Key.ProjId && w.Name == "TRAVELS");
+                            
+                            if (wpTravels == null)
+                            {
+                                var project = await _context.Projects.FirstOrDefaultAsync(p => p.ProjId == group.Key.ProjId);
+                                // Crear el WP de viajes con la duración completa del proyecto
+                                wpTravels = new Wp
+                                {
+                                    ProjId = group.Key.ProjId,
+                                    Name = "TRAVELS",
+                                    StartDate = (DateTime)project.Start,
+                                    EndDate = (DateTime)project.EndReportDate,
+                                    Pms = 0
+                                };
+                                _context.Wps.Add(wpTravels);
+                                await _context.SaveChangesAsync();
+
+                                // Asociar la persona al WP de viajes
+                                var newWpxperson = new Wpxperson
+                                {
+                                    Wp = wpTravels.Id,
+                                    Person = group.Key.PersId
+                                };
+                                _context.Wpxpeople.Add(newWpxperson);
+                                await _context.SaveChangesAsync();
+
+                                // Registrar la creación del WP de viajes y la asociación con la persona
+                                personalLogger.Information($"Creado WP de viajes para el proyecto {group.Key.ProjId} y asociada la persona {group.Key.PersId}");
+                            }
+                            else
+                            {
+                                // Verificar si la persona está asociada al WP de viajes
+                                bool isAssociatedWithTravels = await _context.Wpxpeople
+                                    .AnyAsync(w => w.Wp == wpTravels.Id && w.Person == group.Key.PersId);
+
+                                if (!isAssociatedWithTravels)
+                                {
+                                    // Asociar la persona al WP de viajes
+                                    var newWpxperson = new Wpxperson
+                                    {
+                                        Wp = wpTravels.Id,
+                                        Person = group.Key.PersId
+                                    };
+                                    _context.Wpxpeople.Add(newWpxperson);
+                                    await _context.SaveChangesAsync();
+
+                                    // Registrar la asociación de la persona con el WP de viajes
+                                    personalLogger.Information($"Asociada la persona {group.Key.PersId} con el WP de viajes");
+                                }
+                            }
+                            //Comprobar si ya existe una línea de Perseffort para el mes
+                            var existingPerseffort = await _context.Persefforts
+                                .FirstOrDefaultAsync(p => p.WpxPerson == group.Key.PersId && p.Month == new DateTime(group.Key.Year, group.Key.Month, 1));
+
+                            if (existingPerseffort != null)
+                            {
+                                // Actualizar el valor existente
+                                existingPerseffort.Value += totalPms - accumulatedEffort;
+                            }
+                            else
+                            {
+                                // Obtener el ID de la persona en el WP de viajes
+                                var wpxpersonid = await _context.Wpxpeople
+                                    .Where(w => w.Wp == wpTravels.Id && w.Person == group.Key.PersId)
+                                    .Select(w => w.Id)
+                                    .FirstOrDefaultAsync();
+
+                                // Agregar una nueva línea de Perseffort para el mes
+                                var newPerseffort = new Perseffort
+                                {
+                                    WpxPerson = wpxpersonid,
+                                    Month = new DateTime(group.Key.Year, group.Key.Month, 1),
+                                    Value = totalPms - accumulatedEffort 
+                                };
+                                _context.Persefforts.Add(newPerseffort);
+                                await _context.SaveChangesAsync();
+
+                                // Establecer todas las líneas del grupo con estado 1
+                                foreach (var liquidation in group)
+                                {
+                                    liquidation.Status = "1";
+                                }
+
+                                // Registrar el procesamiento exitoso de las liquidaciones
+                                personalLogger.Information($"Procesadas {group.Count()} líneas exitosamente");
+                                successfulLines += group.Count();
+                            }
+                                                        
                         }
+                        await _context.SaveChangesAsync();
                     }
                 }
 
-                liquidation.Status = "3";
-                _logger.LogInformation($"Liquidation {liquidation.Id} processed successfully.");
-            }
+                // Registrar la finalización del procesamiento de liquidaciones avanzadas
+                personalLogger.Information("Procesamiento de Liquidaciones Avanzadas completado exitosamente");
 
-            await _context.SaveChangesAsync();
+                // Registrar el número total de líneas exitosas y fallidas
+                personalLogger.Information($"Total de líneas exitosas: {successfulLines}");
+                personalLogger.Information($"Total de líneas fallidas: {failedLines}");
+            }
+            catch (Exception ex)
+            {
+                // Registrar cualquier excepción que ocurra durante el procesamiento de liquidaciones avanzadas
+                personalLogger.Error(ex, "Error ocurrido durante el Procesamiento de Liquidaciones Avanzadas");
+            }
         }
+
+
+
+
+
 
         public async Task LoadPersonnelFromFileAsync(string filePath)
         {
-            var personalLogger = new LoggerConfiguration()
-                .MinimumLevel.Debug()
-                .WriteTo.File("CargaPersonalLog.txt", rollingInterval: RollingInterval.Day)
-                .CreateLogger();
-            var lines = await File.ReadAllLinesAsync(filePath);
-            foreach (var line in lines)
+            try
             {
-                var fields = line.Split('\t');
-                // Parsea el Id
-                if (!int.TryParse(fields[0], out int personnelId))
+                var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "CargaPersonnelLog.txt");
+
+                var personalLogger = new LoggerConfiguration()
+                    .MinimumLevel.Debug()
+                    .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                    .CreateLogger();
+                var lines = await File.ReadAllLinesAsync(filePath);
+                foreach (var line in lines)
                 {
-                    personalLogger.Error($"Failed to parse Personnel Id from field: {fields[0]}");
-                    continue;
-                }
-                var format = "yyyy-MM-dd HH:mm:ss.fff"; // Define el formato de fecha esperado
-
-                DateTime startDate, endDate;
-
-                // Intenta parsear la fecha de inicio
-                if (!DateTime.TryParseExact(fields[9], format, CultureInfo.InvariantCulture, DateTimeStyles.None, out startDate))
-                {
-                    personalLogger.Error($"Failed to parse Start Date for Personnel from field: {fields[9]}");
-                    continue;
-                }
-
-                // Intenta parsear la fecha de fin
-                if (!DateTime.TryParseExact(fields[5], format, CultureInfo.InvariantCulture, DateTimeStyles.None, out endDate))
-                {
-                    personalLogger.Error($"Failed to parse End Date for Personnel from field: {fields[5]}");
-                    continue;
-                }
-
-                var personnel = await _context.Personnel
-                                    .AsNoTracking()
-                                    .FirstOrDefaultAsync(p => p.Id == personnelId);
-                personalLogger.Information($"Attempting to add/update Personnel: {personnelId}");
-
-                int department = 0, resp, personnelGroup = 0, a3code = 0;
-                bool parseResp = int.TryParse(fields[7], out resp);
-
-                if (!parseResp)
-                {
-                    personalLogger.Error($"Failed to parse essential field Resp for Personnel {fields[3]} {fields[2]}");
-                    continue; // Si Resp es esencial y falla su parseo, continua con la siguiente línea
-                }
-
-                // Intenta parsear los campos opcionales con manejo de errores
-                if (!int.TryParse(fields[4], out department))
-                {
-                    personalLogger.Warning($"Failed to parse Department for Personnel {fields[3]} {fields[2]}");
-                }
-
-                if (!int.TryParse(fields[10], out personnelGroup))
-                {
-                    personalLogger.Warning($"Failed to parse PersonnelGroup for Personnel {fields[3]} {fields[2]}");
-                }
-
-                if (!int.TryParse(fields[13], out a3code))
-                {
-                    personalLogger.Warning($"Failed to parse A3Code for Personnel {fields[3]} {fields[2]}");
-                }
-
-                if (personnel == null)
-                {
-                    personnel = new Personnel
+                    var fields = line.Split('\t');
+                    // Parsea el Id
+                    if (!int.TryParse(fields[0], out int personnelId))
                     {
-                        Id = personnelId,
-                        Email = fields[1],
-                        Surname = fields[2],
-                        Name = fields[3],
-                        Department = department,
-                        EndDate = endDate,
-                        Category = fields[6],
-                        Resp = resp,
-                        StartDate = startDate,
-                        PersonnelGroup = personnelGroup,
-                        A3code = a3code,
-                        BscId = !string.IsNullOrWhiteSpace(fields[14]) ? fields[14] : null
-                    };
-                    _context.Personnel.Add(personnel);
-                    personalLogger.Information($"Personnel {personnel.Name} {personnel.Surname} added to database.");
-                }
-                else
-                {
-                    personnel.Surname = fields[2];
-                    personnel.Name = fields[3];
-                    personnel.Department = department;
-                    personnel.EndDate = endDate;
-                    personnel.Category = fields[6];
-                    personnel.Resp = resp;
-                    personnel.StartDate = startDate;
-                    personnel.PersonnelGroup = personnelGroup;
-                    personnel.A3code = a3code;
-                    if (!string.IsNullOrWhiteSpace(fields[14]))
-                    {
-                        personnel.BscId = fields[14];
+                        personalLogger.Error($"Failed to parse Personnel Id from field: {fields[0]}");
+                        continue;
                     }
-                    _context.Personnel.Update(personnel);
-                    personalLogger.Information($"Personnel {personnel.Name} {personnel.Surname} updated in database.");
+                    var format = "yyyy-MM-dd HH:mm:ss.fff"; // Define el formato de fecha esperado
+
+                    DateTime startDate, endDate;
+
+                    // Intenta parsear la fecha de inicio
+                    if (!DateTime.TryParseExact(fields[9], format, CultureInfo.InvariantCulture, DateTimeStyles.None, out startDate))
+                    {
+                        personalLogger.Error($"Failed to parse Start Date for Personnel from field: {fields[9]}");
+                        continue;
+                    }
+
+                    // Intenta parsear la fecha de fin
+                    if (!DateTime.TryParseExact(fields[5], format, CultureInfo.InvariantCulture, DateTimeStyles.None, out endDate))
+                    {
+                        personalLogger.Error($"Failed to parse End Date for Personnel from field: {fields[5]}");
+                        continue;
+                    }
+
+                    var personnel = await _context.Personnel
+                                        .AsNoTracking()
+                                        .FirstOrDefaultAsync(p => p.Id == personnelId);
+                    personalLogger.Information($"Attempting to add/update Personnel: {personnelId}");
+
+                    int department = 0, resp, personnelGroup = 0, a3code = 0;
+                    bool parseResp = int.TryParse(fields[7], out resp);
+
+                    if (!parseResp)
+                    {
+                        personalLogger.Error($"Failed to parse essential field Resp for Personnel {fields[3]} {fields[2]}");
+                        continue; // Si Resp es esencial y falla su parseo, continua con la siguiente línea
+                    }
+
+
+                    // Intenta parsear los campos opcionales con manejo de errores
+                    if (!int.TryParse(fields[4], out department))
+                    {
+                        department = 0;
+                        personalLogger.Warning($"Failed to parse Department for Personnel {fields[3]} {fields[2]}");
+                    }
+
+                    if (!int.TryParse(fields[10], out personnelGroup))
+                    {
+                        personnelGroup = 0;
+                        personalLogger.Warning($"Failed to parse PersonnelGroup for Personnel {fields[3]} {fields[2]}, setting default value to 0");
+                    }
+
+                    if (!int.TryParse(fields[13], out a3code))
+                    {
+                        a3code = 0;
+                        personalLogger.Warning($"Failed to parse A3Code for Personnel {fields[3]} {fields[2]}, setting default value to 0");
+                    }
+
+                    if (personnel == null)
+                    {
+                        personnel = new Personnel
+                        {
+                            Id = personnelId,
+                            Email = fields[1],
+                            Surname = fields[2],
+                            Name = fields[3],
+                            Department = department,
+                            EndDate = endDate,
+                            Category = fields[6],
+                            Resp = resp,
+                            StartDate = startDate,
+                            PersonnelGroup = personnelGroup,
+                            A3code = a3code,
+                            BscId = !string.IsNullOrWhiteSpace(fields[14]) ? fields[14] : null,
+                            UserId = null,
+                            Password = string.Empty, // Set an empty string instead of null
+                            PermissionLevel = null
+                        };
+                        _context.Personnel.Add(personnel);
+                        personalLogger.Information($"Personnel {personnel.Name} {personnel.Surname} added to database.");
+                    }
+                    else
+                    {
+                        personnel.Surname = fields[2];
+                        personnel.Name = fields[3];
+                        personnel.Department = department;
+                        personnel.EndDate = endDate;
+                        personnel.Category = fields[6];
+                        personnel.Resp = resp;
+                        personnel.StartDate = startDate;
+                        personnel.PersonnelGroup = personnelGroup;
+                        personnel.A3code = a3code;
+                        if (!string.IsNullOrWhiteSpace(fields[14]))
+                        {
+                            personnel.BscId = fields[14];
+                        }
+                        // No se actualizan los campos UserId, Password y PermissionLevel
+                        _context.Personnel.Update(personnel);
+                        personalLogger.Information($"Personnel {personnel.Name} {personnel.Surname} updated in database.");
+                    }
                 }
+
+                await _context.SaveChangesAsync(); // Guardar todos los cambios en la base de datos
+                personalLogger.Information("Carga de personal finalizada.");
+                personalLogger.Dispose();
             }
-            
-            await _context.SaveChangesAsync(); // Guardar todos los cambios en la base de datos
-            personalLogger.Information("Carga de personal finalizada.");
-            personalLogger.Dispose();
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+            }
         }
 
         // Carga las afiliaciones y dedicaciones desde un archivo
@@ -1035,6 +1348,9 @@ namespace TRS2._0.Services
                     break;
                 case "ProcessLiquidations":
                     await ProcessLiquidationsAsync(); 
+                    break;
+                case "ProcessLiquidationsAdvanced":
+                    await ProcessAdvancedLiquidationsAsync();
                     break;
                 case "LoadPersonnelFromFile":
                     var filePath2 = dataMap.GetString("FilePath"); // Asumir que "FilePath" también se pasa como parámetro
