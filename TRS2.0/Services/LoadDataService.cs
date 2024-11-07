@@ -269,7 +269,11 @@ namespace TRS2._0.Services
                             }
                             else
                             {
-                                personalLogger.Warning($"Advertencia en liquidación {liquidation.Id}: Project1 y Project2 son iguales pero la suma de sus dedicaciones es menor o igual a 100. Procesando Liquidacion");                                
+                                personalLogger.Warning($"Advertencia en liquidación {liquidation.Id}: Project1 y Project2 son iguales pero la suma de sus dedicaciones es menor o igual a 100. Procesando Liquidacion");
+
+                                // Actualizar Project1 con la suma de las dedicaciones
+                                liquidation.Dedication1 = dedicationSum;
+                                liquidation.Project2 = null;
                             }
                         }
 

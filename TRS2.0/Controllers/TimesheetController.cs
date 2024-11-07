@@ -944,23 +944,24 @@ namespace TRS2._0.Controllers
                                         });
 
                                         // Añadiendo filas de ejemplo
-                                        for (int i = 1; i <= 4; i++)
-                                        {
-                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"Liq-{i}").FontSize(8);
-                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"Project-{i}").FontSize(8);
-                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{i * 10.0}%").FontSize(8);
-                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"2024-01-{i:02}").FontSize(8);
-                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"2024-01-{i + 1:02}").FontSize(8);
-                                        }
-                                        // Filas de la tabla con los datos de viaje
-                                        //foreach (var travel in model.TravelsthisMonth)
+                                        //for (int i = 1; i <= 4; i++)
                                         //{
-                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.LiqId}").FontSize(8);
-                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.ProjectSAPCode} - {travel.ProjectAcronimo}").FontSize(8);
-                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.Dedication:0.0}%").FontSize(8);
-                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.StartDate:dd/MM/yyyy}").FontSize(8);
-                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.EndDate:dd/MM/yyyy}").FontSize(8);
+                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"Liq-{i}").FontSize(8);
+                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"Project-{i}").FontSize(8);
+                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{i * 10.0}%").FontSize(8);
+                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"2024-01-{i:02}").FontSize(8);
+                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"2024-01-{i + 1:02}").FontSize(8);
                                         //}
+
+                                        //Filas de la tabla con los datos de viaje
+                                        foreach (var travel in model.TravelsthisMonth)
+                                        {
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.LiqId}").FontSize(8);
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.ProjectSAPCode} - {travel.ProjectAcronimo}").FontSize(8);
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.Dedication:0.0}%").FontSize(8);
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.StartDate:dd/MM/yyyy}").FontSize(8);
+                                            table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.EndDate:dd/MM/yyyy}").FontSize(8);
+                                        }
                                     });
                                 });
                             });
