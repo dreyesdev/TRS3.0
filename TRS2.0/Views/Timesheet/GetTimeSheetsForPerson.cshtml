@@ -119,6 +119,7 @@
                                 var isFuture = day.Date > DateTime.Now.Date;
                                 var isHoliday = Model.Holidays.Any(h => h.Date == day.Date);
                                 var cellStyle = "";
+                                var hasTravelforthisProject = Model.TravelsthisMonth.Any(t => day.Date >= t.StartDate && day.Date <= t.EndDate && t.ProjId == wp.ProjectId);
 
                                 // Define el estilo de la celda según las condiciones dadas
                                 if (isHoliday)
@@ -150,7 +151,7 @@
                                 }
 
                                 <td class="hour-input-cell" style="@cellStyle">
-                                    @if (!wp.IsLocked && !isWeekend && leave == null && !hasTravel && !isFuture && !isHoliday)
+                                    @if (!wp.IsLocked && !isWeekend && leave == null && !hasTravel  && !isFuture && !isHoliday)
                                     {
                                         var timesheetEntry = wp.Timesheets.FirstOrDefault(ts => ts.Day.Date == day.Date);
                                         <input type="text" class="form-control input-hours"

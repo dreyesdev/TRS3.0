@@ -642,11 +642,11 @@ namespace TRS2._0.Controllers
                                          .Select(wpx => new PersonnelEffort
                                          {
                                              PersonId = wpx.Person,
-                                             PersonName = wpx.PersonNavigation.Name + " " + wpx.PersonNavigation.Surname,
+                                             PersonName = wpx.PersonNavigation.Surname + ", " + wpx.PersonNavigation.Name,
                                              Efforts = persefforts.Where(pe => pe.WpxPerson == wpx.Id)
                                                                   .ToDictionary(pe => pe.Month, pe => pe.Value),
                                              EffortId = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id)?.Code ?? 0
-                                         }).ToList()
+                                         }).OrderBy(pe => pe.PersonName).ToList()
                 }).ToList()
             };
             _logger.LogInformation($"Filtrado completo de datos procesado en {stopwatch.ElapsedMilliseconds} ms total");
