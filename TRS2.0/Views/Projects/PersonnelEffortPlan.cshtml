@@ -28,7 +28,7 @@
         @if (Model.WorkPackages.Any())
         {
             <div class="scrollable-table-container">
-            <table class="table table-bordered table-striped table-hover">
+                <table id="effortPlanTable" class="table table-bordered table-striped table-hover">
                 <thead class="thead-dark">
                     <tr>
                         <th>
@@ -180,7 +180,7 @@
             </div>
             <hr> <!-- Línea divisoria -->
             <div class="legend" style="display: flex; justify-content: space-around; padding: 10px;">
-                <div><span style="height: 20px; width: 20px; background-color: lightsalmon; display: inline-block;"></span> Leave</div>
+                <div><span style="height: 20px; width: 20px; background-color: darkorange; display: inline-block;"></span> Leave</div>
                 <div><span style="height: 20px; width: 20px; background-color: lightblue; display: inline-block;"></span> Holiday</div>
                 <div><span style="height: 20px; width: 20px; background-color: yellow; display: inline-block;"></span> Overload</div>
                 <div><span style="height: 20px; width: 20px; background-color: red; display: inline-block;"></span> Out of Contract</div>
@@ -379,6 +379,38 @@ else
             document.body.removeChild(link);
         });
 
+        $(document).ready(function () {
+            var table = $('#effortPlanTable tbody');
+            var rows = table.find('tr').get();
+
+            rows.sort(function (a, b) {
+                var personA = $(a).find('td').eq(0).text().toUpperCase();
+                var personB = $(b).find('td').eq(0).text().toUpperCase();
+                var wpA = $(a).find('td').eq(1).text().toUpperCase().trim();
+                var wpB = $(b).find('td').eq(1).text().toUpperCase().trim();
+
+                if (personA < personB) return -1;
+                if (personA > personB) return 1;
+                console.log(wpA);
+                console.log(wpB);
+                if (wpA === 'TRAVELS') {
+                    console.log('Bajo Fila');
+                    return 1;
+                }
+                if (wpB === 'TRAVELS') { 
+                    console.log('Subo Fila');
+                return -1;
+                }
+                if (wpA < wpB) return -1;
+                if (wpA > wpB) return 1;
+
+                return 0;
+            });
+
+            $.each(rows, function (index, row) {
+                table.append(row);
+            });
+        });
 
     
 

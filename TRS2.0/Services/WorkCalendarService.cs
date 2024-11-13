@@ -402,7 +402,7 @@ public class WorkCalendarService
                     {
                         case 1: // Leave
                             additionalStatuses.Add(3);
-                            gradientParts.Add("lightsalmon");
+                            gradientParts.Add("darkorange");
                             break;
                         case 2: // Personal Holiday
                             additionalStatuses.Add(4);

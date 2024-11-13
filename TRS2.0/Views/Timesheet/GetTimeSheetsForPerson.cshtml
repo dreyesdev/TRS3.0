@@ -139,7 +139,7 @@
                                     switch (leave.Type)
                                     {
                                         case 1:
-                                            cellStyle = "background-color: lightsalmon;";
+                                            cellStyle = "background-color: darkorange;";
                                             break;
                                         case 2:
                                             cellStyle = "background-color: lightblue;";
@@ -151,7 +151,7 @@
                                 }
 
                                 <td class="hour-input-cell" style="@cellStyle">
-                                    @if (!wp.IsLocked && !isWeekend && leave == null && !hasTravel  && !isFuture && !isHoliday)
+                                    @if (!wp.IsLocked && !isWeekend && leave == null && (!hasTravel || hasTravelforthisProject) && !isFuture && !isHoliday)
                                     {
                                         var timesheetEntry = wp.Timesheets.FirstOrDefault(ts => ts.Day.Date == day.Date);
                                         <input type="text" class="form-control input-hours"
