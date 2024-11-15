@@ -465,9 +465,15 @@ namespace TRS2._0.Services
                                     personalLogger.Information($"Asociada la persona {group.Key.PersId} con el WP de viajes");
                                 }
                             }
+                            // Obtener el ID de la persona en el WP de viajes
+                            var wpxpersonid = await _context.Wpxpeople
+                                .Where(w => w.Wp == wpTravels.Id && w.Person == group.Key.PersId)
+                                .Select(w => w.Id)
+                                .FirstOrDefaultAsync();
+
                             //Comprobar si ya existe una línea de Perseffort para el mes
                             var existingPerseffort = await _context.Persefforts
-                                .FirstOrDefaultAsync(p => p.WpxPerson == group.Key.PersId && p.Month == new DateTime(group.Key.Year, group.Key.Month, 1));
+                                .FirstOrDefaultAsync(p => p.WpxPerson == wpxpersonid && p.Month == new DateTime(group.Key.Year, group.Key.Month, 1));
 
                             if (existingPerseffort != null)
                             {
@@ -476,11 +482,7 @@ namespace TRS2._0.Services
                             }
                             else
                             {
-                                // Obtener el ID de la persona en el WP de viajes
-                                var wpxpersonid = await _context.Wpxpeople
-                                    .Where(w => w.Wp == wpTravels.Id && w.Person == group.Key.PersId)
-                                    .Select(w => w.Id)
-                                    .FirstOrDefaultAsync();
+                                
 
                                 // Agregar una nueva línea de Perseffort para el mes
                                 var newPerseffort = new Perseffort

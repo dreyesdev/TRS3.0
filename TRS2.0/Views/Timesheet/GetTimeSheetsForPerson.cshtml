@@ -7,7 +7,7 @@
     var monthName = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(@Model.CurrentMonth);
     var monthNameCapitalized = char.ToUpper(monthName[0]) + monthName.Substring(1);
 }    
-
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
 <div class="container-fluid" style="max-width: 2000px;  padding-right: 5; padding-left: 5; margin-right: auto; margin-left: auto;">
     <h2 style="margin-bottom: 0;">Timesheet for @Model.Person.Name @Model.Person.Surname - @monthNameCapitalized @Model.CurrentYear</h2>
     <!-- Sección de controles para cambiar de mes, con el selector de fechas en el centro -->
@@ -19,7 +19,7 @@
 
             <!-- Selectores de Mes y Año -->
             <select id="monthSelect" class="form-control mx-2">
-                <option value="">Seleccione mes para cambiar...</option>
+                <option value="">Select the month</option>
                 <option value="1">Enero</option>
                 <option value="2">Febrero</option>
                 <option value="3">Marzo</option>
@@ -34,7 +34,7 @@
                 <option value="12">Diciembre</option>
             </select>
             <select id="yearSelect" class="form-control mx-2">
-                <option value="">Seleccione año para cambiar...</option>
+                <option value="">Select the year</option>
                 @for (int year = DateTime.Now.Year - 10; year <= DateTime.Now.Year + 10; year++)
                 {
                     <option value="@year">@year</option>
@@ -74,8 +74,8 @@
                 <thead class="thead-dark">
                     <tr>
                         <th class="sticky-column sticky-header">
-                            <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">Proyecto - Acrónimo</div>
-                            <div style="text-align: center;">Wp - Título</div>
+                            <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">Project - Acronim</div>
+                            <div style="text-align: center;">WP - Title</div>
 
                         </th>
                         @* <th>Dedication - Estimated Hours</th> *@
@@ -101,8 +101,8 @@
                         <tr>
                             <td class="single-line-cell sticky-column">
                                 
-                                <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">@wp.ProjectSAPCode (@wp.ProjectName)</div>
-                                <div style="text-align: center;">@wp.WpName @wp.WpTitle</div>
+                                <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">@wp.ProjectSAPCode - (@wp.ProjectName)</div>
+                                <div style="text-align: center;">@wp.WpName - @wp.WpTitle</div>
 
                             </td>
 
@@ -256,26 +256,26 @@
 <hr/>
 <div class="below-main-table" style="display: flex; justify-content: space-between; margin-top: 20px;">
 <div class="legend-box" style="width: 300px; margin-left:10px; padding: 10px; margin-top: 20px; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,.1);">
-    <h4 style="margin-bottom: 20px; text-align: center; font-weight: bold">Leyenda</h4>
+    <h4 style="margin-bottom: 20px; text-align: center; font-weight: bold">Leyend</h4>
     <div class="mb-2">
-        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: lightsalmon; border: 1px solid black;">&nbsp;</span>
-        <span style="margin-left: 8px;">Ausencia</span>
+        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: darkorange; border: 1px solid black;">&nbsp;</span>
+        <span style="margin-left: 8px;">Leave</span>
     </div>
     <div class="mb-2">
         <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: lightblue; border: 1px solid black;">&nbsp;</span>
-        <span style="margin-left: 8px;">Vacaciones</span>
+        <span style="margin-left: 8px;">Holiday</span>
     </div>
     <div class="mb-2">
-        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: purple; border: 1px solid black;">&nbsp;</span>
-        <span style="margin-left: 8px;">Fuera de contrato</span>
+        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: red; border: 1px solid black;">&nbsp;</span>
+        <span style="margin-left: 8px;">Out of contract</span>
     </div>
     <div class="mb-2">
         <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: lightgreen; border: 1px solid black;">&nbsp;</span>
-        <span style="margin-left: 8px;">Días de viaje</span>
+        <span style="margin-left: 8px;">Travel</span>
     </div>
         <div class="mb-2">
             <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: #FFD700; border: 1px solid black;">&nbsp;</span>
-            <span style="margin-left: 8px;">Fiestas Nacionales</span>
+            <span style="margin-left: 8px;">National Holiday</span>
         </div>
 </div>
     <div class="travel-table-container" style="flex-grow: 1; overflow-x: auto; margin-left: 20px; margin-right:20px;">
@@ -283,9 +283,9 @@
         <table class="table table-bordered" style="min-width: 600px;">
             <thead>
                 <tr>
-                    <th>Id de la liquidación</th>
-                    <th>Proyecto</th>
-                    <th>Dedicación</th>
+                    <th>Liquidation Id</th>
+                    <th>Projecto</th>
+                    <th>Dedication</th>
                     <th>StartDate</th>
                     <th>EndDate</th>
                 </tr>
@@ -434,6 +434,37 @@
                 alert('No changes to save.');
             }
         }
+    });
+
+    $(document).ready(function () {
+        var table = $('#timesheetTable tbody');
+        var rows = table.find('tr').get();
+
+        rows.sort(function (a, b) {
+            var projectA = $(a).find('td').eq(0).find('div').eq(0).text().match(/\(([^)]+)\)/)[1].toUpperCase();
+            var projectB = $(b).find('td').eq(0).find('div').eq(0).text().match(/\(([^)]+)\)/)[1].toUpperCase();
+            var wpA = $(a).find('td').eq(0).find('div').eq(1).text().split(' ')[0].toUpperCase();
+            var wpB = $(b).find('td').eq(0).find('div').eq(1).text().split(' ')[0].toUpperCase();
+                        
+            // Ordenar por ProjectName
+            if (projectA < projectB) return -1;
+            if (projectA > projectB) return 1;
+
+            // Ordenar por WpName, pero mantener "TRAVELS" al final
+            if (wpA === 'TRAVELS') return 1;
+            if (wpB === 'TRAVELS') return -1;
+
+            if (wpA < wpB) return -1;
+            if (wpA > wpB) return 1;
+
+            return 0;
+        });
+
+        
+
+        $.each(rows, function (index, row) {
+            table.append(row);
+        });
     });
 </script>
 

@@ -5,12 +5,12 @@
     <table class="table table-bordered table-striped table-hover">
         <thead class="thead-dark">
             <tr>
-                <th class="nombre-columna">Nombre</th>
+                <th class="nombre-columna text-center">Nombre</th>
                 @foreach (var monthDetail in Model.MonthDetails)
                 {
-                    <th>
-                        <div style="border-bottom: 1px solid white; margin-bottom: 2px; margin-top: 8px; text-align: center">@monthDetail.Key</div>
-                        <div style="text-align: center">@monthDetail.Value</div>
+                    <th class="text-center">
+                        <div style="border-bottom: 1px solid white; margin-bottom: 2px; margin-top: 8px; text-align: center; font-weight: bold;">@monthDetail.Key</div>
+                        <div style="text-align: center; font-weight: bold;">@monthDetail.Value</div>
                     </th>
                 }
             </tr>
@@ -19,7 +19,7 @@
             @foreach (var person in Model.Persons)
             {
                 <tr>
-                    <td>@(person.Personnel.Name + " " + person.Personnel.Surname)</td>
+                    <td class="font-weight-bold">@person.Personnel.Name @person.Personnel.Surname</td>
                     @foreach (var monthDetail in Model.MonthDetails)
                     {
                         var monthDate = DateTime.Parse(monthDetail.Value);
@@ -73,10 +73,10 @@
                             {
                                 @if (isLocked)
                                 {
-                                    <div class="d-flex justify-content-between align-items-center mt-2">
-                                        <button class="btn btn-danger" onclick="updateLockStatus('@person.Personnel.Id', '@monthDate.Year', '@monthDate.Month', '@ViewBag.ProjectId', '@ViewBag.PeriodId', '/Projects/Unlock')">Desbloquear</button>
+                                    <div class="button-container mt-2">
+                                        <button class="btn btn-danger w-100" onclick="updateLockStatus('@person.Personnel.Id', '@monthDate.Year', '@monthDate.Month', '@ViewBag.ProjectId', '@ViewBag.PeriodId', '/Projects/Unlock')">Desbloquear</button>
                                         <!-- Enlace para descargar el Timesheet como PDF -->
-                                        <a href="@Url.Action("ExportTimesheetToPdf2", "Timesheet", new { personId = person.Personnel.Id, year = monthDate.Year, month = monthDate.Month, project = @ViewBag.ProjectId })" class="btn btn-info" style="margin-left: 8px;">Timesheet</a>
+                                        <a href="@Url.Action("ExportTimesheetToPdf2", "Timesheet", new { personId = person.Personnel.Id, year = monthDate.Year, month = monthDate.Month, project = @ViewBag.ProjectId })" class="btn btn-info w-100 mt-2">Timesheet</a>
                                     </div>
                                 }
                                 else
@@ -95,8 +95,36 @@
 <style>
     .nombre-columna {
         min-width: 200px; /* Ajusta según necesites */
+
     }
+
+    .table {
+        max-height: 800px; /* Ajusta esto según la altura deseada */
+        overflow-y: auto;
+        overflow-x: auto; /* Habilita el scroll horizontal */
+        max-width: 1200px; /* Ancho máximo para la tabla */
+        margin: 0 auto; /* Centra la tabla horizontalmente */
+    }
+
+        .table th, .table td {
+            max-width: 150px; /* Ancho máximo para las columnas */
+            max-height: 100px; /* Altura máxima para las filas */
+            overflow: hidden; /* Oculta el contenido que exceda el tamaño */
+            text-overflow: ellipsis; /* Añade puntos suspensivos al contenido que exceda el tamaño */
+            white-space: nowrap; /* Evita que el texto se divida en varias líneas */
+        }
+
+    .button-container {
+        display: flex;
+        flex-direction: column;
+    }
+
+        .button-container .btn {
+            margin-bottom: 5px; /* Espacio entre los botones */
+        }
 </style>
+
+
 
 <script>
     function updateLockStatus(personId, year, month, projectId, periodId, actionUrl) {

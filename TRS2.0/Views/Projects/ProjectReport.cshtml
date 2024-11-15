@@ -12,7 +12,7 @@
     int index = 1; // Inicializa el contador
     
 }
-
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
 
 
 
@@ -66,6 +66,12 @@
                         <div class="row detail-item">
                             <dt class="col-sm-4 text-sm-right">Project Manager</dt>
                             <dd class="col-sm-8 d-inline-block">@ViewBag.PmFullName</dd>
+                        </div>
+                    </dl>
+                    <dl class="row detail-item">
+                        <div class="row detail-item">
+                            <dt class="col-sm-4 text-sm-right">Finance Manager</dt>
+                            <dd class="col-sm-8 d-inline-block">@ViewBag.FmFullName</dd>
                         </div>
                     </dl>
                     <dl class="row detail-item">
@@ -196,22 +202,22 @@
                             <th style="text-align: center; background-color: black; color: white;">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        @foreach (var reportPeriod in Model.ReportPeriods)
-                        {
-                            int startMonth = ((reportPeriod.StartDate.Year - Model.Project.Start.Value.Year) * 12) + reportPeriod.StartDate.Month - Model.Project.Start.Value.Month + 1;
-                            int endMonth = ((reportPeriod.EndDate.Year - Model.Project.Start.Value.Year) * 12) + reportPeriod.EndDate.Month - Model.Project.Start.Value.Month + 1;
-                            <tr>
-                                <td class="periodo" data-periodo-id="@reportPeriod.Id" style="text-align: center;" data-index="@index">P @index</td>
-                                <td style="text-align: center;">@reportPeriod.StartDate.ToString("dd-MM-yyyy") / @reportPeriod.EndDate.ToString("dd-MM-yyyy")</td>
-                                <td style="text-align: center;">M @startMonth / M @endMonth</td>
-                                <td style="text-align: center;">
-                                    <button type="button" class="btn btn-danger" onclick="deleteReportPeriod(@reportPeriod.Id)">Delete</button>
-                                </td>
-                            </tr>
-                                index++;
-                        }
-                    </tbody>
+                    @foreach (var reportPeriod in Model.ReportPeriods)
+                    {
+                        int startMonth = ((reportPeriod.StartDate.Year - Model.Project.Start.Value.Year) * 12) + reportPeriod.StartDate.Month - Model.Project.Start.Value.Month + 1;
+                        int endMonth = ((reportPeriod.EndDate.Year - Model.Project.Start.Value.Year) * 12) + reportPeriod.EndDate.Month - Model.Project.Start.Value.Month + 1;
+                        <tr>
+                            <td class="periodo" data-periodo-id="@reportPeriod.Id" style="text-align: center;" data-index="@index">
+                                <button type="button" class="btn btn-primary btn-block font-weight-bold">@($"P {index}")</button>
+                            </td>
+                            <td style="text-align: center;">@reportPeriod.StartDate.ToString("dd-MM-yyyy") / @reportPeriod.EndDate.ToString("dd-MM-yyyy")</td>
+                            <td style="text-align: center;">M @startMonth / M @endMonth</td>
+                            <td style="text-align: center;">
+                                <button type="button" class="btn btn-danger" onclick="deleteReportPeriod(@reportPeriod.Id)">Delete</button>
+                            </td>
+                        </tr>
+                        index++;
+                    }
                 </table>
             </div>
         </div>
@@ -239,9 +245,9 @@
 
 </div>
 </div>
-<div id="detallesPeriodoContainer"></div>
+<div id="detallesPeriodoContainer" class="table-container-period"></div>
 
-<script src="~/lib/jquery/dist/jquery.min.js"></script>
+
 <script>
 
     $(document).ready(function () {
@@ -418,5 +424,12 @@
         .table-hover tbody tr:hover {
             background-color: #f5f5f5; /* Cambia este color según tus preferencias */
         }
+
+    .table-container-period {
+        max-width: 1600px;
+        margin: 0 auto; /* Centra la tabla horizontalmente */
+    }
+
+    
     </style>
 
