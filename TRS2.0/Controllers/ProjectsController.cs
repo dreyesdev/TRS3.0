@@ -1664,7 +1664,27 @@ namespace TRS2._0.Controllers
             }
         }
 
+        public JsonResult GetAffiliation(int personId)
+        {
+            // Implementa la lógica para obtener el valor de Affiliation de la tabla personnel
+            var affiliation = _context.Personnel
+                .Where(p => p.Id == personId)
+                .Select(p => p.Affiliation)
+                .FirstOrDefault();
 
+            return Json(affiliation);
+        }
+
+        public JsonResult GetMaxAnnualHours(int affiliation, int año)
+        {
+            // Implementa la lógica para obtener el valor de horas máximas anuales de la tabla AffGlobalHours
+            var maxAnnualHours = _context.AffGlobalHours
+                .Where(a => a.Aff == affiliation && a.Year == año)
+                .Select(a => a.Hours)
+                .FirstOrDefault();
+
+            return Json(maxAnnualHours);
+        }
 
 
 

@@ -27,13 +27,15 @@
                         decimal hoursInProject = person.HoursinProyect.ContainsKey(monthDate) ? person.HoursinProyect[monthDate] : 0;
                         decimal completionPercentage = person.CompletionPercentage.ContainsKey(monthDate) ? person.CompletionPercentage[monthDate] : 0;
                         decimal totalEffort = person.TotalEffortinProyect.ContainsKey(monthDate) ? person.TotalEffortinProyect[monthDate] : 0;
+                        int personnelId = person.Personnel.Id;
+                        int year = monthDate.Year;
 
                         var statusKey = $"{monthDate.Year}-{monthDate.Month:D2}";
                         var status = person.PersonStatusByMonth.ContainsKey(statusKey) ? person.PersonStatusByMonth[statusKey] : (OutOfContract: false, Overloaded: false);
                         var isLocked = person.LockStatusByMonth.ContainsKey(statusKey) && person.LockStatusByMonth[statusKey];
                         var backgroundColor = status.OutOfContract ? "#FF8C00" : (status.Overloaded ? "#FFFF00" : "");
 
-                        <td style="background-color: @backgroundColor; padding: 4px; vertical-align: top;" data-declared-hours="@declaredHours" data-hours-in-project="@hoursInProject" data-total-effort="@totalEffort">
+                        <td style="background-color: @backgroundColor; padding: 4px; vertical-align: top;" data-declared-hours="@declaredHours" data-hours-in-project="@hoursInProject" data-total-effort="@totalEffort" personId="@personnelId" year="@year">
                             <div class="d-flex justify-content-center align-items-center" style="flex-grow: 1; font-size: 0.875rem; font-weight:bold;">
                                 <span>@declaredHours | @hoursInProject</span>
                             </div>

@@ -238,7 +238,7 @@
     <!-- Botón para exportar PMs por WP a CSV -->
     <button type="button" class="btn btn-success" id="exportPMSforWPToCSV" onclick="exportPMSforWPToCSV()" style="display:none;">Exportar PMs por WP a CSV</button>
     <!-- Botón para exportar PMs Auditoria -->
-    <button type="button" class="btn btn-success" id="exportPMSforAuditoria" onclick="exportPMSforAuditoria()" style="display:none;">Exportar PMs Auditoria</button>
+    <button type="button" class="btn btn-success" id="exportPMSforAuditoria" onclick="exportPMSforAuditoriaToCSV()" style="display:none;">Exportar PMs Auditoria</button>
 </div>
 
 
@@ -407,8 +407,70 @@
             .catch(error => console.error('Error:', error));
     }
 
+    function exportPMSforAuditoriaToCSV() {
+        var csvContent = "data:text/csv;charset=utf-8,";
+        var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
 
+        rows.forEach(function (row) {
+            var cols = row.querySelectorAll('th, td');
+            var rowData = [];
+            cols.forEach(function (col) {
+                var declaredHours = col.getAttribute('data-declared-hours');
+                var year = col.getAttribute('year');
+                var personid = col.getAttribute('personId');
+                var affiliation = getAffiliation(personid);
+                var maxAnnualHours = getMaxAnnualHours(affiliation, year);
+                var pmsPercentage = calculatePercentage(declaredHours, maxAnnualHours);
+                if (pmsPercentage) {
+                    rowData.push(`${pmsPercentage}`);
+                } else {
+                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim());
+                }
+            });
+            csvContent += rowData.join(";") + "\r\n";
+        });
 
+        var encodedUri = encodeURI(csvContent);
+        var link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "PMsAuditoria.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function getAffiliation(personid) {
+        var affiliation = 0;
+        $.ajax({
+            url: '@Url.Action("GetAffiliation", "Projects")',
+            type: 'GET',
+            data: { personid: personid },
+            async: false,
+            success: function (data) {
+                affiliation = data;
+            }
+        });
+        return affiliation;
+    }
+
+    function getMaxAnnualHours(affiliation, year) {
+        var maxAnnualHours = 0;
+        $.ajax({
+            url: '@Url.Action("GetMaxAnnualHours", "Projects")',
+            type: 'GET',
+            data: { affiliation: affiliation, year: year },
+            async: false,
+            success: function (data) {
+                maxAnnualHours = data;
+            }
+        });
+        return maxAnnualHours;
+    }
+
+    function calculatePercentage(declaredHours, maxAnnualHours) {
+        var maxHoursPerMonth = maxHours / 12;
+        return (declaredHours / maxHoursPerMonth).toFixed(1);
+    }
 </script>
 
 
