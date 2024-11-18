@@ -237,6 +237,8 @@
     <button type="button" class="btn btn-success" id="exportPMsBtn" onclick="exportPMsToCSV()" style="display:none;">Exportar PMs a CSV</button>
     <!-- Botón para exportar PMs por WP a CSV -->
     <button type="button" class="btn btn-success" id="exportPMSforWPToCSV" onclick="exportPMSforWPToCSV()" style="display:none;">Exportar PMs por WP a CSV</button>
+    <!-- Botón para exportar PMs Auditoria -->
+    <button type="button" class="btn btn-success" id="exportPMSforAuditoria" onclick="exportPMSforAuditoria()" style="display:none;">Exportar PMs Auditoria</button>
 </div>
 
 
@@ -266,6 +268,7 @@
                     $('#exportHoursBtn').show(); // Mostrar el botón de exportar horas
                     $('#exportPMsBtn').show(); // Mostrar el botón de exportar PMs
                     $('#exportPMSforWPToCSV').show(); // Mostrar el botón de exportar PMs por WP
+                    $('#exportPMSforAuditoria').show(); // Mostrar el botón de exportar PMs Auditoria
 
                     // Guardar las fechas del periodo seleccionado
                     $('#exportPMSforWPToCSV').data('start-date', startDate);

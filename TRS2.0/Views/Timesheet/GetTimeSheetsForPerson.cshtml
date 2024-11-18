@@ -124,11 +124,11 @@
                                 // Define el estilo de la celda según las condiciones dadas
                                 if (isHoliday)
                                 {
-                                    cellStyle = "background-color: #FFD700;";
+                                    cellStyle = "background-color: green;";
                                 }
                                 else if (hasTravel && !isFuture)
                                 {
-                                    cellStyle = "background-color: lightgreen;";
+                                    cellStyle = "background-color: pink;";
                                 }
                                 else if (isWeekend || isFuture)
                                 {
@@ -270,11 +270,11 @@
         <span style="margin-left: 8px;">Out of contract</span>
     </div>
     <div class="mb-2">
-        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: lightgreen; border: 1px solid black;">&nbsp;</span>
+        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: pink; border: 1px solid black;">&nbsp;</span>
         <span style="margin-left: 8px;">Travel</span>
     </div>
         <div class="mb-2">
-            <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: #FFD700; border: 1px solid black;">&nbsp;</span>
+            <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: green; border: 1px solid black;">&nbsp;</span>
             <span style="margin-left: 8px;">National Holiday</span>
         </div>
 </div>
@@ -307,7 +307,7 @@
                 else
                 {
                     <tr>
-                        <td colspan="5">No hay viajes registrados para este mes</td>
+                        <td colspan="5">There are no trips registered for this month</td>
                     </tr>
                 }
             </tbody>
