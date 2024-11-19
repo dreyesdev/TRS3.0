@@ -408,68 +408,42 @@
     }
 
     function exportPMSforAuditoriaToCSV() {
-        var csvContent = "data:text/csv;charset=utf-8,";
-        var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+        var projectId = @ViewBag.projId;
+        var startDate = $('#exportPMSforWPToCSV').data('start-date');
+        var endDate = $('#exportPMSforWPToCSV').data('end-date');
 
-        rows.forEach(function (row) {
-            var cols = row.querySelectorAll('th, td');
-            var rowData = [];
-            cols.forEach(function (col) {
-                var declaredHours = col.getAttribute('data-declared-hours');
-                var year = col.getAttribute('year');
-                var personid = col.getAttribute('personId');
-                var affiliation = getAffiliation(personid);
-                var maxAnnualHours = getMaxAnnualHours(affiliation, year);
-                var pmsPercentage = calculatePercentage(declaredHours, maxAnnualHours);
-                if (pmsPercentage) {
-                    rowData.push(`${pmsPercentage}`);
-                } else {
-                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim());
+        // Convertir las fechas al formato ISO 8601 (yyyy-MM-dd)
+        var startDateISO = new Date(startDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+        var endDateISO = new Date(endDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+
+        // Verificar los valores antes de enviarlos
+        console.log("Project ID:", projectId);
+        console.log("Start Date (ISO):", startDateISO);
+        console.log("End Date (ISO):", endDateISO);
+
+        fetch('@Url.Action("ExportPmsAuditoria", "Projects")', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ProjectId: projectId, StartDate: startDateISO, EndDate: endDateISO })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
                 }
-            });
-            csvContent += rowData.join(";") + "\r\n";
-        });
-
-        var encodedUri = encodeURI(csvContent);
-        var link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "PMsAuditoria.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-
-    function getAffiliation(personid) {
-        var affiliation = 0;
-        $.ajax({
-            url: '@Url.Action("GetAffiliation", "Projects")',
-            type: 'GET',
-            data: { personid: personid },
-            async: false,
-            success: function (data) {
-                affiliation = data;
-            }
-        });
-        return affiliation;
-    }
-
-    function getMaxAnnualHours(affiliation, year) {
-        var maxAnnualHours = 0;
-        $.ajax({
-            url: '@Url.Action("GetMaxAnnualHours", "Projects")',
-            type: 'GET',
-            data: { affiliation: affiliation, year: year },
-            async: false,
-            success: function (data) {
-                maxAnnualHours = data;
-            }
-        });
-        return maxAnnualHours;
-    }
-
-    function calculatePercentage(declaredHours, maxAnnualHours) {
-        var maxHoursPerMonth = maxHours / 12;
-        return (declaredHours / maxHoursPerMonth).toFixed(1);
+                return response.blob();
+            })
+            .then(blob => {
+                var url = window.URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = `PMsAuditoria_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            })
+            .catch(error => console.error('Error:', error));
     }
 </script>
 

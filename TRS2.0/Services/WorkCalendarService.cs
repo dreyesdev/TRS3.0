@@ -198,6 +198,30 @@ public class WorkCalendarService
         return hoursPerMonth;
     }
 
+    public async Task<Dictionary<DateTime, decimal>> GetDeclaredHoursPerMonthForPersonInProyect(int personId, DateTime startDate, DateTime endDate, int projectId)
+    {
+        // Asegúrate de que endDate es el último momento del mes para incluir todos los días del mes
+        endDate = new DateTime(endDate.Year, endDate.Month, DateTime.DaysInMonth(endDate.Year, endDate.Month));
+
+        var hoursPerMonth = await _context.Timesheets
+            .Where(ts => ts.WpxPersonNavigation.Person == personId &&
+                                    ts.WpxPersonNavigation.WpNavigation.ProjId == projectId &&
+                                                            ts.Day >= startDate &&
+                                                                                    ts.Day <= endDate)
+            .GroupBy(ts => new
+            {
+                Year = ts.Day.Year,
+                Month = ts.Day.Month
+            })
+            .Select(g => new
+            {
+                Month = new DateTime(g.Key.Year, g.Key.Month, 1), // Usa el primer día del mes como clave
+                TotalHours = g.Sum(ts => ts.Hours) // Suma las horas declaradas
+            })
+            .ToDictionaryAsync(g => g.Month, g => g.TotalHours);
+
+        return hoursPerMonth;
+    }
 
     public async Task<Dictionary<DateTime, decimal>> CalculateTotalHoursForPerson(int personId, DateTime startDate, DateTime endDate, int projectId, Dictionary<DateTime, int> workingDaysPerMonth)
     {

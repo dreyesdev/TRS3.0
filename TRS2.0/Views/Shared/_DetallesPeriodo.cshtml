@@ -8,7 +8,7 @@
                 <th class="nombre-columna text-center">Nombre</th>
                 @foreach (var monthDetail in Model.MonthDetails)
                 {
-                    <th class="text-center">
+                    <th class="nombre-mes text-center">
                         <div style="border-bottom: 1px solid white; margin-bottom: 2px; margin-top: 8px; text-align: center; font-weight: bold;">@monthDetail.Key</div>
                         <div style="text-align: center; font-weight: bold;">@monthDetail.Value</div>
                     </th>
@@ -16,10 +16,10 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (var person in Model.Persons)
+            @foreach (var person in Model.Persons.OrderBy(p => p.Personnel.Surname))
             {
                 <tr>
-                    <td class="font-weight-bold">@person.Personnel.Name @person.Personnel.Surname</td>
+                    <td class="font-weight-bold">@person.Personnel.Surname, @person.Personnel.Name </td>
                     @foreach (var monthDetail in Model.MonthDetails)
                     {
                         var monthDate = DateTime.Parse(monthDetail.Value);
@@ -96,11 +96,15 @@
 
 <style>
     .nombre-columna {
-        min-width: 200px; /* Ajusta según necesites */
-        max-width: 100px;
+        min-width: 250px; /* Ajusta según necesites */
+        max-width: 350px;
 
     }
 
+    .nombre-mes{
+        min-width: 130px; /* Ajusta según necesites */
+        max-width: 175px;
+    }
     .table {
         max-height: 800px; /* Ajusta esto según la altura deseada */
         overflow-y: auto;
@@ -109,8 +113,8 @@
         margin: 0 auto; /* Centra la tabla horizontalmente */
     }
 
-        .table th, .table td {
-            max-width: 150px; /* Ancho máximo para las columnas */
+        .table td {
+            max-width: 100px; /* Ancho máximo para las columnas */
             max-height: 100px; /* Altura máxima para las filas */
             overflow: hidden; /* Oculta el contenido que exceda el tamaño */
             text-overflow: ellipsis; /* Añade puntos suspensivos al contenido que exceda el tamaño */

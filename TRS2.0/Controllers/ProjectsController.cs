@@ -1358,7 +1358,7 @@ namespace TRS2._0.Controllers
                     }
 
                     declaredHoursStopwatch.Start();
-                    var declaredHoursResult = await _workCalendarService.GetDeclaredHoursPerMonthForPerson(personId, reportPeriod.StartDate, reportPeriod.EndDate);
+                    var declaredHoursResult = await _workCalendarService.GetDeclaredHoursPerMonthForPersonInProyect(personId, reportPeriod.StartDate, reportPeriod.EndDate, projectId);
                     declaredHoursStopwatch.Stop();
                     Console.WriteLine($"Getting declared hours for person {personId} took {declaredHoursStopwatch.ElapsedMilliseconds} ms");
                     declaredHoursStopwatch.Reset();
@@ -1664,26 +1664,101 @@ namespace TRS2._0.Controllers
             }
         }
 
-        public JsonResult GetAffiliation(int personId)
+        [HttpPost]
+        public async Task<IActionResult> ExportPmsAuditoria([FromBody] ExportRequest request)
         {
-            // Implementa la lógica para obtener el valor de Affiliation de la tabla personnel
-            var affiliation = _context.Personnel
-                .Where(p => p.Id == personId)
-                .Select(p => p.Affiliation)
-                .FirstOrDefault();
+            try
+            {
+                if (request == null || request.ProjectId == 0 || string.IsNullOrEmpty(request.StartDate) || string.IsNullOrEmpty(request.EndDate))
+                {
+                    return BadRequest("Invalid request data.");
+                }
 
-            return Json(affiliation);
-        }
+                // Convertir las fechas de string a DateTime
+                DateTime startDate;
+                DateTime endDate;
+                if (!DateTime.TryParseExact(request.StartDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out startDate) ||
+                    !DateTime.TryParseExact(request.EndDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out endDate))
+                {
+                    return BadRequest("Invalid date format.");
+                }
 
-        public JsonResult GetMaxAnnualHours(int affiliation, int año)
-        {
-            // Implementa la lógica para obtener el valor de horas máximas anuales de la tabla AffGlobalHours
-            var maxAnnualHours = _context.AffGlobalHours
-                .Where(a => a.Aff == affiliation && a.Year == año)
-                .Select(a => a.Hours)
-                .FirstOrDefault();
+                var project = await _context.Projects
+                    .Include(p => p.Wps)
+                    .ThenInclude(wp => wp.Wpxpeople)
+                    .ThenInclude(wpxp => wpxp.PersonNavigation)
+                    .ThenInclude(person => person.Wpxpeople)
+                    .ThenInclude(wpxp => wpxp.Persefforts)
+                    .FirstOrDefaultAsync(p => p.ProjId == request.ProjectId);
 
-            return Json(maxAnnualHours);
+                if (project == null)
+                {
+                    return NotFound("Proyecto no encontrado.");
+                }
+
+                var csv = new StringBuilder();
+
+                // Generar la cabecera con los meses
+                csv.Append("PersonName");
+                var dateList = new List<DateTime>();
+                for (var date = startDate; date <= endDate; date = date.AddMonths(1))
+                {
+                    csv.Append($";{date.ToString("MMM yyyy", CultureInfo.InvariantCulture)}");
+                    dateList.Add(date);
+                }
+                csv.AppendLine();
+
+                // Obtener todas las personas del proyecto ordenadas
+                var people = project.Wps
+                    .SelectMany(wp => wp.Wpxpeople)
+                    .Select(wpxp => wpxp.PersonNavigation)
+                    .Distinct()
+                    .OrderBy(person => person.Surname);
+
+                // Generar las filas con los esfuerzos
+                foreach (var person in people)
+                {
+                    csv.Append(person.Surname + ", " + person.Name);
+                    foreach (var date in dateList)
+                    {
+                        var affiliation = _context.AffxPersons
+                            .Where(ap => ap.PersonId == person.Id && ap.Start <= date && ap.End >= date)
+                            .OrderByDescending(ap => ap.Start)
+                            .FirstOrDefault()?.AffId;
+
+                        if (affiliation != null)
+                        {
+                            var year = date.Year;
+                            var maxHours = _context.AffGlobalHours
+                                .FirstOrDefault(h => h.Aff == affiliation && h.Year == year)?.Hours ?? 0;
+                            var maxHoursPerMonth = maxHours / 12;
+
+                            var startDateOfMonth = new DateTime(date.Year, date.Month, 1);
+                            var endDateOfMonth = startDateOfMonth.AddMonths(1).AddDays(-1);
+                            var declaredHours = await _workCalendarService.GetDeclaredHoursPerMonthForPersonInProyect(person.Id, startDateOfMonth, endDateOfMonth, request.ProjectId);
+
+                            var monthKey = startDateOfMonth;
+                            var declaredHoursForMonth = declaredHours.ContainsKey(monthKey) ? declaredHours[monthKey] : 0;
+
+                            var percentage = declaredHoursForMonth / maxHoursPerMonth;
+                            csv.Append($";{percentage.ToString("0.00", CultureInfo.InvariantCulture)}");
+                        }
+                        else
+                        {
+                            csv.Append(";0");
+                        }
+                    }
+                    csv.AppendLine();
+                }
+
+                var bytes = Encoding.UTF8.GetBytes(csv.ToString());
+                return File(bytes, "text/csv", $"PersonnelEffortPlan_{request.ProjectId}_{DateTime.Now:yyyyMMddHHmmss}.csv");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al generar el CSV de Personnel Effort Plan");
+                return StatusCode(500, "Error interno del servidor");
+            }
         }
 
 
