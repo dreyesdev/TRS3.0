@@ -8,17 +8,22 @@ using Serilog;
 using Newtonsoft.Json;
 using System.Net.Http.Headers;
 using static TRS2._0.Services.WorkCalendarService;
+using System.Text;
+using System.Timers;
+using Newtonsoft.Json.Linq;
 
 
 namespace TRS2._0.Services
 {
     public class LoadDataService : IJob
-    {
+    {        
         private readonly TRSDBContext _context;
         private readonly WorkCalendarService _workCalendarService;
         private readonly ILogger<LoadDataService> _logger;
         private readonly HttpClient _httpClient;
-        private readonly string _bearerToken;
+        private string _bearerToken;
+        private DateTime _nextTokenRenewalDate;
+        private System.Timers.Timer _tokenRenewalTimer;
         // Inyectar dependencias necesarias
         public LoadDataService(TRSDBContext context, WorkCalendarService workCalendarService, ILogger<LoadDataService> logger)
         {
@@ -26,7 +31,7 @@ namespace TRS2._0.Services
             _workCalendarService = workCalendarService;
             _logger = logger;
             _httpClient = new HttpClient();
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _bearerToken);
+            InitializeTokenRenewal();
         }
 
         public async Task UpdateMonthlyPMs()
@@ -1203,7 +1208,176 @@ namespace TRS2._0.Services
             }
         }
 
+        private void InitializeTokenRenewal()
+        {
+            // Renovar el token inmediatamente al iniciar el servicio
+            RenewTokenAsync().GetAwaiter().GetResult();
 
+            // Configurar el timer para verificar la fecha de renovación cada día
+            _tokenRenewalTimer = new System.Timers.Timer(TimeSpan.FromDays(1).TotalMilliseconds);
+            _tokenRenewalTimer.Elapsed += async (sender, e) => await CheckTokenRenewalAsync();
+            _tokenRenewalTimer.AutoReset = true;
+            _tokenRenewalTimer.Enabled = true;
+        }
+
+        private async Task CheckTokenRenewalAsync()
+        {
+            if (DateTime.UtcNow >= _nextTokenRenewalDate)
+            {
+                await RenewTokenAsync();
+            }
+        }
+
+        public async Task RenewTokenAsync()
+        {
+            var requestData = new Dictionary<string, string>
+            {    
+                { "grant_type", "client_credentials" },
+                { "client_id", "23553" },
+                { "client_secret", "jMUDt3WEHTctkronPHJJmVe97h8WLMp4wNXc62ll3To%3d" }
+            };
+
+
+            var content = new FormUrlEncodedContent(requestData);
+            var response = await _httpClient.PostAsync("https://app.woffu.com/token", content);
+            response.EnsureSuccessStatusCode();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var tokenResponse = JsonConvert.DeserializeObject<TokenResponse>(responseContent);
+                if (tokenResponse != null && !string.IsNullOrEmpty(tokenResponse.access_token))
+                {
+                    _bearerToken = tokenResponse.access_token;
+                    // Establecer la próxima fecha de renovación a 80 días a partir de ahora
+                    _nextTokenRenewalDate = DateTime.UtcNow.AddDays(80);
+                    _logger.LogInformation($"Token renovado correctamente. Próxima renovación: {_nextTokenRenewalDate}");
+                }
+                else
+                {
+                    throw new Exception("Token response is null or empty");
+                }
+            }
+            else
+            {
+                // Manejar el error de la solicitud
+                throw new Exception("Error al renovar el token");
+            }
+        }
+
+        class TokenResponse
+        {
+            public string access_token { get; set; }
+        }
+
+        public async Task UpdateLeaveTableAsync()
+        {
+            var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "CargaAusencias.txt");
+
+            var logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+            try
+            {
+                // Configurar el cliente HTTP
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _bearerToken);
+
+                // Realizar la petición GET para obtener los usuarios
+                var response = await _httpClient.GetAsync("https://app.woffu.com/api/v1/users");
+                response.EnsureSuccessStatusCode();
+                var content = await response.Content.ReadAsStringAsync();
+                var users = JsonConvert.DeserializeObject<JArray>(content);
+
+                foreach (var user in users)
+                {
+                    int userId = user["UserId"].Value<int>();
+                    int userKey = user["UserKey"].Value<int>();
+                    logger.Information("Updating absences for user: {PersonId}", userKey);
+
+
+                    // Obtener las peticiones del usuario
+                    var requestsResponse = await _httpClient.GetAsync($"https://app.woffu.com/api/v1/users/{userId}/requests");
+                    requestsResponse.EnsureSuccessStatusCode();
+                    var requestsContent = await requestsResponse.Content.ReadAsStringAsync();
+
+                    // Deserializar el contenido como JObject
+                    var requestsObject = JsonConvert.DeserializeObject<JObject>(requestsContent);
+
+                    // Verificar si "Views" existe en el objeto y deserializarlo
+                    if (requestsObject.ContainsKey("Views"))
+                    {
+                        var requestsArray = (JArray)requestsObject["Views"];
+
+                        foreach (var request in requestsArray)
+                        {
+                            if (request["RequestStatus"]?.ToString() == "Approved")
+                            {
+                                int agreementEventId = request["AgreementEventId"]?.Value<int>() ?? 0;
+                                var agreementEvent = await _context.AgreementEvents.FindAsync(agreementEventId);
+
+                                if (agreementEvent != null)
+                                {
+                                    int personId = _context.Personnel.FirstOrDefault(p => p.Id == userKey)?.Id ?? 0;
+                                    if (personId == 0) continue;
+
+                                    int numberDaysRequested = request["NumberDaysRequested"]?.Value<int>() ?? 0;
+                                    var startDate = DateTime.Parse(request["StartDate"].ToString());
+                                    var endDate = DateTime.Parse(request["EndDate"].ToString());
+                                    var type = agreementEvent.Type;
+
+                                    for (var date = startDate; date <= endDate; date = date.AddDays(1))
+                                    {
+                                        var existingLeave = await _context.Leaves
+                                                                    .AsNoTracking()
+                                                                    .FirstOrDefaultAsync(l => l.PersonId == personId && l.Day == date);
+
+                                        if (existingLeave != null)
+                                        {
+                                            if (existingLeave.Type != type || existingLeave.LeaveReduction != 1.00m)
+                                            {
+                                                existingLeave.Type = (int)type;
+                                                existingLeave.LeaveReduction = 1.00m;
+                                                _context.Leaves.Update(existingLeave);
+                                                logger.Information($"Updated leave record for PersonId: {personId}, Date: {date}");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            var newLeave = new Leave
+                                            {
+                                                PersonId = personId,
+                                                Day = date,
+                                                Type = (int)type,
+                                                Legacy = false,
+                                                LeaveReduction = 1.00m,
+                                                Hours = null
+                                            };
+                                            _context.Leaves.Add(newLeave);
+                                            logger.Information($"Created new leave record for PersonId: {personId}, Date: {date}");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        logger.Warning("The 'Views' property was not found in the response.");
+                    }
+
+                }
+                    await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Error in UpdateLeaveTableAsync: {ex.Message}");
+            }
+            finally
+            {
+                logger.Dispose();
+            }
+        }
 
         //public async Task UpdateLeaveTableAsync()
         //{
@@ -1212,16 +1386,17 @@ namespace TRS2._0.Services
         //        var users = await GetUsersAsync();
         //        foreach (var user in users)
         //        {
-        //            var userId = user["UserId"].ToString();
+        //            var userId = Convert.ToInt32(user["UserId"]);
+        //            var userKey = Convert.ToInt32(user["UserKey"]);
         //            var requests = await GetUserRequestsAsync(userId);
         //            foreach (var request in requests)
         //            {
         //                if (request["RequestStatus"].ToString() == "Approved")
         //                {
-        //                    var agreementEventId = request["AgreementEventId"].ToString();
+        //                    var agreementEventId = Convert.ToInt32(request["AgreementEventId"]);
         //                    if (AgreementEventExists(agreementEventId))
         //                    {
-        //                        var personId = GetPersonId(userId);
+        //                        var personId = GetPersonId(userKey);
         //                        var numberDaysRequested = (int)request["NumberDaysRequested"];
         //                        var startDate = DateTime.Parse(request["StartDate"].ToString());
         //                        var endDate = DateTime.Parse(request["EndDate"].ToString());
@@ -1230,7 +1405,8 @@ namespace TRS2._0.Services
         //                        for (int i = 0; i < numberDaysRequested; i++)
         //                        {
         //                            var leaveDate = startDate.AddDays(i).ToString("yyyy-MM-dd");
-        //                            CreateLeaveRecord(personId, type, leaveDate, 0);
+        //                            DateTime leaveDateTime = DateTime.ParseExact(leaveDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        //                            CreateLeaveRecord(personId, type, leaveDateTime, 0);
         //                        }
         //                    }
         //                }
@@ -1257,7 +1433,7 @@ namespace TRS2._0.Services
         //    }
         //}
 
-        //private async Task<JArray> GetUserRequestsAsync(string userId)
+        //private async Task<JArray> GetUserRequestsAsync(int userId)
         //{
         //    try
         //    {
@@ -1271,7 +1447,7 @@ namespace TRS2._0.Services
         //    }
         //}
 
-        //private bool AgreementEventExists(string agreementEventId)
+        //private bool AgreementEventExists(int agreementEventId)
         //{
         //    try
         //    {
@@ -1284,11 +1460,11 @@ namespace TRS2._0.Services
         //    }
         //}
 
-        //private int GetPersonId(string userId)
+        //private int GetPersonId(int userId)
         //{
         //    try
         //    {
-        //        var person = _context.Persons.FirstOrDefault(p => p.UserId == userId);
+        //        var person = _context.Personnel.FirstOrDefault(p => p.Id == userId);
         //        return person?.Id ?? 0;
         //    }
         //    catch (Exception ex)
@@ -1298,7 +1474,7 @@ namespace TRS2._0.Services
         //    }
         //}
 
-        //private int GetLeaveType(string agreementEventId)
+        //private int GetLeaveType(int agreementEventId)
         //{
         //    try
         //    {
@@ -1312,7 +1488,7 @@ namespace TRS2._0.Services
         //    }
         //}
 
-        //private void CreateLeaveRecord(int personId, int type, string date, int leaveReduction)
+        //private void CreateLeaveRecord(int personId, int type, DateTime date, int leaveReduction)
         //{
         //    try
         //    {
@@ -1390,7 +1566,10 @@ namespace TRS2._0.Services
                 case "UpdatePersonnelUserIds":
                     await UpdatePersonnelUserIdsAsync();
                     break;
-
+                
+                case "UpdateLeaveTable":    
+                    await UpdateLeaveTableAsync();
+                    break;
                 default:
                     _logger.LogError($"Acción desconocida: {action}");
                     throw new ArgumentException("Acción no implementada para este trabajo.");

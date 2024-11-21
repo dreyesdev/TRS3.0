@@ -394,5 +394,38 @@ namespace TRS2._0.Controllers
                 return StatusCode(500, $"Error al iniciar el trabajo de actualización de UserIds: {ex.Message}");
             }
         }
+
+        [HttpGet("/UpdateLeaveTable")]
+        public async Task<IActionResult> TriggerUpdateLeaveTableJob()
+        {
+            try
+            {
+                var scheduler = await _schedulerFactory.GetScheduler();
+                var jobKey = new JobKey("LoadDataServiceJob");
+
+                // Configura JobDataMap con los parámetros específicos para esta acción
+                var jobDataMap = new JobDataMap
+        {
+            {"Action", "UpdateLeaveTable"}
+        };
+
+                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
+                if (await scheduler.CheckExists(jobKey))
+                {
+                    await scheduler.TriggerJob(jobKey, jobDataMap);
+                    return Ok("El trabajo de actualización de la tabla leave se ha iniciado.");
+                }
+                else
+                {
+                    return NotFound("El trabajo de actualización de la tabla leave no se encontró.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Maneja adecuadamente la excepción
+                return StatusCode(500, $"Error al iniciar el trabajo de actualización de la tabla leave: {ex.Message}");
+            }
+        }
+
     }
 }

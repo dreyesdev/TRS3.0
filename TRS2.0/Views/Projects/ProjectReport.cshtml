@@ -23,7 +23,7 @@
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header text-center">
-                    Proyect Details
+                    Project Details
                 </div>
                 <div class="card-body">
                     <dl class="row detail-item">
@@ -117,7 +117,7 @@
 
         <div class="col-md-6">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header" style="text-align: center;">
                     Work Packages Details
                 </div>
                 <div class="card-body">
@@ -163,18 +163,18 @@
                                 }
 
                                 <tr class="@rowClass">
-                                    <td class="centered">@wp.Name</td>
-                                    <td class="centered">@wp.Pms</td>
-                                    <td class="centered">@wp.Distributed</td>
-                                    <td class="centered">@wp.Covered</td>
+                                    <td class="centered" style="text-align: center;">@wp.Name</td>
+                                    <td class="centered" style="text-align: center;">@wp.Pms</td>
+                                    <td class="centered" style="text-align: center;">@wp.Distributed</td>
+                                    <td class="centered" style="text-align: center;">@wp.Covered</td>
                                 </tr>
                             }
                             <!-- Fila de Total -->
                             <tr class="table-primary">
                                 <th style="text-align: center; background-color: black; color: white;">Total</th>
-                                <td class="centered bold">@totalEstimated</td>
-                                <td class="centered bold">@totalDistributed</td>
-                                <td class="centered bold">@totalCovered</td>
+                                <td class="centered bold" style="text-align: center;">@totalEstimated</td>
+                                <td class="centered bold" style="text-align: center;">@totalDistributed</td>
+                                <td class="centered bold" style="text-align: center;">@totalCovered</td>
                             </tr>
                         </tbody>
                     </table>
@@ -469,6 +469,53 @@
         margin: 0 auto; /* Centra la tabla horizontalmente */
     }
 
+    .card-detail-label {
+        font-weight: bold;
+    }
+
+    .card-title {
+        font-weight: bold;
+    }
+
+    .card-header {
+        background-color: #005A9C; /* Azul oscuro, ajusta el código de color según tu logo */
+        color: #FFFFFF; /* Blanco */
+        text-align: center;
+        font-weight: bold;
+        /* Otros estilos que desees mantener, como el padding, etc. */
+    }
+
+    .wp-checkbox {
+        width: 25px; /* Tamaño del checkbox */
+        height: 25px; /* Tamaño del checkbox */
+        cursor: pointer; /* Cambia el cursor a mano al pasar sobre el checkbox */
+        margin: auto; /* Centra el checkbox en la celda */
+    }
     
+    .sticky-header {
+        position: sticky;
+        top: 0;
+        z-index: 2; /* Asegura que el encabezado se mantenga sobre el contenido desplazable */
+    }
+
+    .sticky-name-header {
+        position: sticky;
+        top: 0;
+        left: 0;
+        z-index: 4; /* Asegura que la cabecera fija esté sobre el contenido desplazable */
+    }
+
+    .card-header {
+        font-size: 24px; /* Aumenta el tamaño del texto */
+        font-weight: bold; /* Texto en negrita */
+        text-align: center; /* Texto centrado */
+    }
+
+    .my-style {
+        font-size: 2.5rem; /* Ajusta el tamaño de la fuente */
+        font-weight: bold;
+        color: #0056b3; /* Cambia al color que prefieras */
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.2); /* Añade una ligera sombra */
+    }
     </style>
 

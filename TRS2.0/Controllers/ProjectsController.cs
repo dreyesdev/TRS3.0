@@ -1699,7 +1699,7 @@ namespace TRS2._0.Controllers
                 var csv = new StringBuilder();
 
                 // Generar la cabecera con los meses
-                csv.Append("PersonName");
+                csv.Append("Apellidos, Nombre");
                 var dateList = new List<DateTime>();
                 for (var date = startDate; date <= endDate; date = date.AddMonths(1))
                 {
@@ -1718,7 +1718,7 @@ namespace TRS2._0.Controllers
                 // Generar las filas con los esfuerzos
                 foreach (var person in people)
                 {
-                    csv.Append(person.Surname + ", " + person.Name);
+                    csv.Append(Encoding.UTF8.GetString(Encoding.Default.GetBytes(RemoveAccents(person.Surname) + ", " + RemoveAccents(person.Name))));
                     foreach (var date in dateList)
                     {
                         var affiliation = _context.AffxPersons
@@ -1752,7 +1752,7 @@ namespace TRS2._0.Controllers
                 }
 
                 var bytes = Encoding.UTF8.GetBytes(csv.ToString());
-                return File(bytes, "text/csv", $"PersonnelEffortPlan_{request.ProjectId}_{DateTime.Now:yyyyMMddHHmmss}.csv");
+                return File(Encoding.UTF8.GetBytes(csv.ToString()), "text/csv", $"PersonnelEffortPlan_{request.ProjectId}_{DateTime.Now:yyyyMMddHHmmss}.csv");
             }
             catch (Exception ex)
             {
@@ -1761,8 +1761,24 @@ namespace TRS2._0.Controllers
             }
         }
 
+        private string RemoveAccents(string input)
+        {
+            string normalizedString = input.Normalize(NormalizationForm.FormD);
+            StringBuilder stringBuilder = new StringBuilder();
+
+            foreach (char c in normalizedString)
+            {
+                if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                {
+                    stringBuilder.Append(c);
+                }
+            }
+
+            return stringBuilder.ToString();
+        }
 
 
+        
 
         public class ExportRequest
         {
