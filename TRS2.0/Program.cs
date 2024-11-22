@@ -25,13 +25,16 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
     serverOptions.ListenAnyIP(5000); // HTTP
     serverOptions.ListenAnyIP(5001, listenOptions =>
     {
-        listenOptions.UseHttps("C:\\Users\\dreyes\\Desktop\\Desarrollo\\TRS2.0\\TRS2.0\\Resources\\opstrs03.bsc.es.pfx", "seidor");
+        listenOptions.UseHttps("C:\\Users\\premo\\source\\repos\\trs3.0nuevo\\TRS2.0\\opstrs03.bsc.es.pfx", "seidor");// Colegio
+        //listenOptions.UseHttps("C:\\Users\\dreyes\\Desktop\\Desarrollo\\TRS2.0\\TRS2.0\\Resources\\opstrs03.bsc.es.pfx", "seidor");//Casa
     });
 });
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<TRSDBContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseSqlServer(connectionString)
+           .EnableSensitiveDataLogging()); // Activa Sensitive Data Logging
+
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>

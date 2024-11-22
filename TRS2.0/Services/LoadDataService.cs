@@ -1278,6 +1278,7 @@ namespace TRS2._0.Services
                 .MinimumLevel.Debug()
                 .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
                 .CreateLogger();
+
             try
             {
                 // Configurar el cliente HTTP
@@ -1294,7 +1295,6 @@ namespace TRS2._0.Services
                     int userId = user["UserId"].Value<int>();
                     int userKey = user["UserKey"].Value<int>();
                     logger.Information("Updating absences for user: {PersonId}", userKey);
-
 
                     // Obtener las peticiones del usuario
                     var requestsResponse = await _httpClient.GetAsync($"https://app.woffu.com/api/v1/users/{userId}/requests");
@@ -1329,16 +1329,20 @@ namespace TRS2._0.Services
                                     for (var date = startDate; date <= endDate; date = date.AddDays(1))
                                     {
                                         var existingLeave = await _context.Leaves
-                                                                    .AsNoTracking()
-                                                                    .FirstOrDefaultAsync(l => l.PersonId == personId && l.Day == date);
+                                                            .FirstOrDefaultAsync(l => l.PersonId == personId && l.Day == date);
 
                                         if (existingLeave != null)
                                         {
+                                            // Asegúrate de adjuntar la entidad al contexto si no está adjunta
+                                            if (_context.Entry(existingLeave).State == EntityState.Detached)
+                                            {
+                                                _context.Attach(existingLeave);
+                                            }
+
                                             if (existingLeave.Type != type || existingLeave.LeaveReduction != 1.00m)
                                             {
                                                 existingLeave.Type = (int)type;
                                                 existingLeave.LeaveReduction = 1.00m;
-                                                _context.Leaves.Update(existingLeave);
                                                 logger.Information($"Updated leave record for PersonId: {personId}, Date: {date}");
                                             }
                                         }
@@ -1356,6 +1360,7 @@ namespace TRS2._0.Services
                                             _context.Leaves.Add(newLeave);
                                             logger.Information($"Created new leave record for PersonId: {personId}, Date: {date}");
                                         }
+
                                     }
                                 }
                             }
@@ -1365,9 +1370,26 @@ namespace TRS2._0.Services
                     {
                         logger.Warning("The 'Views' property was not found in the response.");
                     }
-
                 }
-                    await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                logger.Error($"Database update error: {ex.Message}");
+
+                if (ex.InnerException != null)
+                {
+                    logger.Error($"Inner exception: {ex.InnerException.Message}");
+                }
+
+                // Habilitar logging sensible para obtener las claves en conflicto
+                foreach (var entry in _context.ChangeTracker.Entries())
+                {
+                    if (entry.State == EntityState.Added || entry.State == EntityState.Modified)
+                    {
+                        logger.Error($"Conflicting entity: {entry.Entity.GetType().Name}, Keys: {string.Join(", ", entry.Properties.Where(p => p.Metadata.IsPrimaryKey()).Select(p => p.CurrentValue))}");
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -1378,6 +1400,7 @@ namespace TRS2._0.Services
                 logger.Dispose();
             }
         }
+
 
         //public async Task UpdateLeaveTableAsync()
         //{
