@@ -855,6 +855,39 @@ public class WorkCalendarService
     }
 
 
+    // Función para calcular LeaveReduction
+    public async Task<decimal> CalculateLeaveReductionAsync(int personId, DateTime date, decimal totalHoursRequested)
+    {
+        // Buscar la afiliación de la persona para la fecha específica
+        var affiliation = await _context.AffxPersons
+            .FirstOrDefaultAsync(a => a.PersonId == personId && a.Start <= date && a.End >= date);
+
+        if (affiliation == null)
+        {
+            throw new Exception($"No affiliation found for PersonId {personId} on {date}");
+        }
+
+        // Obtener las horas contractuales (100% del día) desde AffHours
+        var affHours = await _context.AffHours
+            .FirstOrDefaultAsync(ah => ah.AffId == affiliation.AffId);
+
+        if (affHours == null)
+        {
+            throw new Exception($"No working hours found for AffId {affiliation.AffId}");
+        }
+
+        // Calcular el porcentaje del día trabajado
+        var fullDayHours = affHours.Hours; // Horas contractuales del día
+        if (fullDayHours <= 0)
+        {
+            throw new Exception($"Invalid working hours ({fullDayHours}) for AffId {affiliation.AffId}");
+        }
+
+        // Asegurarse de que LeaveReduction no sea mayor que 1
+        var leaveReduction = Math.Min(totalHoursRequested / fullDayHours, 1.00m);
+
+        return Math.Round(leaveReduction, 2); // Redondear a dos decimales
+    }
 
 
 }
