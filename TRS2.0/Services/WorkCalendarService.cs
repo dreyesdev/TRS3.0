@@ -89,18 +89,15 @@ public class WorkCalendarService
         }
 
         // Obtener los días festivos para el mes y año especificados
-         var holidays = await _context.NationalHolidays
+        var holidays = await _context.NationalHolidays
             .Where(h => h.Date.Year == year && h.Date.Month == month)
             .Select(h => h.Date)
             .ToListAsync();
 
-        // Obtener los días de ausencia para el mes y año especificados
-        var leaveDays = await _context.Leaves
+        // Obtener los registros de bajas (Leave) para el mes y año especificados
+        var leaveRecords = await _context.Leaves
             .Where(l => l.PersonId == personId && l.Day.Year == year && l.Day.Month == month)
-            .Select(l => l.Day)
-            .ToListAsync();
-
-        decimal totalPm = 0;
+            .ToDictionaryAsync(l => l.Day, l => l.LeaveReduction);
 
         // Valor de PM por día obtenido de la tabla DailyPMValues
         var dailyPmValue = await _context.DailyPMValues
@@ -108,17 +105,23 @@ public class WorkCalendarService
             .Select(d => d.PmPerDay)
             .FirstOrDefaultAsync();
 
+        decimal totalPm = 0;
+
         // Procesar cada día del mes
         for (DateTime currentDate = new DateTime(year, month, 1); currentDate <= new DateTime(year, month, DateTime.DaysInMonth(year, month)); currentDate = currentDate.AddDays(1))
         {
-            // Omitir sábados, domingos, días festivos y días de ausencia
+            // Omitir sábados, domingos, días festivos
             if (currentDate.DayOfWeek == DayOfWeek.Saturday ||
                 currentDate.DayOfWeek == DayOfWeek.Sunday ||
-                holidays.Contains(currentDate) ||
-                leaveDays.Contains(currentDate))
+                holidays.Contains(currentDate))
             {
                 continue;
             }
+
+            // Obtener la reducción por LeaveReduction, si existe
+            var leaveReduction = leaveRecords.TryGetValue(currentDate, out var reduction) && reduction > 0 && reduction < 1
+                ? reduction
+                : 0;
 
             // Aplicar la reducción de dedicación más actual para la fecha
             var applicableDedication = dedications
@@ -127,12 +130,13 @@ public class WorkCalendarService
                 .Select(d => d.Reduc)
                 .FirstOrDefault();
 
-            // Calcular PM para el día y acumular al total
-            totalPm += dailyPmValue * (1 - applicableDedication);
+            // Calcular PM para el día ajustado por dedicación y LeaveReduction
+            totalPm += dailyPmValue * (1 - applicableDedication - leaveReduction);
         }
 
         return Math.Round(totalPm, 2);
     }
+
 
     public async Task<decimal> CalculateMonthlyEffortForPerson(int personId, int year, int month)
     {

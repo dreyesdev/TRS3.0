@@ -47,64 +47,108 @@ namespace TRS2._0.Services
         }
 
 
+        // Método para actualizar los valores mensuales de PM
         public async Task UpdateMonthlyPMs()
         {
-            // Obtener todas las personas
-            var persons = await _context.Personnel.ToListAsync();
+            // Ruta del archivo de logs para registrar el proceso
+            var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "MonthlyPM.txt");
 
-            foreach (var person in persons)
+            // Configuración del logger para este proceso
+            var logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
+            try
             {
-                // Calcula y actualiza PMs para cada mes relevante para la persona
-                var totalMonths = await RelevantMonths(person.Id);
-                foreach (var month in totalMonths)
+                // Obtener todas las personas registradas en el sistema
+                var persons = await _context.Personnel.ToListAsync();
+
+                foreach (var person in persons)
                 {
-                    var pmValue = await _workCalendarService.CalculateMonthlyPM(person.Id, month.Year, month.Month);
+                    // Notificar en el log que estamos procesando a una persona específica
+                    logger.Information($"Processing PMs for PersonId: {person.Id}, Name: {person.Name} {person.Surname}");
 
-                    // Comprobar si ya existe un registro para este mes y persona
-                    var existingRecord = await _context.PersMonthEfforts
-                        .FirstOrDefaultAsync(pme => pme.PersonId == person.Id && pme.Month == new DateTime(month.Year, month.Month, 1));
+                    // Obtener los meses relevantes para esta persona
+                    var totalMonths = await RelevantMonths(person.Id);
 
-                    if (existingRecord != null)
+                    // Iterar sobre cada mes relevante
+                    foreach (var month in totalMonths)
                     {
-                        // Si existe, actualizar el valor existente
-                        existingRecord.Value = pmValue;
-                    }
-                    else
-                    {
-                        // Si no existe, crear un nuevo registro
-                        var newRecord = new PersMonthEffort
+                        // Calcular el valor de PM para esta persona en el mes y año especificados
+                        var pmValue = await _workCalendarService.CalculateMonthlyPM(person.Id, month.Year, month.Month);
+
+                        // Verificar si ya existe un registro de PM para esta persona y mes
+                        var existingRecord = await _context.PersMonthEfforts
+                            .FirstOrDefaultAsync(pme => pme.PersonId == person.Id && pme.Month == new DateTime(month.Year, month.Month, 1));
+
+                        if (existingRecord != null)
                         {
-                            PersonId = person.Id,
-                            Month = new DateTime(month.Year, month.Month, 1),
-                            Value = pmValue
-                        };
-                        _context.PersMonthEfforts.Add(newRecord);
-                        _logger.LogInformation($"New PM value for {person.Id} in {month.Year}-{month.Month}: {pmValue}");
-                    }
-                }
+                            // Actualizar el registro existente si ya hay uno
+                            existingRecord.Value = pmValue;
+                            logger.Information($"Updated PM value for PersonId: {person.Id} in {month.Year}-{month.Month}: {pmValue}");
+                        }
+                        else
+                        {
+                            // Crear un nuevo registro si no existe
+                            var newRecord = new PersMonthEffort
+                            {
+                                PersonId = person.Id,
+                                Month = new DateTime(month.Year, month.Month, 1),
+                                Value = pmValue
+                            };
+                            _context.PersMonthEfforts.Add(newRecord);
 
-                // Guardar los cambios en la base de datos
-                await _context.SaveChangesAsync();
+                            // Registrar la creación del nuevo valor
+                            logger.Information($"Created new PM value for PersonId: {person.Id} in {month.Year}-{month.Month}: {pmValue}");
+                        }
+                    }
+
+                    // Guardar los cambios en la base de datos después de procesar todos los meses de la persona
+                    await _context.SaveChangesAsync();
+                    logger.Information($"Finished processing PMs for PersonId: {person.Id}");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Registrar cualquier error ocurrido durante el proceso
+                logger.Error($"Error in UpdateMonthlyPMs: {ex.Message}");
+            }
+            finally
+            {
+                // Liberar el recurso del logger
+                logger.Dispose();
             }
         }
 
-
+        // Método para calcular los meses relevantes de una persona
         public async Task<List<DateTime>> RelevantMonths(int personId)
         {
-            // Obtener las fechas de inicio y fin de todos los contratos para la persona
+            // Obtener las fechas de inicio y fin de los contratos de la persona
             var contracts = await _context.Dedications
                 .Where(d => d.PersId == personId)
                 .Select(d => new { d.Start, d.End })
                 .OrderBy(d => d.Start)
                 .ToListAsync();
 
-            if (!contracts.Any()) return new List<DateTime>();
+            // Si no hay contratos, devolver una lista vacía
+            if (!contracts.Any())
+            {
+                return new List<DateTime>();
+            }
 
-            // Determinar el inicio del primer contrato y el fin del último contrato
-            var start = contracts.First().Start;
-            var end = contracts.Last().End;
+            // Determinar el año actual
+            var currentYear = DateTime.UtcNow.Year;
 
-            // Generar lista de todos los meses entre el inicio y el fin
+            // Establecer los límites de cálculo: 5 años hacia atrás y 5 años hacia adelante desde el año actual
+            var lowerLimit = new DateTime(currentYear - 10, 1, 1); // Inicio del rango permitido
+            var upperLimit = new DateTime(currentYear + 5, 12, 31); // Fin del rango permitido
+
+            // Obtener el rango de fechas del primer y último contrato
+            var start = contracts.First().Start < lowerLimit ? lowerLimit : contracts.First().Start; // Limitar al rango inferior
+            var end = contracts.Last().End > upperLimit ? upperLimit : contracts.Last().End; // Limitar al rango superior
+
+            // Generar una lista de todos los meses entre el inicio y el fin del rango permitido
             List<DateTime> months = new List<DateTime>();
             for (var date = new DateTime(start.Year, start.Month, 1); date <= end; date = date.AddMonths(1))
             {
@@ -113,6 +157,9 @@ namespace TRS2._0.Services
 
             return months;
         }
+
+
+        
 
         public async Task LoadLiquidationsFromFileAsync(string filePath)
         {
