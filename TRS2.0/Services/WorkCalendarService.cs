@@ -721,16 +721,13 @@ public class WorkCalendarService
                 .FirstOrDefault()?.Reduc;
 
             // Si no se encuentra dedicación específica o Reduc es 0.00, asume una jornada completa
-            if (!currentDedication.HasValue || currentDedication.Value == 0.00M)
-            {
-                
-            }
-
-            // Si no se encuentra dedicación específica o Reduc es 0.00, asume una jornada completa
             decimal dedicationFactor = currentDedication.HasValue ? currentDedication.Value : 0.00M;
 
+            // Calcular las horas ajustadas para el día y redondearlas al entero o .5 más cercano
             decimal adjustedDailyHours = currentAffiliationHours * (1 - dedicationFactor);
+            adjustedDailyHours = RoundToNearestHalfOrWhole(adjustedDailyHours);
 
+            // Agregar al diccionario
             dailyWorkHours.Add(currentDate, adjustedDailyHours);
         }
 
@@ -902,6 +899,13 @@ public class WorkCalendarService
         var leaveReduction = Math.Min(totalHoursRequested / fullDayHours, 1.00m);
 
         return Math.Round(leaveReduction, 2); // Redondear a dos decimales
+    }
+
+    // Método auxiliar para redondear al entero o .5 más cercano
+    private decimal RoundToNearestHalfOrWhole(decimal value)
+    {
+        // Multiplicar por 2, redondear al entero más cercano y dividir por 2
+        return Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2;
     }
 
 

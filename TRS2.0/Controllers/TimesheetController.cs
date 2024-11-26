@@ -152,7 +152,7 @@ namespace TRS2._0.Controllers
                 WorkPackages = wpxPersons.Select(wpx =>
                 {
                     var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
-                    var estimatedHours = Math.Round(totalWorkHours * effort, 1);
+                    var estimatedHours = RoundToNearestHalfOrWhole(totalWorkHours * effort);
                     var isLocked = projectLocks.Any(l => l.ProjectId == wpx.WpNavigation.ProjId && (l.IsLocked == true));
                     return new WorkPackageInfoTS
                     {
@@ -1027,6 +1027,14 @@ namespace TRS2._0.Controllers
             var pdfFileName = $"Timesheet_{personId}_{year}_{month}.pdf";
             return File(stream.ToArray(), "application/pdf", pdfFileName);
         }
+
+        // Método auxiliar para redondear al entero o .5 más cercano
+        private decimal RoundToNearestHalfOrWhole(decimal value)
+        {
+            // Multiplicar por 2, redondear al entero más cercano y dividir por 2
+            return Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2;
+        }
+
 
     }
 }
