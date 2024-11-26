@@ -290,7 +290,7 @@ namespace TRS2._0.Controllers
                 WorkPackages = wpxPersons.Select(wpx =>
                 {
                     var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
-                    var estimatedHours = Math.Round(totalWorkHours * effort, 1);
+                    var estimatedHours = RoundToNearestHalfOrWhole(totalWorkHours * effort);
 
                     return new WorkPackageInfoTS
                     {
