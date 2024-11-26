@@ -1615,99 +1615,146 @@ namespace TRS2._0.Services
             }
         }
 
-        public async Task ProcessInvestigatorsTimesheet()
+        public async Task AutoFillTimesheetsForInvestigatorsInSingleWPWithEffortAsync()
         {
-                var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ProcesarInvestigadoresWP.txt");
+            var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ProcesarInvestigadoresWP.txt");
 
-                var logger = new LoggerConfiguration()
-                    .MinimumLevel.Debug()
-                    .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
-                    .CreateLogger();
+            var logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
 
-                try
+            try
+            {
+                logger.Information("=== INICIO: Procesar investigadores en un único proyecto y paquete de trabajo (proyectos desde 2018) ===");
+
+                // Filtrar investigadores en un único proyecto y único paquete de trabajo (WP) cuyos proyectos comienzan en 2018 o después
+                var allWpxPeople = await _context.Wpxpeople
+                    .Include(wpx => wpx.PersonNavigation)
+                    .Include(wpx => wpx.WpNavigation)
+                    .ThenInclude(wp => wp.Proj)
+                    .Where(wpx =>
+                        wpx.WpNavigation.Proj.Start.HasValue &&  // Verificar que el proyecto tiene fecha de inicio
+                        wpx.WpNavigation.Proj.Start.Value.Year >= 2018 && // Incluir solo proyectos desde 2018
+                        _context.Wpxpeople.Count(w => w.Person == wpx.Person) == 1 && // Solo en un único WP
+                        _context.Projectxpeople.Count(p => p.Person == wpx.Person) == 1) // Solo en un único proyecto
+                    .ToListAsync();
+
+                if (!allWpxPeople.Any())
                 {
-                    logger.Information("Iniciando procesamiento de Timesheets para investigadores...");
+                    logger.Information("No se encontraron investigadores que cumplan las condiciones. Finalizando proceso.");
+                    return;
+                }
 
-                    // Obtener todos los WpxPeople que cumplen las condiciones de un único WP y proyecto
-                    var allWpxPeople = await _context.Wpxpeople
-                        .Include(wpx => wpx.PersonNavigation)
-                        .Include(wpx => wpx.WpNavigation)
-                        .Where(wpx =>
-                            _context.Wpxpeople.Count(w => w.Person == wpx.Person) == 1 && // Solo en un único WP
-                            _context.Projectxpeople.Count(p => p.Person == wpx.Person) == 1) // Solo en un único proyecto
+                foreach (var wpxPerson in allWpxPeople)
+                {
+                    var personId = wpxPerson.Person;
+                    var wpId = wpxPerson.Wp;
+                    var projectId = wpxPerson.WpNavigation.Proj.ProjId;
+
+                    logger.Information($"--- Procesando investigador: PersonId={personId}, WP={wpId}, Proyecto={projectId} ---");
+
+                    // Obtener todos los esfuerzos asignados al WP de esta persona
+                    var efforts = await _context.Persefforts
+                        .Where(e => e.WpxPerson == wpxPerson.Id)
                         .ToListAsync();
 
-                    foreach (var wpxPerson in allWpxPeople)
+                    foreach (var effort in efforts)
                     {
-                        var person = wpxPerson.PersonNavigation;
-                        var wp = wpxPerson.WpNavigation;
+                        var year = effort.Month.Year;
+                        var month = effort.Month.Month;
 
-                        // Obtener effort mensual
-                        var effort = await _context.Persefforts
-                            .FirstOrDefaultAsync(pe => pe.WpxPerson == wpxPerson.Id);
+                        logger.Information($"--- Mes: {year}-{month:D2} ---");
 
-                        if (effort == null || effort.Value <= 0)
+                        // Validar effort
+                        if (effort.Value <= 0)
                         {
-                            logger.Warning($"Sin effort válido para la persona {person.Name} {person.Surname} (ID: {person.Id}) en el WP {wp.Name}. Saltando.");
+                            logger.Warning($"PersonId={personId}, WP={wpId}, Mes={year}-{month:D2}: Effort es 0 o negativo. Omitiendo.");
                             continue;
                         }
 
-                        decimal totalEffort = effort.Value;
+                        // Calcular horas diarias máximas
+                        var dailyWorkHours = await _workCalendarService.CalculateDailyWorkHoursWithDedication(personId, year, month);
 
-                        logger.Information($"Procesando Timesheet para {person.Name} {person.Surname} (ID: {person.Id}) en el WP {wp.Name} (Effort: {totalEffort:P}).");
+                        // Obtener los días válidos del mes (excluyendo festivos y bajas)
+                        var startDate = new DateTime(year, month, 1);
+                        var endDate = new DateTime(year, month, DateTime.DaysInMonth(year, month));
+                        var holidays = await _workCalendarService.GetHolidaysForMonth(year, month);
+                        var leaveDays = await _workCalendarService.GetLeavesForPerson(personId, year, month);
 
-                        // Obtener las horas diarias calculadas
-                        var dailyWorkHours = await _workCalendarService.CalculateDailyWorkHoursWithDedication(person.Id, effort.Month.Year, effort.Month.Month);
+                        var validDays = dailyWorkHours
+                            .Where(dwh => !holidays.Contains(dwh.Key) && !leaveDays.Any(ld => ld.Day == dwh.Key))
+                            .ToList();
 
-                        foreach (var (day, maxDailyHours) in dailyWorkHours)
+                        if (!validDays.Any())
                         {
+                            logger.Warning($"PersonId={personId}, WP={wpId}, Mes={year}-{month:D2}: No hay días válidos (festivos o bajas). Omitiendo.");
+                            continue;
+                        }
+
+                        decimal totalEffort = effort.Value; // Effort mensual
+
+                        foreach (var day in validDays)
+                        {
+                            var dayDate = day.Key;
+                            var maxDailyHours = day.Value;
+
                             // Ajustar las horas diarias por el effort
                             decimal adjustedDailyHours = RoundToNearestHalfOrWhole(maxDailyHours * totalEffort);
 
                             if (adjustedDailyHours == 0)
                             {
-                                logger.Debug($"Día {day:yyyy-MM-dd}: sin horas ajustadas (Effort: {totalEffort:P}, Max: {maxDailyHours}h). Saltando.");
+                                logger.Debug($"PersonId={personId}, Día={dayDate:yyyy-MM-dd}: Sin horas ajustadas (Effort: {totalEffort:P}, Max: {maxDailyHours}h). Omitiendo.");
                                 continue;
                             }
 
-                            // Registrar horas en Timesheet
+                            // Verificar si ya existe un registro para el día
                             var existingTimesheet = await _context.Timesheets
-                                .FirstOrDefaultAsync(ts => ts.WpxPersonId == wpxPerson.Id && ts.Day == day);
+                                .FirstOrDefaultAsync(ts => ts.WpxPersonId == wpxPerson.Id && ts.Day == dayDate);
 
                             if (existingTimesheet != null)
                             {
+                                // Actualizar registro existente
                                 existingTimesheet.Hours = adjustedDailyHours;
                                 _context.Timesheets.Update(existingTimesheet);
-                                logger.Information($"Día {day:yyyy-MM-dd}: actualizadas horas. Max: {maxDailyHours}h, Effort: {totalEffort:P}, Ajustadas: {adjustedDailyHours}h.");
+                                logger.Information($"Actualizado: PersonId={personId}, WP={wpId}, Proyecto={projectId}, Día={dayDate:yyyy-MM-dd}, Horas={adjustedDailyHours}.");
                             }
                             else
                             {
-                                _context.Timesheets.Add(new Timesheet
+                                // Crear un nuevo registro
+                                var newTimesheet = new Timesheet
                                 {
                                     WpxPersonId = wpxPerson.Id,
-                                    Day = day,
+                                    Day = dayDate,
                                     Hours = adjustedDailyHours
-                                });
-                                logger.Information($"Día {day:yyyy-MM-dd}: insertadas horas. Max: {maxDailyHours}h, Effort: {totalEffort:P}, Ajustadas: {adjustedDailyHours}h.");
+                                };
+                                _context.Timesheets.Add(newTimesheet);
+                                logger.Information($"Insertado: PersonId={personId}, WP={wpId}, Proyecto={projectId}, Día={dayDate:yyyy-MM-dd}, Horas={adjustedDailyHours}.");
                             }
                         }
 
-                        await _context.SaveChangesAsync();
-                        logger.Information($"Finalizado procesamiento para {person.Name} {person.Surname} (ID: {person.Id}).");
+                        logger.Information($"--- Fin de procesamiento para Mes: {year}-{month:D2} ---");
                     }
 
-                    logger.Information("Procesamiento de Timesheets completado.");
+                    logger.Information($"--- Fin de procesamiento para investigador PersonId={personId}, WP={wpId} ---");
                 }
-                catch (Exception ex)
-                {
-                    logger.Error($"Error durante el procesamiento de Timesheets: {ex.Message}");
-                    throw;
-                }
-                finally
-                {
-                    logger.Dispose();
-                }
+
+                // Guardar cambios
+                await _context.SaveChangesAsync();
+                logger.Information("=== FIN: Proceso completado exitosamente ===");
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Error en el proceso: {ex.Message}");
+                throw;
+            }
+            finally
+            {
+                logger.Dispose();
+            }
         }
+
+
 
         // Método auxiliar para redondear al entero o .5 más cercano
         private decimal RoundToNearestHalfOrWhole(decimal value)
@@ -1778,7 +1825,7 @@ namespace TRS2._0.Services
                     break;
 
                 case "ProcessInvestigatorsTimesheet":
-                    await ProcessInvestigatorsTimesheet();
+                    await AutoFillTimesheetsForInvestigatorsInSingleWPWithEffortAsync();
                     break;
 
                 default:
