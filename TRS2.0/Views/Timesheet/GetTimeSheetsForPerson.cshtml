@@ -208,14 +208,18 @@
                     <!-- Fila de Totales aquí -->
                 </tbody>
                 <tfoot>
-                    <tr style="background-color: #343a40; color: white;">                    
+                    <tr style="background-color: #343a40; color: white;">
                         <th class="sticky-column" style="background-color: #343a40; color: white;">Total Daily</th>
-                        @* <th style="background-color: #343a40; color: white;"></th> <!-- Espacio vacío para la columna de Dedication - Estimated Hours --> *@
                         @foreach (var day in Model.MonthDays)
                         {
-                            // Calcular el total actual y estimado para el día
+                            // Verificar si el día es un día festivo o tiene una ausencia
+                            bool isHoliday = Model.Holidays.Any(h => h.Date == day);
+                            bool isLeave = Model.LeavesthisMonth.Any(l => l.Day.Date == day.Date);
+
+                            // Calcular los totales
                             var totalActualForDay = Model.TotalHoursWithDedication.ContainsKey(day) ? Model.TotalHoursWithDedication[day] : 0;
-                            var totalEstimadoForDay = Model.HoursPerDayWithDedication.ContainsKey(day) ? Model.HoursPerDayWithDedication[day] : 0;
+                            var totalEstimadoForDay = (isHoliday || isLeave) ? 0 : (Model.HoursPerDayWithDedication.ContainsKey(day) ? Model.HoursPerDayWithDedication[day] : 0);
+
                             string textColorForDay;
                             string backgroundStyle;
 
@@ -248,6 +252,7 @@
                         <th style="background-color: #343a40; color: white;"></th> <!-- Nueva columna -->
                     </tr>
                 </tfoot>
+
 
             </table>
         </div>

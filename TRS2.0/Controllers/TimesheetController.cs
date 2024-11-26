@@ -152,7 +152,7 @@ namespace TRS2._0.Controllers
                 WorkPackages = wpxPersons.Select(wpx =>
                 {
                     var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
-                    var estimatedHours = RoundToNearestHalfOrWhole(totalWorkHours * effort);
+                    var estimatedHours = RoundToNearestHalfOrWhole((hoursPerDayWithDedication.Values.Sum()) * effort);
                     var isLocked = projectLocks.Any(l => l.ProjectId == wpx.WpNavigation.ProjId && (l.IsLocked == true));
                     return new WorkPackageInfoTS
                     {
@@ -290,7 +290,7 @@ namespace TRS2._0.Controllers
                 WorkPackages = wpxPersons.Select(wpx =>
                 {
                     var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
-                    var estimatedHours = RoundToNearestHalfOrWhole(totalWorkHours * effort);
+                    var estimatedHours = RoundToNearestHalfOrWhole((hoursPerDayWithDedication.Values.Sum()) * effort);
 
                     return new WorkPackageInfoTS
                     {

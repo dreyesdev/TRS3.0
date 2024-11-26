@@ -908,5 +908,41 @@ public class WorkCalendarService
         return Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2;
     }
 
+    public async Task<decimal> CalculateEstimatedHoursForPersonInProject(int personId, int projectId, int year, int month)
+    {
+        // Obtener las horas totales trabajadas por la persona en el mes
+        var hoursPerDayWithDedication = await CalculateDailyWorkHoursWithDedication(personId, year, month);
+        var totalMonthlyHours = hoursPerDayWithDedication.Values.Sum();
+
+        if (totalMonthlyHours == 0)
+        {
+            return 0; // Si no hay horas trabajadas, devolver 0
+        }
+
+        // Obtener los esfuerzos para los Work Packages del proyecto en el mes especificado
+        var efforts = await _context.Persefforts
+            .Include(pe => pe.WpxPersonNavigation)
+            .Where(pe => pe.WpxPersonNavigation.Person == personId &&
+                         pe.WpxPersonNavigation.WpNavigation.ProjId == projectId &&
+                         pe.Month.Year == year &&
+                         pe.Month.Month == month)
+            .ToListAsync();
+
+        // Calcular el esfuerzo total
+        decimal totalEffort = efforts.Sum(e => e.Value);
+
+        if (totalEffort == 0)
+        {
+            return 0; // Si no hay esfuerzo registrado, devolver 0
+        }
+
+        // Calcular las horas estimadas en el proyecto
+        decimal estimatedHours = totalMonthlyHours * totalEffort;
+
+        // Redondear al entero o .5 más cercano
+        return RoundToNearestHalfOrWhole(estimatedHours);
+    }
+
+
 
 }

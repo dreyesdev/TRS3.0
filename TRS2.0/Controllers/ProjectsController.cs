@@ -1675,10 +1675,8 @@ namespace TRS2._0.Controllers
                 }
 
                 // Convertir las fechas de string a DateTime
-                DateTime startDate;
-                DateTime endDate;
-                if (!DateTime.TryParseExact(request.StartDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out startDate) ||
-                    !DateTime.TryParseExact(request.EndDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out endDate))
+                if (!DateTime.TryParseExact(request.StartDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var startDate) ||
+                    !DateTime.TryParseExact(request.EndDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var endDate))
                 {
                     return BadRequest("Invalid date format.");
                 }
@@ -1687,8 +1685,6 @@ namespace TRS2._0.Controllers
                     .Include(p => p.Wps)
                     .ThenInclude(wp => wp.Wpxpeople)
                     .ThenInclude(wpxp => wpxp.PersonNavigation)
-                    .ThenInclude(person => person.Wpxpeople)
-                    .ThenInclude(wpxp => wpxp.Persefforts)
                     .FirstOrDefaultAsync(p => p.ProjId == request.ProjectId);
 
                 if (project == null)
@@ -1719,8 +1715,16 @@ namespace TRS2._0.Controllers
                 foreach (var person in people)
                 {
                     csv.Append(Encoding.UTF8.GetString(Encoding.Default.GetBytes(RemoveAccents(person.Surname) + ", " + RemoveAccents(person.Name))));
+
                     foreach (var date in dateList)
                     {
+                        var year = date.Year;
+                        var month = date.Month;
+
+                        // Usar el nuevo método para calcular las horas estimadas
+                        var estimatedHours = await _workCalendarService.CalculateEstimatedHoursForPersonInProject(person.Id, request.ProjectId, year, month);
+
+                        // Obtener las horas máximas por mes para calcular el porcentaje
                         var affiliation = _context.AffxPersons
                             .Where(ap => ap.PersonId == person.Id && ap.Start <= date && ap.End >= date)
                             .OrderByDescending(ap => ap.Start)
@@ -1728,19 +1732,12 @@ namespace TRS2._0.Controllers
 
                         if (affiliation != null)
                         {
-                            var year = date.Year;
                             var maxHours = _context.AffGlobalHours
                                 .FirstOrDefault(h => h.Aff == affiliation && h.Year == year)?.Hours ?? 0;
                             var maxHoursPerMonth = maxHours / 12;
 
-                            var startDateOfMonth = new DateTime(date.Year, date.Month, 1);
-                            var endDateOfMonth = startDateOfMonth.AddMonths(1).AddDays(-1);
-                            var declaredHours = await _workCalendarService.GetDeclaredHoursPerMonthForPersonInProyect(person.Id, startDateOfMonth, endDateOfMonth, request.ProjectId);
-
-                            var monthKey = startDateOfMonth;
-                            var declaredHoursForMonth = declaredHours.ContainsKey(monthKey) ? declaredHours[monthKey] : 0;
-
-                            var percentage = declaredHoursForMonth / maxHoursPerMonth;
+                            // Calcular el porcentaje en base a las horas estimadas
+                            var percentage = maxHoursPerMonth > 0 ? estimatedHours / maxHoursPerMonth : 0;
                             csv.Append($";{percentage.ToString("0.00", CultureInfo.InvariantCulture)}");
                         }
                         else
@@ -1752,7 +1749,7 @@ namespace TRS2._0.Controllers
                 }
 
                 var bytes = Encoding.UTF8.GetBytes(csv.ToString());
-                return File(Encoding.UTF8.GetBytes(csv.ToString()), "text/csv", $"PersonnelEffortPlan_{request.ProjectId}_{DateTime.Now:yyyyMMddHHmmss}.csv");
+                return File(bytes, "text/csv", $"PersonnelEffortPlan_{request.ProjectId}_{DateTime.Now:yyyyMMddHHmmss}.csv");
             }
             catch (Exception ex)
             {
@@ -1760,6 +1757,7 @@ namespace TRS2._0.Controllers
                 return StatusCode(500, "Error interno del servidor");
             }
         }
+
 
         private string RemoveAccents(string input)
         {

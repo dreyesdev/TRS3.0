@@ -1615,7 +1615,108 @@ namespace TRS2._0.Services
             }
         }
 
+        public async Task ProcessInvestigatorsTimesheet()
+        {
+                var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ProcesarInvestigadoresWP.txt");
 
+                var logger = new LoggerConfiguration()
+                    .MinimumLevel.Debug()
+                    .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                    .CreateLogger();
+
+                try
+                {
+                    logger.Information("Iniciando procesamiento de Timesheets para investigadores...");
+
+                    // Obtener todos los WpxPeople que cumplen las condiciones de un único WP y proyecto
+                    var allWpxPeople = await _context.Wpxpeople
+                        .Include(wpx => wpx.PersonNavigation)
+                        .Include(wpx => wpx.WpNavigation)
+                        .Where(wpx =>
+                            _context.Wpxpeople.Count(w => w.Person == wpx.Person) == 1 && // Solo en un único WP
+                            _context.Projectxpeople.Count(p => p.Person == wpx.Person) == 1) // Solo en un único proyecto
+                        .ToListAsync();
+
+                    foreach (var wpxPerson in allWpxPeople)
+                    {
+                        var person = wpxPerson.PersonNavigation;
+                        var wp = wpxPerson.WpNavigation;
+
+                        // Obtener effort mensual
+                        var effort = await _context.Persefforts
+                            .FirstOrDefaultAsync(pe => pe.WpxPerson == wpxPerson.Id);
+
+                        if (effort == null || effort.Value <= 0)
+                        {
+                            logger.Warning($"Sin effort válido para la persona {person.Name} {person.Surname} (ID: {person.Id}) en el WP {wp.Name}. Saltando.");
+                            continue;
+                        }
+
+                        decimal totalEffort = effort.Value;
+
+                        logger.Information($"Procesando Timesheet para {person.Name} {person.Surname} (ID: {person.Id}) en el WP {wp.Name} (Effort: {totalEffort:P}).");
+
+                        // Obtener las horas diarias calculadas
+                        var dailyWorkHours = await _workCalendarService.CalculateDailyWorkHoursWithDedication(person.Id, effort.Month.Year, effort.Month.Month);
+
+                        foreach (var (day, maxDailyHours) in dailyWorkHours)
+                        {
+                            // Ajustar las horas diarias por el effort
+                            decimal adjustedDailyHours = RoundToNearestHalfOrWhole(maxDailyHours * totalEffort);
+
+                            if (adjustedDailyHours == 0)
+                            {
+                                logger.Debug($"Día {day:yyyy-MM-dd}: sin horas ajustadas (Effort: {totalEffort:P}, Max: {maxDailyHours}h). Saltando.");
+                                continue;
+                            }
+
+                            // Registrar horas en Timesheet
+                            var existingTimesheet = await _context.Timesheets
+                                .FirstOrDefaultAsync(ts => ts.WpxPersonId == wpxPerson.Id && ts.Day == day);
+
+                            if (existingTimesheet != null)
+                            {
+                                existingTimesheet.Hours = adjustedDailyHours;
+                                _context.Timesheets.Update(existingTimesheet);
+                                logger.Information($"Día {day:yyyy-MM-dd}: actualizadas horas. Max: {maxDailyHours}h, Effort: {totalEffort:P}, Ajustadas: {adjustedDailyHours}h.");
+                            }
+                            else
+                            {
+                                _context.Timesheets.Add(new Timesheet
+                                {
+                                    WpxPersonId = wpxPerson.Id,
+                                    Day = day,
+                                    Hours = adjustedDailyHours
+                                });
+                                logger.Information($"Día {day:yyyy-MM-dd}: insertadas horas. Max: {maxDailyHours}h, Effort: {totalEffort:P}, Ajustadas: {adjustedDailyHours}h.");
+                            }
+                        }
+
+                        await _context.SaveChangesAsync();
+                        logger.Information($"Finalizado procesamiento para {person.Name} {person.Surname} (ID: {person.Id}).");
+                    }
+
+                    logger.Information("Procesamiento de Timesheets completado.");
+                }
+                catch (Exception ex)
+                {
+                    logger.Error($"Error durante el procesamiento de Timesheets: {ex.Message}");
+                    throw;
+                }
+                finally
+                {
+                    logger.Dispose();
+                }
+        }
+
+        // Método auxiliar para redondear al entero o .5 más cercano
+        private decimal RoundToNearestHalfOrWhole(decimal value)
+        {
+            return Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2;
+        }
+
+
+        
 
 
         public async Task Execute(IJobExecutionContext context)
@@ -1675,6 +1776,11 @@ namespace TRS2._0.Services
                 case "UpdateLeaveTable":    
                     await UpdateLeaveTableAsync();
                     break;
+
+                case "ProcessInvestigatorsTimesheet":
+                    await ProcessInvestigatorsTimesheet();
+                    break;
+
                 default:
                     _logger.LogError($"Acción desconocida: {action}");
                     throw new ArgumentException("Acción no implementada para este trabajo.");

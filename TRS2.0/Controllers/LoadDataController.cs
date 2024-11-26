@@ -427,5 +427,39 @@ namespace TRS2._0.Controllers
             }
         }
 
+        [HttpGet("/ProcessInvestigatorsTimesheet")]
+        public async Task<IActionResult> TriggerProcessInvestigatorsTimesheetJob()
+        {
+            try
+            {
+                // Obtén una instancia del scheduler
+                var scheduler = await _schedulerFactory.GetScheduler();
+                var jobKey = new JobKey("LoadDataServiceJob");
+
+                // Configura JobDataMap con los parámetros específicos para esta acción
+                var jobDataMap = new JobDataMap
+        {
+            { "Action", "ProcessInvestigatorsTimesheet" }
+        };
+
+                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
+                if (await scheduler.CheckExists(jobKey))
+                {
+                    await scheduler.TriggerJob(jobKey, jobDataMap);
+                    return Ok("El trabajo de procesamiento del timesheet para investigadores se ha iniciado.");
+                }
+                else
+                {
+                    return NotFound("El trabajo de procesamiento del timesheet para investigadores no se encontró.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Manejo adecuado de excepciones con un código de error HTTP 500
+                return StatusCode(500, $"Error al iniciar el trabajo de procesamiento del timesheet para investigadores: {ex.Message}");
+            }
+        }
+
+
     }
 }
