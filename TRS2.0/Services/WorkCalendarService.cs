@@ -119,23 +119,34 @@ public class WorkCalendarService
             }
 
             // Obtener la reducción por LeaveReduction, si existe
-            var leaveReduction = leaveRecords.TryGetValue(currentDate, out var reduction) && reduction > 0 && reduction < 1
+            var leaveReduction = leaveRecords.TryGetValue(currentDate, out var reduction) && reduction > 0 && reduction <= 1
                 ? reduction
                 : 0;
 
-            // Aplicar la reducción de dedicación más actual para la fecha
+            // Obtener la reducción de dedicación más actual para la fecha
             var applicableDedication = dedications
                 .Where(d => currentDate >= d.Start && currentDate <= d.End)
                 .OrderByDescending(d => d.Type) // Dar prioridad a la dedicación con el 'Type' más alto
                 .Select(d => d.Reduc)
                 .FirstOrDefault();
 
+            // Asegurarse de que la suma de LeaveReduction y ApplicableDedication no exceda 1
+            var totalReduction = Math.Min(1, applicableDedication + leaveReduction);
+
+            // Si la reducción total es 1 (día no trabajado), no se suma al totalPm
+            if (totalReduction == 1)
+            {
+                continue;
+            }
+
             // Calcular PM para el día ajustado por dedicación y LeaveReduction
-            totalPm += dailyPmValue * (1 - applicableDedication - leaveReduction);
+            totalPm += dailyPmValue * (1 - totalReduction);
         }
 
+        // Redondear el PM total a 2 decimales y devolverlo
         return Math.Round(totalPm, 2);
     }
+
 
 
     public async Task<decimal> CalculateMonthlyEffortForPerson(int personId, int year, int month)
@@ -356,7 +367,7 @@ public class WorkCalendarService
                         {
                             case 1: // Leave
                                 additionalStatuses.Add(3);
-                                gradient += "lightsalmon, ";
+                                gradient += "darkorange, ";
                                 break;
                             case 2: // Personal Holiday
                                 additionalStatuses.Add(4);

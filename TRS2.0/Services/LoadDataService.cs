@@ -141,8 +141,8 @@ namespace TRS2._0.Services
             var currentYear = DateTime.UtcNow.Year;
 
             // Establecer los límites de cálculo: 5 años hacia atrás y 5 años hacia adelante desde el año actual
-            var lowerLimit = new DateTime(currentYear - 10, 1, 1); // Inicio del rango permitido
-            var upperLimit = new DateTime(currentYear + 5, 12, 31); // Fin del rango permitido
+            var lowerLimit = new DateTime(currentYear - 1, 1, 1); // Inicio del rango permitido
+            var upperLimit = new DateTime(currentYear + 1, 1, 31); // Fin del rango permitido
 
             // Obtener el rango de fechas del primer y último contrato
             var start = contracts.First().Start < lowerLimit ? lowerLimit : contracts.First().Start; // Limitar al rango inferior
@@ -863,6 +863,8 @@ namespace TRS2._0.Services
                 {
                     logger.Warning(msg);
                 }
+
+                //Hay que eliminar los registros de tipo 0
                 await _context.SaveChangesAsync();
                 logger.Information("Carga de afiliaciones y dedicaciones finalizada.");
                 
