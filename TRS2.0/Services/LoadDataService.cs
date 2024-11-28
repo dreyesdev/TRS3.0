@@ -588,12 +588,7 @@ namespace TRS2._0.Services
                 personalLogger.Error(ex, "Error ocurrido durante el Procesamiento de Liquidaciones Avanzadas");
             }
         }
-
-
-
-
-
-
+-
         public async Task LoadPersonnelFromFileAsync(string filePath)
         {
             try
