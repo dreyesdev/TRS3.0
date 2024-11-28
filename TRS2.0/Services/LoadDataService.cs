@@ -1762,8 +1762,132 @@ namespace TRS2._0.Services
             return Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2;
         }
 
+        public async Task OutOfContractLoadAsync()
+        {
+            var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "OutOfContractLoadLog.txt");
+            var logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
 
-        
+            try
+            {
+                logger.Information("=== INICIO: Proceso de carga de días fuera de contrato ===");
+
+                // Eliminar todos los registros existentes de tipo 3
+                var existingLeaves = await _context.Leaves.Where(l => l.Type == 3).ToListAsync();
+                _context.Leaves.RemoveRange(existingLeaves);
+                await _context.SaveChangesAsync();
+                logger.Information($"Eliminados {existingLeaves.Count} registros previos de días fuera de contrato.");
+
+                // Obtener todos los contratos de las personas
+                var allContracts = await _context.Dedications
+                    .OrderBy(d => d.PersId)
+                    .ThenBy(d => d.Start)
+                    .ToListAsync();
+
+                var groupedContracts = allContracts
+                    .GroupBy(c => c.PersId)
+                    .ToList();
+
+                foreach (var contractGroup in groupedContracts)
+                {
+                    var personId = contractGroup.Key;
+                    var contracts = contractGroup.ToList();
+                    logger.Information($"Procesando contratos para PersonId={personId}. Total contratos={contracts.Count}");
+
+                    // Detectar días fuera de contrato entre contratos múltiples
+                    for (int i = 0; i < contracts.Count - 1; i++)
+                    {
+                        var currentEnd = contracts[i].End;
+                        var nextStart = contracts[i + 1].Start;
+
+                        if (currentEnd.AddDays(1) < nextStart)
+                        {
+                            // Rango de días fuera de contrato
+                            var gapStart = currentEnd.AddDays(1);
+                            var gapEnd = nextStart.AddDays(-1);
+
+                            logger.Information($"PersonId={personId}: Días fuera de contrato detectados entre {gapStart:yyyy-MM-dd} y {gapEnd:yyyy-MM-dd}");
+
+                            for (var day = gapStart; day <= gapEnd; day = day.AddDays(1))
+                            {
+                                var leave = new Leave
+                                {
+                                    PersonId = personId,
+                                    Day = day,
+                                    Type = 3,
+                                    Legacy = false,
+                                    LeaveReduction = 1,
+                                    Hours = null
+                                };
+                                _context.Leaves.Add(leave);
+                                logger.Debug($"Insertado registro fuera de contrato para PersonId={personId}, Día={day:yyyy-MM-dd}");
+                            }
+                        }
+                    }
+
+                    // Manejar contratos únicos que no cubren el mes completo
+                    var firstContract = contracts.First();
+                    var lastContract = contracts.Last();
+
+                    // Completar días antes del inicio del primer contrato
+                    if (firstContract.Start.Day > 1)
+                    {
+                        var startOfMonth = new DateTime(firstContract.Start.Year, firstContract.Start.Month, 1);
+                        for (var day = startOfMonth; day < firstContract.Start; day = day.AddDays(1))
+                        {
+                            var leave = new Leave
+                            {
+                                PersonId = personId,
+                                Day = day,
+                                Type = 3,
+                                Legacy = false,
+                                LeaveReduction = 1,
+                                Hours = null
+                            };
+                            _context.Leaves.Add(leave);
+                            logger.Debug($"Insertado registro fuera de contrato para PersonId={personId}, Día={day:yyyy-MM-dd}");
+                        }
+                    }
+
+                    // Completar días después del fin del último contrato
+                    var endOfMonth = new DateTime(lastContract.End.Year, lastContract.End.Month, DateTime.DaysInMonth(lastContract.End.Year, lastContract.End.Month));
+                    if (lastContract.End < endOfMonth)
+                    {
+                        for (var day = lastContract.End.AddDays(1); day <= endOfMonth; day = day.AddDays(1))
+                        {
+                            var leave = new Leave
+                            {
+                                PersonId = personId,
+                                Day = day,
+                                Type = 3,
+                                Legacy = false,
+                                LeaveReduction = 1,
+                                Hours = null
+                            };
+                            _context.Leaves.Add(leave);
+                            logger.Debug($"Insertado registro fuera de contrato para PersonId={personId}, Día={day:yyyy-MM-dd}");
+                        }
+                    }
+                }
+
+                // Guardar cambios en la base de datos
+                await _context.SaveChangesAsync();
+                logger.Information("=== FIN: Proceso completado exitosamente ===");
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Error en OutOfContractLoadAsync: {ex.Message}");
+                throw;
+            }
+            finally
+            {
+                logger.Dispose();
+            }
+        }
+
+
 
 
         public async Task Execute(IJobExecutionContext context)
@@ -1826,6 +1950,10 @@ namespace TRS2._0.Services
 
                 case "ProcessInvestigatorsTimesheet":
                     await AutoFillTimesheetsForInvestigatorsInSingleWPWithEffortAsync();
+                    break;
+
+                case "LoadOutOfContract":
+                    await OutOfContractLoadAsync();
                     break;
 
                 default:
