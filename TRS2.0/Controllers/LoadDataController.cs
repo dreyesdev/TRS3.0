@@ -472,7 +472,7 @@ namespace TRS2._0.Controllers
                 // Configura JobDataMap con los parámetros específicos para esta acción
                 var jobDataMap = new JobDataMap
         {
-            {"Action", "OutOfContractLoad"}
+            {"Action", "LoadOutOfContract"}
         };
 
                 // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena

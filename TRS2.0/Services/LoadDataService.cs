@@ -588,7 +588,7 @@ namespace TRS2._0.Services
                 personalLogger.Error(ex, "Error ocurrido durante el Procesamiento de Liquidaciones Avanzadas");
             }
         }
--
+
         public async Task LoadPersonnelFromFileAsync(string filePath)
         {
             try
@@ -1770,12 +1770,12 @@ namespace TRS2._0.Services
                 logger.Information("=== INICIO: Proceso de carga de días fuera de contrato ===");
 
                 // Eliminar todos los registros existentes de tipo 3
-                var existingLeaves = await _context.Leaves.Where(l => l.Type == 3).ToListAsync();
-                _context.Leaves.RemoveRange(existingLeaves);
-                await _context.SaveChangesAsync();
-                logger.Information($"Eliminados {existingLeaves.Count} registros previos de días fuera de contrato.");
+                logger.Information("Eliminando registros existentes de tipo 3 en la tabla Leave...");
+                var deletedCount = await _context.Database.ExecuteSqlRawAsync("DELETE FROM Leave WHERE Type = 3");
+                logger.Information($"Eliminados {deletedCount} registros previos de días fuera de contrato.");
 
                 // Obtener todos los contratos de las personas
+                logger.Information("Cargando contratos de todas las personas...");
                 var allContracts = await _context.Dedications
                     .OrderBy(d => d.PersId)
                     .ThenBy(d => d.Start)
@@ -1784,6 +1784,10 @@ namespace TRS2._0.Services
                 var groupedContracts = allContracts
                     .GroupBy(c => c.PersId)
                     .ToList();
+
+                logger.Information($"Procesando un total de {groupedContracts.Count} personas con contratos registrados.");
+
+                var newLeaves = new List<Leave>();
 
                 foreach (var contractGroup in groupedContracts)
                 {
@@ -1807,17 +1811,19 @@ namespace TRS2._0.Services
 
                             for (var day = gapStart; day <= gapEnd; day = day.AddDays(1))
                             {
-                                var leave = new Leave
+                                if (!newLeaves.Any(l => l.PersonId == personId && l.Day == day))
                                 {
-                                    PersonId = personId,
-                                    Day = day,
-                                    Type = 3,
-                                    Legacy = false,
-                                    LeaveReduction = 1,
-                                    Hours = null
-                                };
-                                _context.Leaves.Add(leave);
-                                logger.Debug($"Insertado registro fuera de contrato para PersonId={personId}, Día={day:yyyy-MM-dd}");
+                                    newLeaves.Add(new Leave
+                                    {
+                                        PersonId = personId,
+                                        Day = day,
+                                        Type = 3,
+                                        Legacy = false,
+                                        LeaveReduction = 1,
+                                        Hours = null
+                                    });
+                                    logger.Debug($"Preparado para insertar: PersonId={personId}, Día={day:yyyy-MM-dd}");
+                                }
                             }
                         }
                     }
@@ -1832,17 +1838,19 @@ namespace TRS2._0.Services
                         var startOfMonth = new DateTime(firstContract.Start.Year, firstContract.Start.Month, 1);
                         for (var day = startOfMonth; day < firstContract.Start; day = day.AddDays(1))
                         {
-                            var leave = new Leave
+                            if (!newLeaves.Any(l => l.PersonId == personId && l.Day == day))
                             {
-                                PersonId = personId,
-                                Day = day,
-                                Type = 3,
-                                Legacy = false,
-                                LeaveReduction = 1,
-                                Hours = null
-                            };
-                            _context.Leaves.Add(leave);
-                            logger.Debug($"Insertado registro fuera de contrato para PersonId={personId}, Día={day:yyyy-MM-dd}");
+                                newLeaves.Add(new Leave
+                                {
+                                    PersonId = personId,
+                                    Day = day,
+                                    Type = 3,
+                                    Legacy = false,
+                                    LeaveReduction = 1,
+                                    Hours = null
+                                });
+                                logger.Debug($"Preparado para insertar: PersonId={personId}, Día={day:yyyy-MM-dd}");
+                            }
                         }
                     }
 
@@ -1852,18 +1860,36 @@ namespace TRS2._0.Services
                     {
                         for (var day = lastContract.End.AddDays(1); day <= endOfMonth; day = day.AddDays(1))
                         {
-                            var leave = new Leave
+                            if (!newLeaves.Any(l => l.PersonId == personId && l.Day == day))
                             {
-                                PersonId = personId,
-                                Day = day,
-                                Type = 3,
-                                Legacy = false,
-                                LeaveReduction = 1,
-                                Hours = null
-                            };
-                            _context.Leaves.Add(leave);
-                            logger.Debug($"Insertado registro fuera de contrato para PersonId={personId}, Día={day:yyyy-MM-dd}");
+                                newLeaves.Add(new Leave
+                                {
+                                    PersonId = personId,
+                                    Day = day,
+                                    Type = 3,
+                                    Legacy = false,
+                                    LeaveReduction = 1,
+                                    Hours = null
+                                });
+                                logger.Debug($"Preparado para insertar: PersonId={personId}, Día={day:yyyy-MM-dd}");
+                            }
                         }
+                    }
+                }
+
+                logger.Information($"Preparados {newLeaves.Count} registros para insertar.");
+
+                // Insertar nuevos registros
+                foreach (var leave in newLeaves)
+                {
+                    if (!await _context.Leaves.AnyAsync(l => l.PersonId == leave.PersonId && l.Day == leave.Day))
+                    {
+                        _context.Leaves.Add(leave);
+                        logger.Debug($"Insertado: PersonId={leave.PersonId}, Día={leave.Day:yyyy-MM-dd}");
+                    }
+                    else
+                    {
+                        logger.Warning($"Duplicado evitado: PersonId={leave.PersonId}, Día={leave.Day:yyyy-MM-dd}");
                     }
                 }
 
@@ -1874,6 +1900,17 @@ namespace TRS2._0.Services
             catch (Exception ex)
             {
                 logger.Error($"Error en OutOfContractLoadAsync: {ex.Message}");
+
+                if (ex.InnerException != null)
+                {
+                    logger.Error($"Inner Exception: {ex.InnerException.Message}");
+                    logger.Error($"Stack Trace: {ex.InnerException.StackTrace}");
+                }
+                else
+                {
+                    logger.Error($"Stack Trace: {ex.StackTrace}");
+                }
+
                 throw;
             }
             finally
@@ -1881,6 +1918,8 @@ namespace TRS2._0.Services
                 logger.Dispose();
             }
         }
+
+
 
 
 
