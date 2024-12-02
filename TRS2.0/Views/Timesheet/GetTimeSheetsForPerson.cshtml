@@ -121,7 +121,7 @@
                                 var cellStyle = "";
                                 var hasTravelforthisProject = Model.TravelsthisMonth.Any(t => day.Date >= t.StartDate && day.Date <= t.EndDate && t.ProjId == wp.ProjectId);
 
-                                // Define el estilo de la celda según las condiciones dadas
+                                // Definir el estilo de la celda según las condiciones dadas
                                 if (isHoliday)
                                 {
                                     cellStyle = "background-color: green;";
@@ -147,11 +147,15 @@
                                         case 3:
                                             cellStyle = "background-color: purple;";
                                             break;
+                                        case 11: // Partial Leave - Light Orange
+                                        case 12: // Partial Leave - Light Orange
+                                            cellStyle = "background-color: lightcoral;";
+                                            break;
                                     }
                                 }
 
                                 <td class="hour-input-cell" style="@cellStyle">
-                                    @if (!wp.IsLocked && !isWeekend && leave == null && (!hasTravel || hasTravelforthisProject) && !isFuture && !isHoliday)
+                                    @if (leave?.Type == 11 || leave?.Type == 12 || (!wp.IsLocked && !isWeekend && leave == null && (!hasTravel || hasTravelforthisProject) && !isFuture && !isHoliday))
                                     {
                                         var timesheetEntry = wp.Timesheets.FirstOrDefault(ts => ts.Day.Date == day.Date);
                                         <input type="text" class="form-control input-hours"
@@ -170,6 +174,7 @@
                                     }
                                 </td>
                             }
+
 
 
 
@@ -213,12 +218,19 @@
                         @foreach (var day in Model.MonthDays)
                         {
                             // Verificar si el día es un día festivo o tiene una ausencia
+                            var leave = Model.LeavesthisMonth.FirstOrDefault(l => l.Day.Date == day.Date);
                             bool isHoliday = Model.Holidays.Any(h => h.Date == day);
-                            bool isLeave = Model.LeavesthisMonth.Any(l => l.Day.Date == day.Date);
+                            bool isLeave = leave != null && leave.Type != 11 && leave.Type != 12; // No considera parciales como bajas completas
 
                             // Calcular los totales
                             var totalActualForDay = Model.TotalHoursWithDedication.ContainsKey(day) ? Model.TotalHoursWithDedication[day] : 0;
-                            var totalEstimadoForDay = (isHoliday || isLeave) ? 0 : (Model.HoursPerDayWithDedication.ContainsKey(day) ? Model.HoursPerDayWithDedication[day] : 0);
+                            var totalEstimadoForDay = isHoliday || isLeave ? 0 : (Model.HoursPerDayWithDedication.ContainsKey(day) ? Model.HoursPerDayWithDedication[day] : 0);
+
+                            // Para bajas parciales, ajustar el total estimado
+                            if (leave?.Type == 11 || leave?.Type == 12)
+                            {
+                                totalEstimadoForDay = Model.HoursPerDayWithDedication.ContainsKey(day) ? Model.HoursPerDayWithDedication[day] : 0;
+                            }
 
                             string textColorForDay;
                             string backgroundStyle;
@@ -226,17 +238,17 @@
                             if (totalActualForDay == totalEstimadoForDay)
                             {
                                 textColorForDay = "#006400"; // Verde oscuro
-                                backgroundStyle = "background-color: #e6ffe6;"; // Verde muy muy claro
+                                backgroundStyle = "background-color: #e6ffe6;";
                             }
                             else if (totalActualForDay > totalEstimadoForDay)
                             {
                                 textColorForDay = "#FF8C00"; // Naranja oscuro
-                                backgroundStyle = "background-color: #fff0e6;"; // Naranja muy muy claro
+                                backgroundStyle = "background-color: #fff0e6;";
                             }
                             else
                             {
                                 textColorForDay = "#00008B"; // Azul oscuro
-                                backgroundStyle = "background-color: #e6f3ff;"; // Azul muy muy claro
+                                backgroundStyle = "background-color: #e6f3ff;";
                             }
 
                             <td style="@backgroundStyle font-weight: bold; color: @textColorForDay;">
@@ -248,10 +260,11 @@
                                 </div>
                             </td>
                         }
-                        <th style="background-color: #343a40; color: white;"></th> <!-- Espacio vacío para la columna de Total -->
-                        <th style="background-color: #343a40; color: white;"></th> <!-- Nueva columna -->
+                        <th style="background-color: #343a40; color: white;"></th>
+                        <th style="background-color: #343a40; color: white;"></th>
                     </tr>
                 </tfoot>
+
 
 
             </table>
@@ -259,13 +272,15 @@
     </div>
 </div>
 <hr/>
-<div class="below-main-table" style="display: flex; justify-content: space-between; margin-top: 20px;">
-<div class="legend-box" style="width: 300px; margin-left:10px; padding: 10px; margin-top: 20px; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,.1);">
+<div class="below-main-table" style="display: flex; justify-content: space-between; margin-top: 10px;">
+    <div class="legend-box" style="width: 300px; margin-left:10px; padding: 10px; margin-top: 10px; margin-bottom: 15px; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,.1);">
     <h4 style="margin-bottom: 20px; text-align: center; font-weight: bold">Leyend</h4>
     <div class="mb-2">
         <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: darkorange; border: 1px solid black;">&nbsp;</span>
         <span style="margin-left: 8px;">Leave</span>
     </div>
+        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: lightcoral; border: 1px solid black;">&nbsp;</span>
+        <span style="margin-left: 8px;">Partial Leave</span>
     <div class="mb-2">
         <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: lightblue; border: 1px solid black;">&nbsp;</span>
         <span style="margin-left: 8px;">Holiday</span>
@@ -677,6 +692,19 @@
     .sticky-header {
         z-index: 5; /* Asegura que la cabecera de la primera columna esté por encima de las demás */
     }
+
+    .legend-box {
+        width: 300px;
+        margin-left: 10px;
+        padding: 10px;
+        margin-top: 10px; /* Reducido desde 20px */
+        border: 1px solid #ccc;
+        box-shadow: 0 2px 4px rgba(0,0,0,.1);
+    }
+
+        .legend-box .mb-2 {
+            margin-bottom: 15px; /* Incrementado para mayor separación */
+        }
 </style>
 
 

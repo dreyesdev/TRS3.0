@@ -1401,10 +1401,7 @@ namespace TRS2._0.Services
 
         public async Task UpdateLeaveTableAsync()
         {
-            // Ruta del archivo de logs para registrar el proceso
             var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "CargaAusencias.txt");
-
-            // Configuración del logger utilizando Serilog
             var logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
@@ -1412,172 +1409,152 @@ namespace TRS2._0.Services
 
             try
             {
-                // Configurar el cliente HTTP con el token Bearer necesario para la autenticación
-                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _bearerToken);
+                logger.Information("=== Inicio del proceso de actualización de la tabla Leave ===");
 
-                // Realizar la petición GET para obtener la lista de usuarios
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _bearerToken);
                 var response = await _httpClient.GetAsync("https://app.woffu.com/api/v1/users");
                 if (!response.IsSuccessStatusCode)
                 {
-                    // Registrar detalles de la respuesta si no es exitosa
                     var responseContent = await response.Content.ReadAsStringAsync();
                     logger.Error($"HTTP request failed. Status: {response.StatusCode}, Content: {responseContent}");
                     throw new Exception($"Request failed with status: {response.StatusCode}");
                 }
-                var content = await response.Content.ReadAsStringAsync();
 
-                // Deserializar la respuesta en un array JSON para procesar los usuarios
+                var content = await response.Content.ReadAsStringAsync();
                 var users = JsonConvert.DeserializeObject<JArray>(content);
 
-                // Procesar cada usuario de forma individual
                 foreach (var user in users)
                 {
-                    // Verificar si el UserKey existe antes de continuar
                     if (user["UserKey"] == null || string.IsNullOrEmpty(user["UserKey"].ToString()))
                     {
                         string firstName = user["FirstName"]?.ToString() ?? "Unknown";
                         string lastName = user["LastName"]?.ToString() ?? "Unknown";
                         string email = user["Email"]?.ToString() ?? "Unknown";
                         logger.Warning($"Missing UserKey for user {firstName} {lastName} ({email}). This record needs manual correction.");
-                        continue; // Pasar al siguiente usuario
+                        continue;
                     }
 
-                    // Obtener el ID del usuario remoto y el ID interno de la empresa
                     int userId = user["UserId"].Value<int>();
                     int userKey = user["UserKey"].Value<int>();
                     logger.Information($"Updating absences for user: {userKey}, WoffuId: {userId}");
 
-                    // Buscar el ID interno de la persona en la base de datos local
                     int personId = _context.Personnel.FirstOrDefault(p => p.Id == userKey)?.Id ?? 0;
                     if (personId == 0)
                     {
-                        // Si no existe la persona en la base de datos, se omite
                         continue;
                     }
 
-                    // Obtener los registros existentes de bajas para esta persona
                     var existingLeaves = _context.Leaves
-                        .Where(l => l.PersonId == personId) // Filtrar por la persona actual
-                        .ToDictionary(l => l.Day, l => l); // Convertir a diccionario con clave: día
+                        .Where(l => l.PersonId == personId)
+                        .ToDictionary(l => l.Day, l => l);
 
-                    // Temporizador: Pausar 1 segundo entre solicitudes para evitar bloqueos del servidor
                     await Task.Delay(1000);
 
-                    // Hacer la petición HTTP para obtener las solicitudes de bajas del usuario
                     var requestsResponse = await _httpClient.GetAsync($"https://app.woffu.com/api/v1/users/{userId}/requests");
                     if (!requestsResponse.IsSuccessStatusCode)
                     {
-                        // Registrar el contenido de la respuesta si la solicitud falla
                         var responseContent = await requestsResponse.Content.ReadAsStringAsync();
                         logger.Error($"HTTP request failed. Status: {requestsResponse.StatusCode}, Content: {responseContent}");
-                        continue; // Pasar al siguiente usuario
+                        continue;
                     }
 
-                    // Leer y deserializar la respuesta
                     var requestsContent = await requestsResponse.Content.ReadAsStringAsync();
                     var requestsObject = JsonConvert.DeserializeObject<JObject>(requestsContent);
 
-                    // Verificar si existe la propiedad "Views" en la respuesta
                     if (requestsObject.ContainsKey("Views"))
                     {
                         var requestsArray = (JArray)requestsObject["Views"];
 
-                        // Agrupar todas las solicitudes por día y sumar las horas
                         var groupedDays = requestsArray
-                            .Where(r => r["RequestStatus"]?.ToString() == "Approved") // Filtrar solo las solicitudes aprobadas
+                            .Where(r => r["RequestStatus"]?.ToString() == "Approved")
                             .SelectMany(r =>
                             {
-                                // Expandir cada rango de fechas (StartDate a EndDate) en días individuales
                                 var startDate = DateTime.Parse(r["StartDate"].ToString());
                                 var endDate = DateTime.Parse(r["EndDate"].ToString());
-                                var hours = (decimal?)r["NumberHoursRequested"] ?? 0; // Horas solicitadas
+                                var hours = (decimal?)r["NumberHoursRequested"] ?? 0;
+                                var agreementEventId = r["AgreementEventId"]?.Value<int>() ?? 0;
 
-                                // Generar un registro para cada día en el rango
                                 return Enumerable.Range(0, (endDate - startDate).Days + 1)
                                     .Select(offset => new
                                     {
-                                        Date = startDate.AddDays(offset), // Día específico dentro del rango
-                                        Hours = hours, // Horas solicitadas
-                                        AgreementEventId = r["AgreementEventId"]?.Value<int>() ?? 0 // Evento relacionado
+                                        Date = startDate.AddDays(offset),
+                                        Hours = hours,
+                                        AgreementEventId = agreementEventId
                                     });
                             })
-                            .GroupBy(x => x.Date) // Agrupar por día
+                            .GroupBy(x => x.Date)
                             .Select(g => new
                             {
-                                Date = g.Key, // Día específico
-                                TotalHours = g.Sum(x => x.Hours), // Sumar todas las horas para este día
-                                AgreementEventId = g.First().AgreementEventId // Usar el primer evento relacionado (suponiendo que es consistente)
+                                Date = g.Key,
+                                TotalHours = g.Sum(x => x.Hours),
+                                AgreementEventId = g.First().AgreementEventId
                             });
 
-                        // Mantener un registro de los días procesados
                         var processedDays = new HashSet<DateTime>();
 
-                        // Procesar cada día único en los datos agrupados
                         foreach (var dayGroup in groupedDays)
                         {
-                            var date = dayGroup.Date; // Día procesado
-                            var totalHours = dayGroup.TotalHours; // Total de horas acumuladas
-                            var agreementEventId = dayGroup.AgreementEventId; // ID del evento asociado
+                            var date = dayGroup.Date;
+                            var totalHours = dayGroup.TotalHours;
+                            var agreementEventId = dayGroup.AgreementEventId;
 
-                            // Buscar el evento en la base de datos
                             var agreementEvent = await _context.AgreementEvents.FindAsync(agreementEventId);
                             if (agreementEvent != null)
                             {
-                                // Calcular la reducción de la baja (LeaveReduction)
                                 decimal leaveReduction;
-                                if (totalHours > 0) // Si la baja es por horas
+
+                                if (agreementEventId == 1079914) // Baja de paternidad por horas
+                                {
+                                    leaveReduction = 0.5m; // Reducción fija al 50%
+                                    logger.Information($"Processing paternity leave (ID=1079914): PersonId={personId}, Date={date}, Reduction={leaveReduction:P}");
+                                }
+                                else if (totalHours > 0)
                                 {
                                     leaveReduction = await _workCalendarService.CalculateLeaveReductionAsync(personId, date, totalHours);
                                 }
-                                else // Si es una baja completa
+                                else
                                 {
-                                    leaveReduction = 1.00m; // Reducción completa
+                                    leaveReduction = 1.00m;
                                 }
 
-                                // Verificar si ya existe un registro para este día
                                 if (existingLeaves.TryGetValue(date, out var existingLeave))
                                 {
-                                    // No eliminar registros cuyo Type sea 3, independientemente de su estado Legacy
                                     if (existingLeave.Type == 3)
                                     {
-                                        logger.Information($"Skipping record with Type 3 for PersonId: {personId}, Date: {date}.");
+                                        logger.Information($"Skipping record with Type 3 for PersonId={personId}, Date={date}.");
                                         continue;
                                     }
 
-                                    // Si el registro existente necesita actualización
                                     if (existingLeave.LeaveReduction != leaveReduction || existingLeave.Hours != totalHours)
                                     {
                                         existingLeave.LeaveReduction = leaveReduction;
                                         existingLeave.Hours = totalHours > 0 ? totalHours : null;
-                                        existingLeave.Type = (int)agreementEvent.Type;
+                                        existingLeave.Type = agreementEventId == 1079914 ? 12 : (int)agreementEvent.Type;
                                         _context.Leaves.Update(existingLeave);
 
-                                        logger.Information($"Updated leave record for PersonId: {personId}, Date: {date}, LeaveReduction: {leaveReduction}");
+                                        logger.Information($"Updated leave record for PersonId={personId}, Date={date}, LeaveReduction={leaveReduction}");
                                     }
                                 }
                                 else
                                 {
-                                    // Crear un nuevo registro si no existe
                                     var newLeave = new Leave
                                     {
                                         PersonId = personId,
                                         Day = date,
-                                        Type = (int)agreementEvent.Type,
-                                        Legacy = false, // Nuevo registro, no heredado
+                                        Type = agreementEventId == 1079914 ? 12 : (int)agreementEvent.Type,
+                                        Legacy = false,
                                         LeaveReduction = leaveReduction,
                                         Hours = totalHours > 0 ? totalHours : null
                                     };
                                     _context.Leaves.Add(newLeave);
 
-                                    logger.Information($"Created new leave record for PersonId: {personId}, Date: {date}, LeaveReduction: {leaveReduction}");
+                                    logger.Information($"Created new leave record for PersonId={personId}, Date={date}, LeaveReduction={leaveReduction}");
                                 }
 
-                                // Marcar el día como procesado
                                 processedDays.Add(date);
                             }
                         }
 
-                        // Eliminar registros no procesados (Legacy = 0) y que no sean de Type 3
                         var daysToDelete = existingLeaves
                             .Where(e => !processedDays.Contains(e.Key) && e.Value.Legacy == false && e.Value.Type != 3)
                             .Select(e => e.Key)
@@ -1587,7 +1564,7 @@ namespace TRS2._0.Services
                         {
                             var leaveToRemove = existingLeaves[day];
                             _context.Leaves.Remove(leaveToRemove);
-                            logger.Information($"Deleted leave record for PersonId: {personId}, Date: {day}");
+                            logger.Information($"Deleted leave record for PersonId={personId}, Date={day}");
                         }
                     }
                     else
@@ -1596,8 +1573,8 @@ namespace TRS2._0.Services
                     }
                 }
 
-                // Guardar todos los cambios en la base de datos
                 await _context.SaveChangesAsync();
+                logger.Information("=== Fin del proceso de actualización de la tabla Leave ===");
             }
             catch (Exception ex)
             {
@@ -1609,6 +1586,7 @@ namespace TRS2._0.Services
                 logger.Dispose();
             }
         }
+
 
         public async Task AutoFillTimesheetsForInvestigatorsInSingleWPWithEffortAsync()
         {

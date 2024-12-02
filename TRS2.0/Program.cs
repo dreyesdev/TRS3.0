@@ -63,6 +63,11 @@ builder.Services.AddAuthorization(options =>
         policy.RequireRole("ProjectManager", "Admin"));
     options.AddPolicy("AdminPolicy", policy =>
         policy.RequireRole("Admin"));
+    options.AddPolicy("AllowLogsPolicy", policy =>
+        policy.RequireAssertion(context =>
+            context.User.IsInRole("Admin") ||
+            context.Resource.ToString() == "/Admin/GetLogFiles" ||
+            context.Resource.ToString().StartsWith("/Admin/GetLogFileContent")));
 });
 
 builder.Services.AddScoped<WorkCalendarService>();

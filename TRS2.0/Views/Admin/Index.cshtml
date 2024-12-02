@@ -1,213 +1,306 @@
 ﻿@model TRS2._0.Models.ViewModels.AdminIndexViewModel
 
 @{
-    ViewData["Title"] = "Admin Index";
+    ViewData["Title"] = "Admin Dashboard";
 }
 
-<h1>Admin Index</h1>
+<h1 class="text-center my-4">Admin Dashboard</h1>
 
-<button id="selectFolderButton" class="btn btn-primary">Seleccionar Carpeta para cargar Excell</button>
+<div class="container">
+    <!-- Primera fila: Trabajos Automatizados -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4>Trabajos Automatizados</h4>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap">
+                        <button class="btn btn-success m-2" onclick="triggerJob('/Carga')">Carga de Datos</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/Liquidaciones')">Liquidaciones</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/ProcesaLiquidaciones')">Procesar Liquidaciones</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaPersonal')">Carga de Personal</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaAfiliacionesYDedicaciones')">Afiliaciones y Dedicaciones</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaGruposPersonas')">Grupos de Personas</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaLideres')">Líderes</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaProyectos')">Proyectos</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<!-- Sección de Generar PM Values -->
-<h2>Generar Valores PM</h2>
-<form asp-action="GeneratePMValues" method="post" class="form-inline">
-    <div class="form-group mb-2">
-        <label for="year" class="sr-only">Year</label>
-        <input type="number" name="year" class="form-control" placeholder="Year" required />
-    </div>
-    <div class="form-group mx-sm-3 mb-2">
-        <label for="month" class="sr-only">Month</label>
-        <input type="number" name="month" class="form-control" placeholder="Month" required />
-    </div>
-    <button type="submit" class="btn btn-primary mb-2">Generate PM Values</button>
-</form>
-
-<!-- Sección de PM Values -->
-<h2>Valores PM Diarios</h2>
-<table class="table">
-    <thead>
-        <tr>
-            <th>Year</th>
-            <th>Month</th>
-            <th>Workable Days</th>
-            <th>PM per Day</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var pm in Model.DailyPMValues)
-        {
-            <tr>
-                <td>@pm.Year</td>
-                <td>@pm.Month</td>
-                <td>@pm.WorkableDays</td>
-                <td>@pm.PmPerDay</td>
-            </tr>
-        }
-    </tbody>
-</table>
-
-<!-- Sección de Asignación de PM Diario -->
-<h2>Calcular PM Diario</h2>
-<form asp-action="CalculateDailyPM" method="post" class="form-inline">
-    <div class="form-group mb-2">
-        <label for="personId" class="sr-only">Persona</label>
-        <select name="personId" class="form-control" required>
-            @foreach (var person in Model.People)
-            {
-                <option value="@person.Value">@person.Text</option>
-            }
-        </select>
-    </div>
-    <div class="form-group mx-sm-3 mb-2">
-        <label for="date" class="sr-only">Fecha</label>
-        <input type="date" name="date" class="form-control" required />
-    </div>
-    <button type="submit" class="btn btn-primary mb-2">Calcular PM Diario</button>
-</form>
-
-<!-- Sección de Asignación de PM Mensual -->
-<h2>Calcular PM Mensual</h2>
-<form asp-action="CalculateMonthlyPM" method="post" class="form-inline">
-    <div class="form-group mb-2">
-        <label for="personId" class="sr-only">Persona</label>
-        <select name="personId" class="form-control" required>
-            @foreach (var person in Model.People)
-            {
-                <option value="@person.Value">@person.Text</option>
-            }
-        </select>
-    </div>
-    <div class="form-group mx-sm-3 mb-2">
-        <label for="date" class="sr-only">Fecha</label>
-        <input type="month" name="date" class="form-control" required />
-    </div>
-    <button type="submit" class="btn btn-primary mb-2">Calcular PM Mensual</button>
-</form>
-
-<!-- Sección de Asignación de Roles -->
-<h2>Gestionar Roles de Usuario</h2>
-<table class="table">
-    <thead>
-        <tr>
-            <th>Username</th>
-            <th>Role</th>
-            <th>Action</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var user in Model.Users)
-        {
-            <tr>
-                <td>@user.Text</td>
-                <td>
-                    <form asp-action="AssignRole" method="post">
-                        <input type="hidden" name="userId" value="@user.Value" />
-                        <select name="role" class="form-select">
-                            @foreach (var role in Model.Roles)
-                            {
-                                <option value="@role.Value">@role.Text</option>
-                            }
+    <!-- Segunda fila: Visor de Logs -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h4>Visor de Logs</h4>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="logFileSelect" class="form-label">Seleccionar Archivo de Log:</label>
+                        <select id="logFileSelect" class="form-select" onchange="loadLogFile()">
+                            <option value="">Cargando archivos de log...</option>
                         </select>
-                        <button type="submit" class="btn btn-primary">Assign Role</button>
+                    </div>
+                    <div id="logContent" style="height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background: #f8f9fa;">
+                        <p>Seleccione un archivo de log para visualizar su contenido...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tercera fila: Cargar Excel y Generar PM -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h4>Seleccionar Carpeta para Cargar Excel</h4>
+                </div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <button id="selectFolderButton" class="btn btn-primary">Seleccionar Carpeta</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-white">
+                    <h4>Generar Valores PM</h4>
+                </div>
+                <div class="card-body">
+                    <form asp-action="GeneratePMValues" method="post" class="row g-3">
+                        <div class="col-md-6">
+                            <label for="year" class="form-label">Año</label>
+                            <input type="number" name="year" class="form-control" placeholder="Year" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="month" class="form-label">Mes</label>
+                            <input type="number" name="month" class="form-control" placeholder="Month" required />
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary w-100">Generar</button>
+                        </div>
                     </form>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cuarta fila: Valores PM Diarios -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Valores PM Diarios</h4>
+                </div>
+                <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-bordered table-hover table-striped">
+                        <thead>
+                            <tr>
+                                <th>Año</th>
+                                <th>Mes</th>
+                                <th>Días Laborables</th>
+                                <th>PM por Día</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var pm in Model.DailyPMValues.OrderBy(pm => pm.Year).ThenBy(pm => pm.Month))
+                            {
+                                <tr>
+                                    <td>@pm.Year</td>
+                                    <td>@pm.Month</td>
+                                    <td>@pm.WorkableDays</td>
+                                    <td>@pm.PmPerDay</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quinta fila: Calcular PM Diario y Mensual -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-light text-dark">
+                    <h4>Calcular PM Diario</h4>
+                </div>
+                <div class="card-body">
+                    <form asp-action="CalculateDailyPM" method="post" class="row g-3">
+                        <div class="col-8">
+                            <label for="personId" class="form-label">Persona</label>
+                            <select name="personId" class="form-select" required>
+                                @foreach (var person in Model.People)
+                                {
+                                    <option value="@person.Value">@person.Text</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <label for="date" class="form-label">Fecha</label>
+                            <input type="date" name="date" class="form-control" required />
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary w-100">Calcular</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-light text-dark">
+                    <h4>Calcular PM Mensual</h4>
+                </div>
+                <div class="card-body">
+                    <form asp-action="CalculateMonthlyPM" method="post" class="row g-3">
+                        <div class="col-8">
+                            <label for="personId" class="form-label">Persona</label>
+                            <select name="personId" class="form-select" required>
+                                @foreach (var person in Model.People)
+                                {
+                                    <option value="@person.Value">@person.Text</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <label for="date" class="form-label">Mes</label>
+                            <input type="month" name="date" class="form-control" required />
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary w-100">Calcular</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sexta fila: Gestionar Roles -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h4>Gestionar Roles de Usuario</h4>
+                </div>
+                <div class="card-body">
+                    <table class="table table-bordered table-hover table-striped">
+                        <thead>
+                            <tr>
+                                <th>Nombre de Usuario</th>
+                                <th>Rol</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var user in Model.Users)
+                            {
+                                <tr>
+                                    <td>@user.Text</td>
+                                    <td>
+                                        <form asp-action="AssignRole" method="post" class="d-flex align-items-center">
+                                            <input type="hidden" name="userId" value="@user.Value" />
+                                            <select name="role" class="form-select mx-2">
+                                                @foreach (var role in Model.Roles)
+                                                {
+                                                    <option value="@role.Value">@role.Text</option>
+                                                }
+                                            </select>
+                                            <button type="submit" class="btn btn-primary">Asignar</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
-        function generatePMValues() {
-            var year = $('#yearSelector').val();
-            var month = $('#monthSelector').val();
-            $.ajax({
-                url: '@Url.Action("GeneratePMValues", "Admin")',
-                type: 'POST',
-                data: { year: year, month: month },
-                success: function (response) {
-                    if (response.success) {
-                        alert('Valores PM generados con éxito.');
-                        location.reload();
-                        // Puedes optar por recargar la página o actualizar una tabla de valores PM si es necesario
-                    } else {
-                        alert('Error al generar valores PM: ' + response.message);
+        // Cargar lista de archivos de logs al iniciar la página
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('/Admin/GetLogFiles')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Error HTTP: ${response.status}`);
                     }
-                },
-                error: function (xhr, status, error) {
-                    alert('Error al generar valores PM: ' + error);
-                }
-            });
-        }
-
-        function updateDailyPMValues() {
-            $.ajax({
-                url: '@Url.Action("DailyPMValuesList", "Admin")',
-                success: function (data) {
-                    $('#dailyPmValuesContainer').html(data);
-                }
-            });
-        }
-
-        $('#calculateDailyPM').click(function () {
-            var personId = $('#personSelector').val();
-            var date = $('#dateSelector').val();
-            $.post('@Url.Action("CalculateDailyPM", "Admin")', { personId: personId, date: date }, function (data) {
-                $('#dailyPMResult').text(data);
-            });
-        });
-
-        $('#calculateMonthlyPM').click(function () {
-            var personId = $('#personSelector').val();
-            var date = $('#dateSelector').val();
-            $.post('@Url.Action("CalculateMonthlyPM", "Admin")', { personId: personId, date: date }, function (data) {
-                $('#monthlyPMResult').text(data);
-            });
-        });
-
-        function generateYearlyPMValues() {
-            var year = $('#yearSelector').val();
-            $.ajax({
-                url: '@Url.Action("GenerateYearlyPMValues", "Admin")',
-                type: 'POST',
-                data: { year: year },
-                success: function (response) {
-                    if (response.success) {
-                        alert('Valores PM anuales generados con éxito.');
-                        location.reload(); // Actualizar la tabla de valores PM
+                    return response.json();
+                })
+                .then(data => {
+                    const logFileSelect = document.getElementById('logFileSelect');
+                    logFileSelect.innerHTML = ''; // Limpia opciones anteriores
+                    if (data.length === 0) {
+                        const option = document.createElement('option');
+                        option.value = '';
+                        option.textContent = 'No hay archivos disponibles';
+                        logFileSelect.appendChild(option);
                     } else {
-                        alert('Error al generar valores PM anuales: ' + response.message);
-                    }
-                },
-                error: function (xhr, status, error) {
-                    alert('Error al generar valores PM anuales: ' + error);
-                }
-            });
-        }
-
-        
-            document.getElementById('selectFolderButton').addEventListener('click', function () {
-                var input = document.createElement('input');
-                input.type = 'file';
-                input.webkitdirectory = true;
-                input.directory = true;
-                input.multiple = true;
-                input.addEventListener('change', function (event) {
-                    var files = event.target.files;
-                    var folderPath = files[0].webkitRelativePath.split('/')[0];
-                    // Enviar la ruta de la carpeta al servidor
-                    fetch('/Admin/ProcessFolder', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ folderPath: folderPath })
-                    }).then(response => response.json())
-                        .then(data => {
-                            console.log(data);
+                        data.forEach(file => {
+                            const option = document.createElement('option');
+                            option.value = file;
+                            option.textContent = file;
+                            logFileSelect.appendChild(option);
                         });
+                    }
+                })
+                .catch(error => {
+                    alert(`Error al cargar archivos de log: ${error.message}`);
                 });
-                input.click();
+        });
+
+        // Cargar contenido del archivo seleccionado
+        function loadLogFile() {
+            const selectedFile = document.getElementById('logFileSelect').value;
+            fetch(`/Admin/GetLogFileContent?fileName=${selectedFile}`)
+                .then(response => response.text())
+                .then(content => {
+                    document.getElementById('logContent').innerText = content;
+                });
+
+            // Actualización en tiempo real
+            setInterval(() => {
+                fetch(`/Admin/GetLogFileContent?fileName=${selectedFile}`)
+                    .then(response => response.text())
+                    .then(content => {
+                        document.getElementById('logContent').innerText = content;
+                    });
+            }, 5000); // Actualiza cada 5 segundos
+        }
+
+        // Ejecutar un trabajo
+        function triggerJob(endpoint) {
+            fetch(endpoint, { method: 'GET' })
+                .then(response => response.text())
+                .then(message => alert(message))
+                .catch(error => alert(`Error triggering job: ${error.message}`));
+        }
+
+        // Selección de carpeta para carga de Excel
+        document.getElementById('selectFolderButton').addEventListener('click', function () {
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.webkitdirectory = true;
+            input.directory = true;
+            input.multiple = true;
+            input.addEventListener('change', function (event) {
+                var files = event.target.files;
+                var folderPath = files[0].webkitRelativePath.split('/')[0];
+                fetch('/Admin/ProcessFolder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folderPath: folderPath })
+                }).then(response => response.json())
+                    .then(data => console.log(data));
             });
-    
+            input.click();
+        });
     </script>
 }

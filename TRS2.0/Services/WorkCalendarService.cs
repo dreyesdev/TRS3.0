@@ -97,7 +97,7 @@ public class WorkCalendarService
         // Obtener los registros de bajas (Leave) para el mes y año especificados
         var leaveRecords = await _context.Leaves
             .Where(l => l.PersonId == personId && l.Day.Year == year && l.Day.Month == month)
-            .ToDictionaryAsync(l => l.Day, l => l.LeaveReduction);
+            .ToDictionaryAsync(l => l.Day, l => new { l.LeaveReduction, l.Type });
 
         // Valor de PM por día obtenido de la tabla DailyPMValues
         var dailyPmValue = await _context.DailyPMValues
@@ -118,10 +118,10 @@ public class WorkCalendarService
                 continue;
             }
 
-            // Obtener la reducción por LeaveReduction, si existe
-            var leaveReduction = leaveRecords.TryGetValue(currentDate, out var reduction) && reduction > 0 && reduction <= 1
-                ? reduction
-                : 0;
+            // Obtener la reducción de baja si existe
+            var leaveData = leaveRecords.TryGetValue(currentDate, out var leave) ? leave : null;
+            var leaveReduction = leaveData?.LeaveReduction ?? 0;
+            var leaveType = leaveData?.Type ?? 0;
 
             // Obtener la reducción de dedicación más actual para la fecha
             var applicableDedication = dedications
@@ -130,22 +130,28 @@ public class WorkCalendarService
                 .Select(d => d.Reduc)
                 .FirstOrDefault();
 
-            // Asegurarse de que la suma de LeaveReduction y ApplicableDedication no exceda 1
-            var totalReduction = Math.Min(1, applicableDedication + leaveReduction);
-
-            // Si la reducción total es 1 (día no trabajado), no se suma al totalPm
-            if (totalReduction == 1)
+            // Manejar el caso específico de baja de paternidad (Type 12)
+            if (leaveType == 12)
             {
-                continue;
+                // Aplicar la reducción de baja al PM ajustado por la dedicación
+                var adjustedPmForDedication = dailyPmValue * (1 - applicableDedication);
+                totalPm += adjustedPmForDedication * (1 - leaveReduction); // Baja afecta al PM ya ajustado
             }
-
-            // Calcular PM para el día ajustado por dedicación y LeaveReduction
-            totalPm += dailyPmValue * (1 - totalReduction);
+            else
+            {
+                // Sumar el PM ajustado por la suma de reducciones estándar
+                var totalReduction = Math.Min(1, applicableDedication + leaveReduction);
+                if (totalReduction < 1)
+                {
+                    totalPm += dailyPmValue * (1 - totalReduction);
+                }
+            }
         }
 
         // Redondear el PM total a 2 decimales y devolverlo
         return Math.Round(totalPm, 2);
     }
+
 
 
 

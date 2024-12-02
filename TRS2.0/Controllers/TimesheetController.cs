@@ -57,20 +57,43 @@ namespace TRS2._0.Controllers
                 personId = user.PersonnelId;
             }
 
-            // Asegurarse de que personId no es nulo
+            // Validar que personId no sea nulo y obtener su valor
             int validPersonId = personId.Value;
 
             // Determina el año y mes actual si no se proporcionan
             var currentYear = year ?? DateTime.Now.Year;
             var currentMonth = month ?? DateTime.Now.Month;
 
-            ViewBag.CurrentYear = currentYear;
-            ViewBag.CurrentMonth = currentMonth;
             var startDate = new DateTime(currentYear, currentMonth, 1);
             var endDate = startDate.AddMonths(1).AddDays(-1);
 
+            // Obtener las bajas de tipo 11 y 12 para el mes actual
+            var leaveReductions = await _context.Leaves
+                .Where(l => l.PersonId == validPersonId &&
+                            l.Day >= startDate &&
+                            l.Day <= endDate &&
+                            (l.Type == 11 || l.Type == 12) &&
+                            l.LeaveReduction > 0 && l.LeaveReduction <= 1)
+                .ToDictionaryAsync(l => l.Day, l => l.LeaveReduction);
+
+            // Obtener las horas diarias iniciales con dedicación
+            var hoursPerDayWithDedication = await _workCalendarService.CalculateDailyWorkHoursWithDedication(validPersonId, currentYear, currentMonth);
+
+            // Ajustar las horas por día considerando las bajas de tipo 11 y 12
+            foreach (var day in hoursPerDayWithDedication.Keys.ToList())
+            {
+                if (leaveReductions.TryGetValue(day, out var reduction))
+                {
+                    // Aplicar la reducción al máximo de horas diarias
+                    hoursPerDayWithDedication[day] = RoundToNearestHalfOrWhole(hoursPerDayWithDedication[day] * (1 - reduction));
+                }
+            }
+
+            // Obtener las bajas y viajes del mes
             var leavesthismonth = await _workCalendarService.GetLeavesForPerson(validPersonId, currentYear, currentMonth);
             var travelsthismonth = await _workCalendarService.GetTravelsForThisMonth(validPersonId, currentYear, currentMonth);
+
+            // Obtener los datos de la persona
             var person = await _context.Personnel.FindAsync(personId);
 
             if (person == null)
@@ -78,7 +101,6 @@ namespace TRS2._0.Controllers
                 _logger.LogError($"No se encontró la persona con el ID {personId}");
                 return NotFound();
             }
-
 
             // Obtener WPs para la persona en el rango de fecha especificado
             var wpxPersons = await _context.Wpxpeople
@@ -91,12 +113,11 @@ namespace TRS2._0.Controllers
                     WpxPerson = wpx,
                     Effort = _context.Persefforts
                         .Where(pe => pe.WpxPerson == wpx.Id && pe.Month >= startDate && pe.Month <= endDate)
-                        .Sum(pe => (decimal?)pe.Value) // Suma la dedicación para el rango de fechas
+                        .Sum(pe => (decimal?)pe.Value)
                 })
-                .Where(wpx => wpx.Effort.HasValue && wpx.Effort.Value > 0) // Filtra aquellos con dedicación
-                .Select(wpx => wpx.WpxPerson) // Selecciona solo el WpxPerson
+                .Where(wpx => wpx.Effort.HasValue && wpx.Effort.Value > 0)
+                .Select(wpx => wpx.WpxPerson)
                 .ToListAsync();
-
 
             // Obtener Timesheets para la persona en el rango de fecha especificado
             var timesheets = await _context.Timesheets
@@ -105,28 +126,28 @@ namespace TRS2._0.Controllers
 
             var hoursUsed = timesheets.Sum(ts => ts.Hours);
 
-            // Fiestas Nacionales y locales
-
+            // Obtener días festivos nacionales y locales
             var holidays = await _workCalendarService.GetHolidaysForMonth(currentYear, currentMonth);
 
-            //    Obtener esfuerzos del personal y mapearlos
+            // Obtener los esfuerzos del personal y mapearlos
             var persefforts = await _context.Persefforts
                                     .Include(pe => pe.WpxPersonNavigation)
                                     .Where(pe => pe.WpxPersonNavigation.Person == personId && pe.Month >= startDate && pe.Month <= endDate)
                                     .ToListAsync();
 
-            var dailyworkhours = await _workCalendarService.CalculateDailyWorkHours(validPersonId, currentYear, currentMonth);
-            var totalWorkHours = dailyworkhours.Sum(entry => entry.Value);
+            // Calcular las horas totales trabajadas y el porcentaje utilizado
+            var totalWorkHours = hoursPerDayWithDedication.Sum(entry => entry.Value);
             decimal percentageUsed = totalWorkHours > 0 ? hoursUsed / totalWorkHours * 100 : 0;
-            var hoursPerDayWithDedication = await _workCalendarService.CalculateDailyWorkHoursWithDedication(validPersonId, currentYear, currentMonth);
-            var totalWorkHoursWithDedication = timesheets
-                    .GroupBy(ts => ts.Day)
-                    .ToDictionary(
-                        group => group.Key,
-                        group => group.Sum(ts => ts.Hours) // Asume que 'Hours' ya está ajustado por la dedicación si es necesario
-                    );
 
-            // Suponiendo que tienes una lista o puedes obtener los IDs de los proyectos a los que la persona está asignada en ese mes concreto
+            // Agrupar horas de timesheets por día
+            var totalWorkHoursWithDedication = timesheets
+                .GroupBy(ts => ts.Day)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Sum(ts => ts.Hours)
+                );
+
+            // Suponiendo que tienes una lista o puedes obtener los IDs de los proyectos
             var projectIds = wpxPersons.Select(wpx => wpx.WpNavigation.ProjId).Distinct().ToList();
 
             // Obtener los estados de bloqueo para esos proyectos en el mes y año específicos
@@ -135,6 +156,7 @@ namespace TRS2._0.Controllers
                             l.Year == currentYear &&
                             l.Month == currentMonth)
                 .ToListAsync();
+
             // Preparación del ViewModel
             var viewModel = new TimesheetViewModel
             {
@@ -143,7 +165,7 @@ namespace TRS2._0.Controllers
                 CurrentMonth = currentMonth,
                 LeavesthisMonth = leavesthismonth,
                 TravelsthisMonth = travelsthismonth,
-                HoursPerDay = dailyworkhours,
+                HoursPerDay = hoursPerDayWithDedication,
                 HoursPerDayWithDedication = hoursPerDayWithDedication,
                 TotalHours = totalWorkHours,
                 TotalHoursWithDedication = totalWorkHoursWithDedication,
@@ -163,8 +185,8 @@ namespace TRS2._0.Controllers
                         ProjectSAPCode = wpx.WpNavigation.Proj.SapCode,
                         ProjectId = wpx.WpNavigation.Proj.ProjId,
                         IsLocked = isLocked,
-                        Effort = effort, // Asigna el esfuerzo calculado
-                        EstimatedHours = estimatedHours, // Asigna las horas estimadas calculadas
+                        Effort = effort,
+                        EstimatedHours = estimatedHours,
                         Timesheets = timesheets.Where(ts => ts.WpxPersonId == wpx.Id).ToList()
                     };
                 }).ToList(),
@@ -173,10 +195,9 @@ namespace TRS2._0.Controllers
 
             ViewBag.PercentageUsed = percentageUsed.ToString("0.0", CultureInfo.InvariantCulture);
 
-
-
             return View(viewModel);
         }
+
 
         public async Task<TimesheetViewModel> GetTimesheetDataForPerson(int personId, int year, int month, int project)
         {
@@ -184,11 +205,32 @@ namespace TRS2._0.Controllers
             var currentYear = year;
             var currentMonth = month;
 
-            ViewBag.CurrentYear = currentYear;
-            ViewBag.CurrentMonth = currentMonth;
             var startDate = new DateTime(currentYear, currentMonth, 1);
             var endDate = startDate.AddMonths(1).AddDays(-1);
 
+            // Obtener bajas de tipo 11 y 12 con LeaveReduction para el mes y persona
+            var leaveReductions = await _context.Leaves
+                .Where(l => l.PersonId == personId &&
+                            l.Day >= startDate &&
+                            l.Day <= endDate &&
+                            (l.Type == 11 || l.Type == 12) &&
+                            l.LeaveReduction > 0 && l.LeaveReduction <= 1)
+                .ToDictionaryAsync(l => l.Day, l => l.LeaveReduction);
+
+            // Calcular horas diarias iniciales con la dedicación
+            var hoursPerDayWithDedication = await _workCalendarService.CalculateDailyWorkHoursWithDedication(personId, currentYear, currentMonth);
+
+            // Ajustar las horas por día considerando las bajas de tipo 11 y 12
+            foreach (var day in hoursPerDayWithDedication.Keys.ToList())
+            {
+                if (leaveReductions.TryGetValue(day, out var reduction))
+                {
+                    // Aplicar la reducción al máximo de horas diarias
+                    hoursPerDayWithDedication[day] = RoundToNearestHalfOrWhole(hoursPerDayWithDedication[day] * (1 - reduction));
+                }
+            }
+
+            // Resto del código permanece igual
             var leavesthismonth = await _workCalendarService.GetLeavesForPerson(personId, currentYear, currentMonth);
             var travelsthismonth = await _workCalendarService.GetTravelsForThisMonth(personId, currentYear, currentMonth);
             var person = await _context.Personnel.FindAsync(personId);
@@ -198,55 +240,47 @@ namespace TRS2._0.Controllers
                 _logger.LogError($"No se encontró la persona con el ID {personId}");
             }
 
-
-            // Obtener WPs para la persona en el rango de fecha especificado
             var wpxPersons = await _context.Wpxpeople
                 .Include(wpx => wpx.PersonNavigation)
                 .Include(wpx => wpx.WpNavigation)
-            .ThenInclude(wp => wp.Proj)
+                .ThenInclude(wp => wp.Proj)
                 .Where(wpx => wpx.Person == personId && wpx.WpNavigation.ProjId == project && wpx.WpNavigation.StartDate <= endDate && wpx.WpNavigation.EndDate >= startDate)
                 .Select(wpx => new
                 {
                     WpxPerson = wpx,
                     Effort = _context.Persefforts
                         .Where(pe => pe.WpxPerson == wpx.Id && pe.Month >= startDate && pe.Month <= endDate)
-                        .Sum(pe => (decimal?)pe.Value) // Suma la dedicación para el rango de fechas
+                        .Sum(pe => (decimal?)pe.Value)
                 })
-                .Where(wpx => wpx.Effort.HasValue && wpx.Effort.Value > 0) // Filtra aquellos con dedicación
-                .Select(wpx => wpx.WpxPerson) // Selecciona solo el WpxPerson
+                .Where(wpx => wpx.Effort.HasValue && wpx.Effort.Value > 0)
+                .Select(wpx => wpx.WpxPerson)
                 .ToListAsync();
 
             var projectdata = await _context.Projects.FindAsync(project);
 
-            // Obtener Timesheets para la persona en el rango de fecha especificado
             var timesheets = await _context.Timesheets
                         .Include(ts => ts.WpxPersonNavigation)
-                            .ThenInclude(wpx => wpx.WpNavigation)
+                        .ThenInclude(wpx => wpx.WpNavigation)
                         .Where(ts => ts.WpxPersonNavigation.Person == personId &&
                                      ts.Day >= startDate && ts.Day <= endDate &&
-                                     ts.WpxPersonNavigation.WpNavigation.ProjId == project) // Filtrado por proyecto
+                                     ts.WpxPersonNavigation.WpNavigation.ProjId == project)
                         .ToListAsync();
 
             var hoursUsed = timesheets.Sum(ts => ts.Hours);
 
-            // Fiestas Nacionales y locales
-
             var holidays = await _workCalendarService.GetHolidaysForMonth(currentYear, currentMonth);
 
-            //    Obtener esfuerzos del personal y mapearlos
             var persefforts = await _context.Persefforts
                                     .Include(pe => pe.WpxPersonNavigation)
                                     .Where(pe => pe.WpxPersonNavigation.Person == personId && pe.Month >= startDate && pe.Month <= endDate)
                                     .ToListAsync();
 
-            // Obtener todas las afiliaciones para la persona en el mes dado
             var affiliations = await _context.AffxPersons
                                 .Where(ap => ap.PersonId == personId && ap.Start <= startDate.AddMonths(1).AddDays(-1) && ap.End >= startDate)
                                 .Select(ap => ap.AffId)
                                 .Distinct()
                                 .ToListAsync();
 
-            // Obtener las horas de trabajo de todas las afiliaciones aplicables
             var affHoursList = await _context.AffHours
                                 .Where(ah => affiliations.Contains(ah.AffId) && ah.StartDate <= startDate.AddMonths(1).AddDays(-1) && ah.EndDate >= startDate)
                                 .ToListAsync();
@@ -257,20 +291,17 @@ namespace TRS2._0.Controllers
                                         .Where(r => r.Id == person.Resp)
                                         .Select(r => r.Name + " " + r.Surname)
                                         .FirstOrDefault();
-            var dailyworkhours = await _workCalendarService.CalculateDailyWorkHours(personId, currentYear, currentMonth);
-            var totalWorkHours = dailyworkhours.Sum(entry => entry.Value);
+
+            var totalWorkHours = hoursPerDayWithDedication.Sum(entry => entry.Value);
             decimal percentageUsed = totalWorkHours > 0 ? hoursUsed / totalWorkHours * 100 : 0;
-            var hoursPerDayWithDedication = await _workCalendarService.CalculateDailyWorkHoursWithDedication(personId, currentYear, currentMonth);
+
             var totalWorkHoursWithDedication = timesheets
                     .GroupBy(ts => ts.Day)
                     .ToDictionary(
                         group => group.Key,
-                        group => group.Sum(ts => ts.Hours) // Asume que 'Hours' ya está ajustado por la dedicación si es necesario
+                        group => group.Sum(ts => ts.Hours)
                     );
 
-
-
-            // Preparación del ViewModel
             var viewModel = new TimesheetViewModel
             {
                 Person = person,
@@ -280,7 +311,7 @@ namespace TRS2._0.Controllers
                 CurrentMonth = currentMonth,
                 LeavesthisMonth = leavesthismonth,
                 TravelsthisMonth = travelsthismonth,
-                HoursPerDay = dailyworkhours,
+                HoursPerDay = hoursPerDayWithDedication,
                 HoursPerDayWithDedication = hoursPerDayWithDedication,
                 TotalHours = totalWorkHours,
                 TotalHoursWithDedication = totalWorkHoursWithDedication,
@@ -300,8 +331,8 @@ namespace TRS2._0.Controllers
                         ProjectName = wpx.WpNavigation.Proj.Acronim,
                         ProjectSAPCode = wpx.WpNavigation.Proj.SapCode,
                         ProjectId = wpx.WpNavigation.Proj.ProjId,
-                        Effort = effort, // Asigna el esfuerzo calculado
-                        EstimatedHours = estimatedHours, // Asigna las horas estimadas calculadas
+                        Effort = effort,
+                        EstimatedHours = estimatedHours,
                         Timesheets = timesheets.Where(ts => ts.WpxPersonId == wpx.Id).ToList()
                     };
                 }).ToList(),
@@ -310,10 +341,9 @@ namespace TRS2._0.Controllers
 
             ViewBag.PercentageUsed = percentageUsed.ToString("0.0", CultureInfo.InvariantCulture);
 
-
-
             return viewModel;
         }
+
 
         [HttpPost]
         public async Task<IActionResult> SaveTimesheetHours([FromBody] TimesheetUpdateModel model)

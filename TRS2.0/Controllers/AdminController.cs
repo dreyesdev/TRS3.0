@@ -25,6 +25,8 @@ namespace TRS2._0.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly ILogger<AdminController> _logger;
+        private readonly string _logDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Logs");
+
 
         public AdminController(WorkCalendarService workCalendarService, TRSDBContext context, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, ILogger<AdminController> logger)
         {
@@ -306,7 +308,44 @@ namespace TRS2._0.Controllers
             logger.Dispose();
             return Json(new { success = true });
         }
+
+        [Authorize(Policy = "AllowLogsPolicy")]
+        [HttpGet("GetLogFiles")]
+        [Route("Admin/GetLogFiles")]
+        public IActionResult GetLogFiles()
+        {
+            _logger.LogInformation("Intentando obtener archivos de log desde: {LogDirectory}", _logDirectory);
+
+            if (!Directory.Exists(_logDirectory))
+            {
+                _logger.LogWarning("El directorio de logs no existe: {LogDirectory}", _logDirectory);
+                return Json(new string[0]);
+            }
+
+            var logFiles = Directory.GetFiles(_logDirectory, "*.txt")
+                                    .Select(Path.GetFileName)
+                                    .ToArray();
+
+            _logger.LogInformation("Archivos encontrados: {LogFiles}", string.Join(", ", logFiles));
+
+            return Json(logFiles);
+        }
+
+        [Authorize(Policy = "AllowLogsPolicy")]
+        [HttpGet("GetLogFileContent")]
+        [Route("/Admin/GetLogFileContent")]
+        public IActionResult GetLogFileContent(string fileName)
+        {
+            var filePath = Path.Combine(_logDirectory, fileName);
+            if (!System.IO.File.Exists(filePath))
+                return NotFound("Log file not found.");
+
+            var content = System.IO.File.ReadAllText(filePath);
+            return Content(content);
+        }
     }
+
+
 }
 
 

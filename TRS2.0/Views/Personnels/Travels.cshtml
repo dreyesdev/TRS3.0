@@ -1,0 +1,367 @@
+﻿@model IEnumerable<TRS2._0.Models.DataModels.Personnel>
+
+@{
+    ViewData["Title"] = "Travels";
+    var selectedPersonId = ViewBag.SelectedPersonId;
+}
+
+<h2>Travels</h2>
+
+<div class="container">
+    <div class="row">
+        <!-- Columna de selección de personal -->
+        <div class="col-md-6">
+            <h2>Person Selection</h2>
+
+            <!-- Dropdown para seleccionar personal -->
+            <select id="personnelSelect" class="form-control">
+                <option value="">Please select a person from the list below:</option>
+                @foreach (var person in Model)
+                {
+                    <option value="@person.Id">@person.Name @person.Surname</option>
+                }
+            </select>
+
+            <!-- Barra de búsqueda -->
+            <p>Or start typing here the name of the person:</p>
+            <input type="text" id="searchTerm" class="form-control" placeholder="Start typing..." onkeyup="filterPersonnel()" />
+
+            <!-- Resultados de búsqueda -->
+            <div id="searchResults"></div>
+        </div>
+
+        <!-- Columna de detalles del personal -->
+        <div class="col-md-6">
+            <h2>Person Details</h2>
+            <div id="personDetails" class="card">
+                <!-- Aquí se cargarán los detalles del personal -->
+            </div>
+        </div>
+    </div>
+</div>
+<hr />
+
+<div id="travelsTableContainer">
+    <!-- Tabla de viajes se cargará aquí -->
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('personnelSelect').addEventListener('change', function () {
+            var personId = this.value;
+            fetchPersonDetails(personId);
+            loadTravelData(personId);
+        });
+
+        function filterPersonnel() {
+            var searchTerm = document.getElementById('searchTerm').value;
+
+            $.ajax({
+                url: '@Url.Action("GetFilteredPersonnel", "Personnels")',
+                data: { searchTerm: searchTerm },
+                success: function (data) {
+                    var resultsDiv = document.getElementById('searchResults');
+                    resultsDiv.innerHTML = ''; // Limpiar resultados anteriores
+
+                    data.forEach(function (person) {
+                        var personDiv = document.createElement('div');
+                        personDiv.className = 'person-result';
+                        personDiv.textContent = person.name + ' ' + person.surname;
+                        personDiv.setAttribute('data-person-id', person.id);
+
+                        personDiv.onclick = function () {
+                            // Marcar el resultado seleccionado como activo y limpiar los demás
+                            document.querySelectorAll('.person-result').forEach(function (el) {
+                                el.classList.remove('active');
+                            });
+                            this.classList.add('active');
+
+                            fetchPersonDetails(person.id);
+                            loadTravelData(person.id);
+                        };
+
+                        resultsDiv.appendChild(personDiv);
+                    });
+                }
+            });
+        }
+
+        function fetchPersonDetails(personId) {
+            $.ajax({
+                url: '@Url.Action("GetPersonDetails", "Personnels")',
+                data: { id: personId },
+                success: function (response) {
+                    var detailsDiv = document.getElementById('personDetails');
+                    var searchTermInput = document.getElementById('searchTerm');
+                    detailsDiv.innerHTML = '';
+                    if (response.success) {
+                        var data = response.data;
+                        // Asignar el nombre completo de la persona al campo de búsqueda
+                        searchTermInput.value = data.fullName || '';
+                        detailsDiv.innerHTML = '<div class="card-body">' +
+                            '<h5 class="card-title">' + (data.fullName || '') + '</h5>' +
+                            '<p> </p>' +
+                            '<p><span class="card-detail-label">Affiliation:</span> ' + (data.affiliation || '') + '</p>' +
+                            '<p><span class="card-detail-label">Department:</span> ' + (data.departmentName || '') + '</p>' +
+                            '<p><span class="card-detail-label">Group:</span> ' + (data.personnelGroupName || '') + '</p>' +
+                            '<p><span class="card-detail-label">Group Leader:</span> ' + (data.responsiblePerson || '') + '</p>' +
+                            '<p><span class="card-detail-label">Contract Start:</span> ' + (data.startDate || '') + '</p>' +
+                            '<p><span class="card-detail-label">Contract End:</span> ' + (data.endDate || '') + '</p>' +
+                            '</div>';
+                    } else {
+                        // Manejar el caso en que la persona no se encontró
+                        detailsDiv.innerHTML = '<p>Person details not found.</p>';
+                    }
+                }
+            });
+            // Ocultar la lista de resultados
+            document.getElementById('searchResults').style.display = 'none';
+        }
+
+        document.getElementById('searchResults').addEventListener('click', function (event) {
+            if (event.target && event.target.matches('div.person-result')) {
+                var personId = event.target.getAttribute('data-person-id');
+                fetchPersonDetails(personId);
+            }
+        });
+
+        // Mostrar la lista de resultados cuando el campo de búsqueda recibe el foco
+        document.getElementById('searchTerm').addEventListener('focus', function () {
+            document.getElementById('searchResults').style.display = 'block';
+        });
+
+        function loadTravelData(personId) {
+            $.ajax({
+                url: '@Url.Action("GetTravelData", "Personnels")',
+                data: { personId: personId },
+                success: function (response) {
+                    if (!response.success) {
+                        alert(response.message);
+                        return;
+                    }
+
+                    var data = response.data;
+                    var tableHtml = '<table class="table table-bordered">';
+                    tableHtml += '<thead class="thead-light"><tr>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">#</th>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">Code</th>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">Start Date</th>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">End Date</th>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">Project 1</th>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">Dedication 1</th>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">Project 2</th>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">Dedication 2</th>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">Status</th>';
+                    tableHtml += '<th style="font-weight: bold; text-align: center;">Action</th>';
+                    tableHtml += '</tr></thead>';
+                    tableHtml += '<tbody>';
+
+                    data.forEach(function (item, index) {
+                        tableHtml += '<tr>';
+                        tableHtml += `<td style="text-align: center;">${index + 1}</td>`;
+                        tableHtml += `<td style="text-align: center;">${item.code}</td>`;
+                        tableHtml += `<td style="text-align: center;">${item.startDate.split('T')[0]}</td>`;
+                        tableHtml += `<td style="text-align: center;">${item.endDate.split('T')[0]}</td>`;
+                        tableHtml += `<td style="text-align: center;">${item.project1 || ''}</td>`;
+                        tableHtml += `<td style="text-align: center;">${item.dedication1 || ''}</td>`;
+                        tableHtml += `<td style="text-align: center;">${item.project2 || ''}</td>`;
+                        tableHtml += `<td style="text-align: center;">${item.dedication2 || ''}</td>`;
+
+                        // Mostrar el estado con colores
+                        if (item.status === "Aprobada") {
+                            tableHtml += `<td style="text-align: center; color: green; font-weight: bold;">${item.status}</td>`;
+                            tableHtml += '<td></td>'; // No se muestra botón para Aprobada
+                        } else if (item.status === "Pendiente") {
+                            tableHtml += `<td style="text-align: center; color: red; font-weight: bold;">${item.status}</td>`;
+                            tableHtml += `<td style="text-align: center;"><button class="btn btn-success btn-sm" onclick="approveTravel('${item.code}')">Approve</button></td>`;
+                        } else {
+                            tableHtml += `<td style="text-align: center; color: gray;">${item.status}</td>`;
+                            tableHtml += '<td></td>'; // Acción vacía si el estado es desconocido
+                        }
+
+                        tableHtml += '</tr>';
+                    });
+
+                    tableHtml += '</tbody></table>';
+                    $('#travelsTableContainer').html(tableHtml);
+                },
+                error: function (error) {
+                    console.error("Error loading travel data", error);
+                }
+            });
+        }
+
+
+
+
+
+
+        function approveTravel(travelId) {
+            if (!confirm('¿Estás seguro de que deseas aprobar este viaje?')) {
+                return;
+            }
+
+            $.ajax({
+                url: '@Url.Action("ApproveTravel", "Personnels")',
+                type: 'POST',
+                data: { id: travelId },
+                success: function (response) {
+                    alert(response.message);
+                    if (response.success) {
+                        // Recargar los datos de viajes después de la aprobación
+                        var personId = $('#personnelSelect').val();
+                        loadTravelData(personId);
+                    }
+                },
+                error: function (error) {
+                    console.error("Error approving travel", error);
+                }
+            });
+        }
+
+
+        function updateTravel(id, pId) {
+            // Recuperar los datos de los inputs en la fila correspondiente
+            var row = $('#row-' + id); // Selecciona la fila por ID
+            var destination = row.find("input[type='text']").eq(0).val();
+            var startDate = row.find("input[type='date']").eq(0).val();
+            var endDate = row.find("input[type='date']").eq(1).val();
+            var purpose = row.find("input[type='text']").eq(1).val();
+
+            // Llamar a la acción del controlador para actualizar
+            $.ajax({
+                url: '@Url.Action("ApproveTravel", "Personnels")',
+                type: 'POST',
+                data: {
+                    id: id,
+                    destination: destination,
+                    startDate: startDate,
+                    endDate: endDate,
+                    purpose: purpose
+                },
+                success: function (response) {
+                    alert(response.message);
+                    loadTravelData(pId);
+                },
+                error: function (error) {
+                    // Manejar error
+                }
+            });
+        }
+
+        function removeTravel(id, pId) {
+            // Llamar a la acción del controlador para eliminar
+            $.ajax({
+                url: '@Url.Action("RemoveTravel", "Personnels")',
+                type: 'POST',
+                data: { id: id },
+                success: function (response) {
+                    alert(response.message);
+                    loadTravelData(pId);
+                    // Recargar la tabla o mostrar mensaje de éxito
+                },
+                error: function (error) {
+                    // Manejar error
+                }
+            });
+        }
+
+        function addTravel(personId) {
+            var row = $('#new-row');
+            var destination = row.find("input[type='text']").eq(0).val();
+            var startDate = row.find("input[type='date']").eq(0).val();
+            var endDate = row.find("input[type='date']").eq(1).val();
+            var purpose = row.find("input[type='text']").eq(1).val();
+
+            // Verificar que los campos no estén vacíos
+            if (!destination || !startDate || !endDate || !purpose) {
+                alert('Please fill in all fields.');
+                return;
+            }
+
+            // Llamar a la acción del controlador para agregar un nuevo viaje
+            $.ajax({
+                url: '@Url.Action("AddTravel", "Personnels")',
+                type: 'POST',
+                data: {
+                    personId: personId,
+                    destination: destination,
+                    startDate: startDate,
+                    endDate: endDate,
+                    purpose: purpose
+                },
+                success: function (response) {
+                    alert(response.message);
+                    if (response.success) {
+                        loadTravelData(personId); // Recargar la tabla
+                    }
+                },
+                error: function (error) {
+                    // Manejar el error
+                    console.error("Error adding travel", error);
+                }
+            });
+        }
+    </script>
+}
+
+<style>
+    .person-result {
+        cursor: pointer;
+        padding: 5px;
+    }
+
+        .person-result:hover {
+            background-color: #eee;
+        }
+
+        .person-result.active {
+            background-color: #4c87c6;
+        }
+
+    .card-detail-label {
+        font-weight: bold;
+    }
+
+    .card-title {
+        font-weight: bold;
+    }
+
+    #searchResults {
+        max-height: 200px; /* Ajusta esto según tus necesidades */
+        overflow-y: auto;
+        display: none; /* Inicialmente oculto */
+    }
+
+    /* Estilos para la tabla */
+    .table {
+        width: 100%;
+        border-collapse: collapse; /* Para bordes más definidos */
+        margin-bottom: 1rem; /* Espaciado debajo de la tabla */
+    }
+
+        .table th, .table td {
+            padding: 0.75rem;
+            vertical-align: top;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .table thead th {
+            vertical-align: bottom;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .table tbody + tbody {
+            border-top: 2px solid #dee2e6;
+        }
+
+    .table-sm th,
+    .table-sm td {
+        padding: 0.3rem;
+    }
+
+    h2 {
+        text-align: center;
+        font-weight: bold;
+    }
+</style>

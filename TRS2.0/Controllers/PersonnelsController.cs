@@ -394,7 +394,82 @@ namespace TRS2._0.Controllers
             return Json(new { success = true, data = monthlyPM });
         }
 
+        // Método para mostrar la vista inicial de Travels
+        [HttpGet]
+        public async Task<IActionResult> Travels(int? personId)
+        {
+            // Si se ha proporcionado un ID de persona, lo pasamos a la vista
+            if (personId.HasValue)
+            {
+                ViewBag.SelectedPersonId = personId.Value;
+            }
+            else if (TempData["SelectedPersonId"] != null)
+            {
+                // Si no hay ID, pero existe en TempData, se recupera
+                ViewBag.SelectedPersonId = TempData["SelectedPersonId"];
+                TempData.Keep("SelectedPersonId");
+            }
 
+            // Obtenemos la lista de personas del sistema
+            var persons = await _context.Personnel.ToListAsync();
+            return View(persons); // Pasamos la lista de personas a la vista
+        }
+
+        // Método para obtener los datos de viajes de una persona específica
+        [HttpGet]
+        public async Task<IActionResult> GetTravelData(int personId)
+        {
+            // Obtiene la lista de viajes relacionados con la persona
+            var travels = await _context.Liquidations
+                .Where(l => l.PersId == personId) // Filtra los viajes por el ID de la persona
+                .Select(l => new
+                {
+                    Code = l.Id, // Utiliza el ID como código único del viaje
+                    StartDate = l.Start, // Fecha de inicio del viaje
+                    EndDate = l.End, // Fecha de fin del viaje
+                    Project1 = string.IsNullOrWhiteSpace(l.Project1) ? "N/A" : l.Project1, // Maneja valores nulos o vacíos para Proyecto 1
+                    Dedication1 = l.Dedication1, // Ya que es un decimal, no necesita manejo de nulidad
+                    Project2 = string.IsNullOrWhiteSpace(l.Project2) ? "N/A" : l.Project2, // Maneja valores nulos o vacíos para Proyecto 2
+                    Dedication2 = l.Dedication2, // Ya que es un decimal, no necesita manejo de nulidad
+                    Status = l.Status == "3"
+                        ? "Aprobada"
+                        : l.Status == "4"
+                            ? "Pendiente"
+                            : "Desconocido" // Define un estado por defecto si no es 3 o 4
+                })
+                .ToListAsync(); // Convierte el resultado en una lista
+
+            // Si no hay viajes, retorna un mensaje informativo
+            if (travels == null || !travels.Any())
+            {
+                return Json(new { success = false, message = "No se encontraron viajes para esta persona." });
+            }
+
+            // Devuelve la lista de viajes con éxito
+            return Json(new { success = true, data = travels });
+        }
+
+
+
+        // Método para aprobar un viaje (cambiar el estado a 3)
+        [HttpPost]
+        public async Task<IActionResult> ApproveTravel(int id)
+        {
+            // Buscamos el viaje por su ID
+            var travel = await _context.Liquidations.FindAsync(id);
+            if (travel == null)
+            {
+                // Si no se encuentra, devolvemos un error
+                return Json(new { success = false, message = "Registro de viaje no encontrado." });
+            }
+
+            // Cambiamos el estado a 3 (aprobado)
+            travel.Status = "3";
+            _context.Update(travel); // Marcamos el cambio
+            await _context.SaveChangesAsync(); // Guardamos en la base de datos
+
+            return Json(new { success = true, message = "Viaje aprobado correctamente." }); // Respuesta de éxito
+        }
 
 
 
