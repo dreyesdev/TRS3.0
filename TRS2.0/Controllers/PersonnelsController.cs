@@ -424,18 +424,14 @@ namespace TRS2._0.Controllers
                 .Where(l => l.PersId == personId) // Filtra los viajes por el ID de la persona
                 .Select(l => new
                 {
-                    Code = l.Id, // Utiliza el ID como código único del viaje
-                    StartDate = l.Start, // Fecha de inicio del viaje
-                    EndDate = l.End, // Fecha de fin del viaje
-                    Project1 = string.IsNullOrWhiteSpace(l.Project1) ? "N/A" : l.Project1, // Maneja valores nulos o vacíos para Proyecto 1
-                    Dedication1 = l.Dedication1, // Ya que es un decimal, no necesita manejo de nulidad
-                    Project2 = string.IsNullOrWhiteSpace(l.Project2) ? "N/A" : l.Project2, // Maneja valores nulos o vacíos para Proyecto 2
-                    Dedication2 = l.Dedication2, // Ya que es un decimal, no necesita manejo de nulidad
-                    Status = l.Status == "3"
-                        ? "Aprobada"
-                        : l.Status == "4"
-                            ? "Pendiente"
-                            : "Desconocido" // Define un estado por defecto si no es 3 o 4
+                    Code = l.Id.ToString(),
+                    StartDate = l.Start?.ToString("yyyy-MM-dd"),
+                    EndDate = l.End?.ToString("yyyy-MM-dd"),
+                    Project1 = l.Project1 ?? "N/A",
+                    Dedication1 = l.Dedication1 ?? 0,
+                    Project2 = string.IsNullOrWhiteSpace(l.Project2) ? "N/A" : l.Project2,
+                    Dedication2 = l.Dedication2 ?? 0,
+                    Status = l.Status == 3 ? "Approved" : "Pending"
                 })
                 .ToListAsync(); // Convierte el resultado en una lista
 

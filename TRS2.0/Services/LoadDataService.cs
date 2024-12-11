@@ -11,6 +11,7 @@ using static TRS2._0.Services.WorkCalendarService;
 using System.Text;
 using System.Timers;
 using Newtonsoft.Json.Linq;
+using Microsoft.AspNetCore.Mvc;
 
 
 namespace TRS2._0.Services
@@ -298,7 +299,7 @@ namespace TRS2._0.Services
 
                 // Excluye las liquidaciones en estado 3, 4 y ahora también 5.
                 var liquidations = await _context.Liquidations
-                    .Where(l => l.Status != "3" && l.Status != "4" && l.Status != "5")
+                    .Where(l => l.Status != "3" && l.Status != "4" && l.Status != "5" && l.Status != "6")
                     .ToListAsync();
 
                 foreach (var liquidation in liquidations)
@@ -320,7 +321,7 @@ namespace TRS2._0.Services
                             continue;
                         }
 
-                        // Verifica si Project1 y Project2 son el mismo, lo cual es un error.
+                        // Verifica si Project1 y Project2 son el mismo, lo cual es un error sin la suma de sus dedicaciones es mayor a 100
                         if (!string.IsNullOrEmpty(liquidation.Project1) && liquidation.Project1 == liquidation.Project2)
                         {
                             decimal dedicationSum = liquidation.Dedication1 + (liquidation.Dedication2 ?? 0);
@@ -588,6 +589,112 @@ namespace TRS2._0.Services
                 personalLogger.Error(ex, "Error ocurrido durante el Procesamiento de Liquidaciones Avanzadas");
             }
         }
+
+        public async Task<IActionResult> CancelLiquidation(string liquidationId)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // Recuperar la liquidación a cancelar
+                var liquidation = await _context.Liquidations.FindAsync(liquidationId);
+                if (liquidation == null)
+                {
+                    return Json(new { success = false, message = "Liquidation not found." });
+                }
+
+                // Obtener registros de liqdayxproject relacionados
+                var liqDayProjects = await _context.liqdayxproject
+                    .Where(ld => ld.LiqId == liquidationId)
+                    .ToListAsync();
+
+                if (!liqDayProjects.Any())
+                {
+                    return Json(new { success = false, message = "No associated project records found for liquidation." });
+                }
+
+                // Agrupar registros por proyecto, mes y año
+                var groupedByProjectMonth = liqDayProjects
+                    .GroupBy(ld => new { ld.ProjId, Month = ld.Day.Month, Year = ld.Day.Year })
+                    .ToList();
+
+                foreach (var group in groupedByProjectMonth)
+                {
+                    var projectId = group.Key.ProjId;
+                    var month = group.Key.Month;
+                    var year = group.Key.Year;
+
+                    // Obtener esfuerzo total para este proyecto y mes
+                    var totalEffortForMonth = group.Sum(ld => ld.Pms);
+
+                    // Navegar para encontrar WP y validar si hay un WP de tipo "TRAVELS"
+                    var relatedWpxPeople = await _context.Wpxpeople
+                        .Include(wp => wp.WpNavigation)
+                        .Where(wp => wp.WpNavigation.ProjId == projectId)
+                        .ToListAsync();
+
+                    var travelsWpx = relatedWpxPeople.FirstOrDefault(wpx => wpx.WpNavigation.Name == "TRAVELS");
+                    if (travelsWpx == null)
+                    {
+                        continue; // Si no hay un WP de tipo "TRAVELS", no hacemos nada para este proyecto
+                    }
+
+                    // Obtener el esfuerzo actual en TRAVELS para este mes
+                    var travelsEffortForMonth = await _context.Persefforts
+                        .Where(pe => pe.WpxPerson == travelsWpx.Id && pe.Month == month && pe.Year == year)
+                        .SumAsync(pe => pe.Value);
+
+                    if (travelsEffortForMonth >= totalEffortForMonth)
+                    {
+                        // Hay suficiente esfuerzo para restar
+                        var remainingEffort = travelsEffortForMonth - totalEffortForMonth;
+
+                        // Actualizar el esfuerzo en Perseffort
+                        var effortEntry = await _context.Persefforts
+                            .FirstOrDefaultAsync(pe => pe.WpxPerson == travelsWpx.Id && pe.Month == month && pe.Year == year);
+
+                        if (effortEntry != null)
+                        {
+                            effortEntry.Value = remainingEffort;
+                            _context.Persefforts.Update(effortEntry);
+                        }
+                    }
+                    else if (travelsEffortForMonth > 0)
+                    {
+                        // Hay algo de esfuerzo, pero no suficiente. Retirar lo que se pueda
+                        totalEffortForMonth -= travelsEffortForMonth;
+
+                        var effortEntry = await _context.Persefforts
+                            .FirstOrDefaultAsync(pe => pe.WpxPerson == travelsWpx.Id && pe.Month == month && pe.Year == year);
+
+                        if (effortEntry != null)
+                        {
+                            effortEntry.Value = 0;
+                            _context.Persefforts.Update(effortEntry);
+                        }
+                    }
+                }
+
+                // Eliminar registros de liqdayxproject
+                _context.liqdayxproject.RemoveRange(liqDayProjects);
+
+                // Marcar liquidación como cancelada y tratada
+                liquidation.Status = "7"; // Estado de cancelada y tratada
+                _context.Liquidations.Update(liquidation);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Json(new { success = true, message = "Liquidation successfully canceled." });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return Json(new { success = false, message = $"Error canceling liquidation: {ex.Message}" });
+            }
+        }
+
+
+
 
         public async Task LoadPersonnelFromFileAsync(string filePath)
         {
@@ -1587,7 +1694,7 @@ namespace TRS2._0.Services
             }
         }
 
-
+        // PENDIENTE: ES NECESARIO QUE AJUSTAR LA FECHA MÁXIMA SEGÚN SE DECIDA EN PRINCIPIO NO DEBE SER MAYOR QUE EL DÍA ACTUAL, SE ESTAN RELLENANDO TIMESHEETS A TIEMPO FUTURO//
         public async Task AutoFillTimesheetsForInvestigatorsInSingleWPWithEffortAsync()
         {
             var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ProcesarInvestigadoresWP.txt");
@@ -1673,7 +1780,7 @@ namespace TRS2._0.Services
                             var maxDailyHours = day.Value;
 
                             // Ajustar las horas diarias por el effort
-                            decimal adjustedDailyHours = RoundToNearestHalfOrWhole(maxDailyHours * totalEffort);
+                            decimal adjustedDailyHours =  (maxDailyHours * totalEffort);
 
                             if (adjustedDailyHours == 0)
                             {
