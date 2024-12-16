@@ -425,13 +425,13 @@ namespace TRS2._0.Controllers
                 .Select(l => new
                 {
                     Code = l.Id.ToString(),
-                    StartDate = l.Start?.ToString("yyyy-MM-dd"),
-                    EndDate = l.End?.ToString("yyyy-MM-dd"),
+                    StartDate = l.Start.ToString("yyyy-MM-dd"),
+                    EndDate = l.End.ToString("yyyy-MM-dd"),
                     Project1 = l.Project1 ?? "N/A",
-                    Dedication1 = l.Dedication1 ?? 0,
+                    Dedication1 = (decimal?)l.Dedication1 ?? 0m,
                     Project2 = string.IsNullOrWhiteSpace(l.Project2) ? "N/A" : l.Project2,
-                    Dedication2 = l.Dedication2 ?? 0,
-                    Status = l.Status == 3 ? "Approved" : "Pending"
+                    Dedication2 = (decimal?)l.Dedication2 ?? 0m,
+                    Status = l.Status == "3" ? "Approved" : "Pending"
                 })
                 .ToListAsync(); // Convierte el resultado en una lista
 
@@ -444,6 +444,7 @@ namespace TRS2._0.Controllers
             // Devuelve la lista de viajes con éxito
             return Json(new { success = true, data = travels });
         }
+
 
 
 
