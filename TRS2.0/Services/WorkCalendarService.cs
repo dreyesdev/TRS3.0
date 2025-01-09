@@ -949,6 +949,115 @@ public class WorkCalendarService
         return RoundToNearestHalfOrWhole(estimatedHours);
     }
 
+    public async Task<string> AdjustEffortAsync(int wpId, int personId, DateTime month)
+    {
+        // Inicio del mes y fin del mes
+        DateTime startOfMonth = new DateTime(month.Year, month.Month, 1);
+        DateTime endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
 
+        // Validar si hay horas registradas en Timesheets
+        var wpxPerson = await _context.Wpxpeople
+            .FirstOrDefaultAsync(wpx => wpx.Wp == wpId && wpx.Person == personId);
+
+        if (wpxPerson == null)
+        {
+            return "Error: No se encontró la relación entre la persona y el paquete de trabajo.";
+        }
+
+        var totalHoursInTimesheets = await _context.Timesheets
+            .Where(ts => ts.WpxPersonId == wpxPerson.Id && ts.Day >= startOfMonth && ts.Day <= endOfMonth)
+            .SumAsync(ts => (decimal?)ts.Hours) ?? 0;
+
+        if (totalHoursInTimesheets == 0)
+        {
+            return "Error: No hay horas registradas para esta persona en este paquete de trabajo y mes.";
+        }
+
+        // Obtener el máximo de horas para la persona en el mes usando la nueva función
+        decimal maxHours = await CalculateMaxHoursForPersonInMonth(personId, month.Year, month.Month);
+
+        if (maxHours == 0)
+        {
+            return "Error: No se encontraron horas máximas definidas para las afiliaciones de esta persona.";
+        }
+
+        // Calcular el porcentaje de esfuerzo
+        decimal effortPercentage = totalHoursInTimesheets / maxHours;
+
+        // Ajustar o crear el registro en Perseffort
+        var existingEffort = await _context.Persefforts
+            .FirstOrDefaultAsync(pe => pe.WpxPerson == wpxPerson.Id && pe.Month == startOfMonth);
+
+        if (existingEffort != null)
+        {
+            existingEffort.Value = effortPercentage;
+            _context.Persefforts.Update(existingEffort);
+        }
+        else
+        {
+            var newEffort = new Perseffort
+            {
+                WpxPerson = wpxPerson.Id,
+                Month = startOfMonth,
+                Value = effortPercentage
+            };
+            _context.Persefforts.Add(newEffort);
+        }
+
+        await _context.SaveChangesAsync();
+
+        return $"Éxito: El esfuerzo para la persona {personId} en el paquete de trabajo {wpId} ha sido ajustado al {effortPercentage:P2} para el mes {month:MMMM yyyy}.";
+    }
+
+    public async Task<decimal> CalculateMaxHoursForPersonInMonth(int personId, int year, int month)
+    {
+        // Fecha de inicio y fin del mes
+        DateTime startOfMonth = new DateTime(year, month, 1);
+        DateTime endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
+
+        // Obtener todas las afiliaciones activas para la persona en este mes
+        var affiliations = await _context.AffxPersons
+            .Where(ap => ap.PersonId == personId && ap.Start <= endOfMonth && ap.End >= startOfMonth)
+            .Select(ap => new
+            {
+                ap.AffId,
+                StartDate = ap.Start < startOfMonth ? startOfMonth : ap.Start,
+                EndDate = ap.End > endOfMonth ? endOfMonth : ap.End
+            })
+            .ToListAsync();
+
+        if (!affiliations.Any())
+        {
+            return 0; // No hay afiliaciones activas
+        }
+
+        // Calcular las horas máximas ajustadas para cada afiliación
+        decimal totalMaxHours = 0;
+        var daysInMonth = DateTime.DaysInMonth(year, month);
+
+        foreach (var affiliation in affiliations)
+        {
+            // Número de días cubiertos por esta afiliación en el mes
+            int coveredDays = (affiliation.EndDate - affiliation.StartDate).Days + 1;
+
+            // Obtener las horas máximas definidas para esta afiliación
+            var maxHoursForAffiliation = await _context.AffHours
+                .Where(ah => ah.AffId == affiliation.AffId && ah.StartDate <= endOfMonth && ah.EndDate >= startOfMonth)
+                .Select(ah => ah.Hours)
+                .FirstOrDefaultAsync();
+
+            if (maxHoursForAffiliation > 0)
+            {
+                // Calcular las horas ajustadas según los días cubiertos
+                decimal dailyHours = maxHoursForAffiliation / daysInMonth;
+                decimal adjustedHours = dailyHours * coveredDays;
+                totalMaxHours += adjustedHours;
+            }
+        }
+
+        return totalMaxHours;
+    }
+
+    
 
 }

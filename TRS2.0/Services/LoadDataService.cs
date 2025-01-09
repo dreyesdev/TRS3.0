@@ -1492,7 +1492,9 @@ namespace TRS2._0.Services
             public string access_token { get; set; }
         }
 
-        public async Task UpdateLeaveTableAsync()
+        public async Task 
+            
+            UpdateLeaveTableAsync()
         {
             var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "CargaAusencias.txt");
             var logger = new LoggerConfiguration()

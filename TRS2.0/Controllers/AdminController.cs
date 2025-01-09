@@ -16,6 +16,7 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using System.Text.RegularExpressions;
 using System.Text;
+using static TRS2._0.Services.WorkCalendarService;
 
 namespace TRS2._0.Controllers
 {
@@ -514,6 +515,50 @@ namespace TRS2._0.Controllers
             var content = System.IO.File.ReadAllText(filePath);
             return Content(content);
         }
+
+        [HttpGet]
+        public async Task<IActionResult> GetProjects()
+        {
+            var projects = await _context.Projects
+                .Select(p => new { p.ProjId, p.Acronim })
+                .ToListAsync();
+
+            return Json(projects);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetWorkPackages(int projectId)
+        {
+            var workPackages = await _context.Wps
+                .Where(wp => wp.ProjId == projectId)
+                .Select(wp => new { wp.Id, wp.Name })
+                .ToListAsync();
+
+            return Json(workPackages);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetPersonsInWorkPackage(int wpId)
+        {
+            var persons = await _context.Wpxpeople
+                .Where(wpx => wpx.Wp == wpId)
+                .Select(wpx => new { wpx.Person, wpx.PersonNavigation.Name, wpx.PersonNavigation.Surname })
+                .ToListAsync();
+
+            return Json(persons);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> AdjustEffort([FromBody] AdjustEffortRequest model)
+        {
+            if (model == null || model.WpId <= 0 || model.PersonId <= 0 || model.Month == DateTime.MinValue)
+            {
+                return Json(new { message = "Error: Los datos enviados son inválidos." });
+            }
+
+            var result = await _workCalendarService.AdjustEffortAsync(model.WpId, model.PersonId, model.Month);
+            return Json(new { message = result });
+        }
     }
 
 
@@ -523,4 +568,11 @@ namespace TRS2._0.Controllers
 public class FolderPathModel
 {
     public string FolderPath { get; set; }
+}
+
+public class AdjustEffortRequest
+{
+    public int WpId { get; set; }
+    public int PersonId { get; set; }
+    public DateTime Month { get; set; }
 }

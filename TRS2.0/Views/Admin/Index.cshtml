@@ -221,6 +221,35 @@
             </div>
         </div>
     </div>
+
+    <div class="container">
+        <h3 class="text-center">Ajuste de Esfuerzo</h3>
+        <form id="effort-adjustment-form">
+            <div class="form-group">
+                <label for="project-select">Proyecto:</label>
+                <select id="project-select" class="form-control" onchange="loadWorkPackages()">
+                    <option value="">Seleccione un proyecto</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="wp-select">Paquete de Trabajo:</label>
+                <select id="wp-select" class="form-control" onchange="loadPersons()" disabled>
+                    <option value="">Seleccione un paquete de trabajo</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="person-select">Persona:</label>
+                <select id="person-select" class="form-control" disabled>
+                    <option value="">Seleccione una persona</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="month-input">Mes:</label>
+                <input type="month" id="month-input" class="form-control" />
+            </div>
+            <button type="button" class="btn btn-primary" onclick="adjustEffort()">Ajustar Esfuerzo</button>
+        </form>
+    </div>
 </div>
 
 @section Scripts {
@@ -302,5 +331,79 @@
             });
             input.click();
         });
+
+        async function loadProjects() {
+            const response = await fetch('/Admin/GetProjects');
+            const projects = await response.json();
+            const select = document.getElementById('project-select');
+            projects.sort((a, b) => a.acronim.localeCompare(b.acronim)); // Orden alfabético
+            projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.projId;
+                option.textContent = project.acronim;
+                select.appendChild(option);
+            });
+        }
+
+        async function loadWorkPackages() {
+            const projectId = document.getElementById('project-select').value;
+            if (!projectId) return;
+
+            const response = await fetch(`/Admin/GetWorkPackages?projectId=${projectId}`);
+            const workPackages = await response.json();
+            const select = document.getElementById('wp-select');
+            select.innerHTML = '<option value="">Seleccione un paquete de trabajo</option>';
+            workPackages.sort((a, b) => a.name.localeCompare(b.name)); // Orden alfabético
+            workPackages.forEach(wp => {
+                const option = document.createElement('option');
+                option.value = wp.id;
+                option.textContent = wp.name;
+                select.appendChild(option);
+            });
+            select.disabled = false;
+        }
+
+        async function loadPersons() {
+            const wpId = document.getElementById('wp-select').value;
+            if (!wpId) return;
+
+            const response = await fetch(`/Admin/GetPersonsInWorkPackage?wpId=${wpId}`);
+            const persons = await response.json();
+            const select = document.getElementById('person-select');
+            select.innerHTML = '<option value="">Seleccione una persona</option>';
+            persons.sort((a, b) => a.surname.localeCompare(b.surname)); // Orden alfabético por apellido
+            persons.forEach(person => {
+                const option = document.createElement('option');
+                option.value = person.person;
+                option.textContent = `${person.surname}, ${person.name}`;
+                select.appendChild(option);
+            });
+            select.disabled = false;
+        }
+
+        async function adjustEffort() {
+            const wpId = parseInt(document.getElementById('wp-select').value);
+            const personId = parseInt(document.getElementById('person-select').value);
+            const month = document.getElementById('month-input').value;
+
+            if (!wpId || !personId || !month) {
+                alert('Por favor, complete todos los campos.');
+                return;
+            }
+
+            // Convertimos el mes al formato esperado por el backend
+            const formattedMonth = `${month}-01T00:00:00`;
+
+            const response = await fetch('/Admin/AdjustEffort', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wpId, personId, month: formattedMonth })
+            });
+
+            const result = await response.json();
+            alert(result.message);
+        }
+
+        document.addEventListener('DOMContentLoaded', loadProjects);
     </script>
 }
