@@ -1011,18 +1011,14 @@ public class WorkCalendarService
 
     public async Task<decimal> CalculateMaxHoursForPersonInMonth(int personId, int year, int month)
     {
-        // Fecha de inicio y fin del mes
-        DateTime startOfMonth = new DateTime(year, month, 1);
-        DateTime endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
-
-        // Obtener todas las afiliaciones activas para la persona en este mes
+        // Obtener afiliaciones activas de la persona para el mes
         var affiliations = await _context.AffxPersons
-            .Where(ap => ap.PersonId == personId && ap.Start <= endOfMonth && ap.End >= startOfMonth)
+            .Where(ap => ap.PersonId == personId && ap.Start <= new DateTime(year, month, DateTime.DaysInMonth(year, month)) && ap.End >= new DateTime(year, month, 1))
             .Select(ap => new
             {
                 ap.AffId,
-                StartDate = ap.Start < startOfMonth ? startOfMonth : ap.Start,
-                EndDate = ap.End > endOfMonth ? endOfMonth : ap.End
+                StartDate = ap.Start,
+                EndDate = ap.End
             })
             .ToListAsync();
 
@@ -1031,33 +1027,88 @@ public class WorkCalendarService
             return 0; // No hay afiliaciones activas
         }
 
-        // Calcular las horas máximas ajustadas para cada afiliación
-        decimal totalMaxHours = 0;
-        var daysInMonth = DateTime.DaysInMonth(year, month);
-
-        foreach (var affiliation in affiliations)
+        // Caso de una sola afiliación que cubre todo el mes
+        if (affiliations.Count == 1 && affiliations[0].StartDate <= new DateTime(year, month, 1))
         {
-            // Número de días cubiertos por esta afiliación en el mes
-            int coveredDays = (affiliation.EndDate - affiliation.StartDate).Days + 1;
-
-            // Obtener las horas máximas definidas para esta afiliación
-            var maxHoursForAffiliation = await _context.AffHours
-                .Where(ah => ah.AffId == affiliation.AffId && ah.StartDate <= endOfMonth && ah.EndDate >= startOfMonth)
+            var dailyHours = await _context.AffHours
+                .Where(ah => ah.AffId == affiliations[0].AffId && ah.StartDate <= new DateTime(year, month, DateTime.DaysInMonth(year, month)) && ah.EndDate >= new DateTime(year, month, 1))
                 .Select(ah => ah.Hours)
                 .FirstOrDefaultAsync();
 
-            if (maxHoursForAffiliation > 0)
+            if (dailyHours > 0)
             {
-                // Calcular las horas ajustadas según los días cubiertos
-                decimal dailyHours = maxHoursForAffiliation / daysInMonth;
-                decimal adjustedHours = dailyHours * coveredDays;
-                totalMaxHours += adjustedHours;
+                int workingDays = await GetWorkingDaysInMonth(year, month);
+                return workingDays * dailyHours;
+            }
+        }
+
+        decimal totalMaxHours = 0;
+
+        // Iterar por cada día del mes para múltiples afiliaciones
+        DateTime startOfMonth = new DateTime(year, month, 1);
+        DateTime endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
+        for (DateTime currentDay = startOfMonth; currentDay <= endOfMonth; currentDay = currentDay.AddDays(1))
+        {
+            // Saltar sábados, domingos y días festivos
+            var nationalHolidays = await _context.NationalHolidays
+                .Where(nh => nh.Date >= startOfMonth && nh.Date <= endOfMonth)
+                .Select(nh => nh.Date)
+                .ToListAsync();
+
+            if (currentDay.DayOfWeek == DayOfWeek.Saturday || currentDay.DayOfWeek == DayOfWeek.Sunday || nationalHolidays.Contains(currentDay))
+            {
+                continue;
+            }
+
+            // Determinar la afiliación activa para el día
+            var activeAffiliation = affiliations
+                .FirstOrDefault(aff => aff.StartDate <= currentDay && aff.EndDate >= currentDay);
+
+            if (activeAffiliation != null)
+            {
+                // Obtener las horas diarias de la afiliación activa
+                var dailyHours = await _context.AffHours
+                    .Where(ah => ah.AffId == activeAffiliation.AffId && ah.StartDate <= currentDay && ah.EndDate >= currentDay)
+                    .Select(ah => ah.Hours)
+                    .FirstOrDefaultAsync();
+
+                if (dailyHours > 0)
+                {
+                    totalMaxHours += dailyHours;
+                }
             }
         }
 
         return totalMaxHours;
     }
 
-    
+    public async Task<int> GetWorkingDaysInMonth(int year, int month)
+    {
+        // Fecha de inicio y fin del mes
+        DateTime startOfMonth = new DateTime(year, month, 1);
+        DateTime endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
+
+        // Obtener días festivos nacionales
+        var nationalHolidays = await _context.NationalHolidays
+            .Where(nh => nh.Date >= startOfMonth && nh.Date <= endOfMonth)
+            .Select(nh => nh.Date)
+            .ToListAsync();
+
+        int workingDays = 0;
+
+        // Iterar por cada día del mes
+        for (DateTime currentDay = startOfMonth; currentDay <= endOfMonth; currentDay = currentDay.AddDays(1))
+        {
+            // Contar solo días laborables
+            if (currentDay.DayOfWeek != DayOfWeek.Saturday && currentDay.DayOfWeek != DayOfWeek.Sunday && !nationalHolidays.Contains(currentDay))
+            {
+                workingDays++;
+            }
+        }
+
+        return workingDays;
+    }
+
+
 
 }
