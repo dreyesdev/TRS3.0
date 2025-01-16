@@ -12,6 +12,7 @@ using System.Text;
 using System.Timers;
 using Newtonsoft.Json.Linq;
 using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 
 
 
@@ -590,29 +591,38 @@ namespace TRS2._0.Services
             }
         }
 
-        public async Task<string> CancelLiquidation(string liquidationId)
+        public async Task<IActionResult> CancelLiquidation(string liquidationId)
         {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = true
-            };
-
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                var logger = new LoggerConfiguration()
+                    .MinimumLevel.Debug()
+                    .WriteTo.File(Path.Combine(Directory.GetCurrentDirectory(), "Logs", "CancelLiquidationLog.txt"), rollingInterval: RollingInterval.Day)
+                    .CreateLogger();
+
+                logger.Information($"Starting cancellation process for Liquidation ID: {liquidationId}");
+
+                // Recuperar la liquidación
                 var liquidation = await _context.Liquidations.FindAsync(liquidationId);
                 if (liquidation == null)
                 {
-                    return System.Text.Json.JsonSerializer.Serialize(new { success = false, message = "Liquidation not found." }, options);
+                    logger.Warning($"Liquidation with ID {liquidationId} not found.");
+                    return new JsonResult(new { success = false, message = "Liquidation not found." });
                 }
 
-                var liqDayProjects = await _context.liqdayxproject.Where(ld => ld.LiqId == liquidationId).ToListAsync();
+                // Obtener registros de liqdayxproject relacionados
+                var liqDayProjects = await _context.liqdayxproject
+                    .Where(ld => ld.LiqId == liquidationId)
+                    .ToListAsync();
+
                 if (!liqDayProjects.Any())
                 {
-                    return System.Text.Json.JsonSerializer.Serialize(new { success = false, message = "No associated project records found for liquidation." }, options);
+                    logger.Warning($"No associated liqdayxproject records found for Liquidation ID: {liquidationId}");
+                    return new JsonResult(new { success = false, message = "No associated project records found for liquidation." });
                 }
 
+                // Agrupar por proyecto y mes
                 var groupedByProjectMonth = liqDayProjects
                     .GroupBy(ld => new { ld.ProjId, Month = ld.Day.Month, Year = ld.Day.Year })
                     .ToList();
@@ -623,59 +633,83 @@ namespace TRS2._0.Services
                     var month = group.Key.Month;
                     var year = group.Key.Year;
 
+                    // Obtener esfuerzo total para el grupo
                     var totalEffortForMonth = group.Sum(ld => ld.PMs);
 
+                    // Encontrar WP "TRAVELS"
                     var relatedWpxPeople = await _context.Wpxpeople
-                        .Include(wp => wp.WpNavigation)
-                        .Where(wp => wp.WpNavigation.ProjId == projectId)
+                        .Include(wpx => wpx.WpNavigation)
+                        .Where(wpx => wpx.WpNavigation.ProjId == projectId)
                         .ToListAsync();
 
                     var travelsWpx = relatedWpxPeople.FirstOrDefault(wpx => wpx.WpNavigation.Name == "TRAVELS");
-                    if (travelsWpx == null) continue;
+                    if (travelsWpx == null)
+                    {
+                        logger.Information($"No 'TRAVELS' WP found for Project ID: {projectId}. Skipping adjustments.");
+                        continue;
+                    }
 
+                    // Ajustar esfuerzos en "TRAVELS"
                     var travelsEffortForMonth = await _context.Persefforts
                         .Where(pe => pe.WpxPerson == travelsWpx.Id && pe.Month.Month == month && pe.Month.Year == year)
                         .SumAsync(pe => pe.Value);
 
                     if (travelsEffortForMonth >= totalEffortForMonth)
                     {
-                        var remainingEffort = travelsEffortForMonth - totalEffortForMonth;
+                        logger.Information($"Sufficient PMs available in 'TRAVELS'. Adjusting effort by {totalEffortForMonth}.");
+
                         var effortEntry = await _context.Persefforts
                             .FirstOrDefaultAsync(pe => pe.WpxPerson == travelsWpx.Id && pe.Month.Month == month && pe.Month.Year == year);
+
                         if (effortEntry != null)
                         {
-                            effortEntry.Value = remainingEffort;
+                            effortEntry.Value -= totalEffortForMonth;
                             _context.Persefforts.Update(effortEntry);
                         }
                     }
                     else if (travelsEffortForMonth > 0)
                     {
+                        logger.Warning($"Partial PM adjustment in 'TRAVELS'. Available: {travelsEffortForMonth}, Required: {totalEffortForMonth}.");
+
                         totalEffortForMonth -= travelsEffortForMonth;
+
                         var effortEntry = await _context.Persefforts
                             .FirstOrDefaultAsync(pe => pe.WpxPerson == travelsWpx.Id && pe.Month.Month == month && pe.Month.Year == year);
+
                         if (effortEntry != null)
                         {
                             effortEntry.Value = 0;
                             _context.Persefforts.Update(effortEntry);
                         }
                     }
+                    else
+                    {
+                        logger.Warning($"No PMs available in 'TRAVELS' for Project ID: {projectId}, Month: {month}, Year: {year}.");
+                    }
                 }
 
+                // Eliminar registros de liqdayxproject
                 _context.liqdayxproject.RemoveRange(liqDayProjects);
-                liquidation.Status = "7";
+                logger.Information($"Deleted {liqDayProjects.Count} records from liqdayxproject.");
+
+                // Actualizar estado de la liquidación
+                liquidation.Status = "7"; // Cancelada
                 _context.Liquidations.Update(liquidation);
+                logger.Information($"Liquidation ID {liquidationId} marked as canceled.");
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                return System.Text.Json.JsonSerializer.Serialize(new { success = true, message = "Liquidation successfully canceled." }, options);
+                logger.Information($"Successfully completed cancellation for Liquidation ID: {liquidationId}.");
+                return new JsonResult(new { success = true, message = "Liquidation successfully canceled." });
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                return System.Text.Json.JsonSerializer.Serialize(new { success = false, message = $"Error canceling liquidation: {ex.Message}" }, options);
+                return new JsonResult(new { success = false, message = $"Error canceling liquidation: {ex.Message}" });
             }
         }
+
 
 
 

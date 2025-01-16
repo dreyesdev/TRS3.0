@@ -14,11 +14,13 @@ namespace TRS2._0.Controllers
     {
         private readonly TRSDBContext _context;
         private readonly WorkCalendarService _workCalendarService;
+        private readonly LoadDataService _loadDataService;
 
-        public PersonnelsController(TRSDBContext context, WorkCalendarService workCalendarService)
+        public PersonnelsController(TRSDBContext context, WorkCalendarService workCalendarService, LoadDataService loadDataService)
         {
             _context = context;
             _workCalendarService = workCalendarService;
+            _loadDataService = loadDataService;
         }
 
         // GET: Personnels
@@ -468,6 +470,30 @@ namespace TRS2._0.Controllers
             return Json(new { success = true, message = "Viaje aprobado correctamente." }); // Respuesta de éxito
         }
 
+        [HttpPost]
+        public async Task<IActionResult> CancelTravel(string id)
+        {
+            try
+            {                
+
+                // Llama al método CancelLiquidation
+                var result = await _loadDataService.CancelLiquidation(id);
+
+                // Convertir el resultado a JsonResult para retornarlo directamente
+                if (result is JsonResult jsonResult)
+                {
+                    return jsonResult;
+                }
+
+                // En caso de que no sea un JsonResult, retornar un error genérico
+                return Json(new { success = false, message = "Unexpected response format from service." });
+            }
+            catch (Exception ex)
+            {
+                // Manejar errores inesperados
+                return Json(new { success = false, message = $"Error canceling travel: {ex.Message}" });
+            }
+        }
 
 
     }

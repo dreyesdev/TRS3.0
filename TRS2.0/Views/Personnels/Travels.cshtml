@@ -5,43 +5,41 @@
     var selectedPersonId = ViewBag.SelectedPersonId;
 }
 
-<h2>Travels</h2>
+<h2 class="text-center my-4">Travel Management</h2>
 
 <div class="container">
     <div class="row">
         <!-- Columna de selección de personal -->
         <div class="col-md-6">
-            <h2>Person Selection</h2>
-
-            <!-- Dropdown para seleccionar personal -->
-            <select id="personnelSelect" class="form-control">
-                <option value="">Please select a person from the list below:</option>
+            <h3 class="text-primary">Select a Person</h3>
+            <select id="personnelSelect" class="form-control mb-3">
+                <option value="">Select a person from the list</option>
                 @foreach (var person in Model)
                 {
                     <option value="@person.Id">@person.Name @person.Surname</option>
                 }
             </select>
 
-            <!-- Barra de búsqueda -->
-            <p>Or start typing here the name of the person:</p>
-            <input type="text" id="searchTerm" class="form-control" placeholder="Start typing..." onkeyup="filterPersonnel()" />
+            <p class="text-secondary">Or search for a name:</p>
+            <input type="text" id="searchTerm" class="form-control mb-2" placeholder="Start typing..." onkeyup="filterPersonnel()" />
 
-            <!-- Resultados de búsqueda -->
-            <div id="searchResults"></div>
+            <div id="searchResults" class="border rounded p-2 bg-light"></div>
         </div>
 
         <!-- Columna de detalles del personal -->
         <div class="col-md-6">
-            <h2>Person Details</h2>
-            <div id="personDetails" class="card">
+            <h3 class="text-primary">Person Details</h3>
+            <div id="personDetails" class="card bg-light shadow-sm p-3">
                 <!-- Aquí se cargarán los detalles del personal -->
+                <p class="text-muted text-center">Select a person to view details</p>
             </div>
         </div>
     </div>
 </div>
+
 <hr />
 
-<div id="travelsTableContainer">
+<div id="travelsTableContainer" class="mt-4">
     <!-- Tabla de viajes se cargará aquí -->
 </div>
 
@@ -63,14 +61,18 @@
                     var resultsDiv = document.getElementById('searchResults');
                     resultsDiv.innerHTML = ''; // Limpiar resultados anteriores
 
+                    if (!data || data.length === 0) {
+                        resultsDiv.innerHTML = '<p>No matches found.</p>';
+                        return;
+                    }
+
                     data.forEach(function (person) {
                         var personDiv = document.createElement('div');
-                        personDiv.className = 'person-result';
-                        personDiv.textContent = person.name + ' ' + person.surname;
+                        personDiv.className = 'person-result shadow-sm p-2 mb-2 bg-white rounded';
+                        personDiv.textContent = `${person.name} ${person.surname}`;
                         personDiv.setAttribute('data-person-id', person.id);
 
                         personDiv.onclick = function () {
-                            // Marcar el resultado seleccionado como activo y limpiar los demás
                             document.querySelectorAll('.person-result').forEach(function (el) {
                                 el.classList.remove('active');
                             });
@@ -82,6 +84,11 @@
 
                         resultsDiv.appendChild(personDiv);
                     });
+
+                    resultsDiv.style.display = 'block'; // Mostrar resultados
+                },
+                error: function (error) {
+                    console.error("Error in filterPersonnel:", error);
                 }
             });
         }
@@ -92,43 +99,28 @@
                 data: { id: personId },
                 success: function (response) {
                     var detailsDiv = document.getElementById('personDetails');
-                    var searchTermInput = document.getElementById('searchTerm');
                     detailsDiv.innerHTML = '';
                     if (response.success) {
                         var data = response.data;
-                        // Asignar el nombre completo de la persona al campo de búsqueda
-                        searchTermInput.value = data.fullName || '';
                         detailsDiv.innerHTML = '<div class="card-body">' +
-                            '<h5 class="card-title">' + (data.fullName || '') + '</h5>' +
-                            '<p> </p>' +
-                            '<p><span class="card-detail-label">Affiliation:</span> ' + (data.affiliation || '') + '</p>' +
-                            '<p><span class="card-detail-label">Department:</span> ' + (data.departmentName || '') + '</p>' +
-                            '<p><span class="card-detail-label">Group:</span> ' + (data.personnelGroupName || '') + '</p>' +
-                            '<p><span class="card-detail-label">Group Leader:</span> ' + (data.responsiblePerson || '') + '</p>' +
-                            '<p><span class="card-detail-label">Contract Start:</span> ' + (data.startDate || '') + '</p>' +
-                            '<p><span class="card-detail-label">Contract End:</span> ' + (data.endDate || '') + '</p>' +
+                            `<h5 class="card-title">${data.fullName || ''}</h5>` +
+                            `<p><span class="card-detail-label">Affiliation:</span> ${data.affiliation || ''}</p>` +
+                            `<p><span class="card-detail-label">Department:</span> ${data.departmentName || ''}</p>` +
+                            `<p><span class="card-detail-label">Group:</span> ${data.personnelGroupName || ''}</p>` +
+                            `<p><span class="card-detail-label">Group Leader:</span> ${data.responsiblePerson || ''}</p>` +
+                            `<p><span class="card-detail-label">Contract Start:</span> ${data.startDate || ''}</p>` +
+                            `<p><span class="card-detail-label">Contract End:</span> ${data.endDate || ''}</p>` +
                             '</div>';
                     } else {
-                        // Manejar el caso en que la persona no se encontró
-                        detailsDiv.innerHTML = '<p>Person details not found.</p>';
+                        detailsDiv.innerHTML = '<p class="text-danger text-center">Person details not found.</p>';
                     }
+                },
+                error: function (error) {
+                    console.error("Error in fetchPersonDetails:", error);
                 }
             });
-            // Ocultar la lista de resultados
             document.getElementById('searchResults').style.display = 'none';
         }
-
-        document.getElementById('searchResults').addEventListener('click', function (event) {
-            if (event.target && event.target.matches('div.person-result')) {
-                var personId = event.target.getAttribute('data-person-id');
-                fetchPersonDetails(personId);
-            }
-        });
-
-        // Mostrar la lista de resultados cuando el campo de búsqueda recibe el foco
-        document.getElementById('searchTerm').addEventListener('focus', function () {
-            document.getElementById('searchResults').style.display = 'block';
-        });
 
         function loadTravelData(personId) {
             $.ajax({
@@ -141,42 +133,40 @@
                     }
 
                     var data = response.data;
-                    var tableHtml = '<table class="table table-bordered">';
-                    tableHtml += '<thead class="thead-light"><tr>';
-                    tableHtml += '<th style="font-weight: bold; text-align: center;">#</th>';
-                    tableHtml += '<th style="font-weight: bold; text-align: center;">Code</th>';
-                    tableHtml += '<th style="font-weight: bold; text-align: center;">Start Date</th>';
-                    tableHtml += '<th style="font-weight: bold; text-align: center;">End Date</th>';
-                    tableHtml += '<th style="font-weight: bold; text-align: center;">Project 1</th>';
-                    tableHtml += '<th style="font-weight: bold; text-align: center;">Dedication 1</th>';
-                    tableHtml += '<th style="font-weight: bold; text-align: center;">Project 2</th>';
-                    tableHtml += '<th style="font-weight: bold; text-align: center;">Dedication 2</th>';
-                    tableHtml += '<th style="font-weight: bold; text-align: center;">Status</th>';
-                    tableHtml += '<th style="font-weight: bold; text-align: center;">Action</th>';
+                    var tableHtml = '<table class="table table-hover table-bordered shadow">';
+                    tableHtml += '<thead class="thead-dark"><tr>';
+                    tableHtml += '<th>#</th>';
+                    tableHtml += '<th>Code</th>';
+                    tableHtml += '<th>Start Date</th>';
+                    tableHtml += '<th>End Date</th>';
+                    tableHtml += '<th>Project 1</th>';
+                    tableHtml += '<th>Dedication 1</th>';
+                    tableHtml += '<th>Project 2</th>';
+                    tableHtml += '<th>Dedication 2</th>';
+                    tableHtml += '<th>Status</th>';
+                    tableHtml += '<th>Actions</th>';
                     tableHtml += '</tr></thead>';
                     tableHtml += '<tbody>';
 
                     data.forEach(function (item, index) {
                         tableHtml += '<tr>';
-                        tableHtml += `<td style="text-align: center;">${index + 1}</td>`;
-                        tableHtml += `<td style="text-align: center;">${item.code}</td>`;
-                        tableHtml += `<td style="text-align: center;">${item.startDate.split('T')[0]}</td>`;
-                        tableHtml += `<td style="text-align: center;">${item.endDate.split('T')[0]}</td>`;
-                        tableHtml += `<td style="text-align: center;">${item.project1 || ''}</td>`;
-                        tableHtml += `<td style="text-align: center;">${item.dedication1 || ''}</td>`;
-                        tableHtml += `<td style="text-align: center;">${item.project2 || ''}</td>`;
-                        tableHtml += `<td style="text-align: center;">${item.dedication2 || ''}</td>`;
+                        tableHtml += `<td>${index + 1}</td>`;
+                        tableHtml += `<td>${item.code}</td>`;
+                        tableHtml += `<td>${item.startDate.split('T')[0]}</td>`;
+                        tableHtml += `<td>${item.endDate.split('T')[0]}</td>`;
+                        tableHtml += `<td>${item.project1 || ''}</td>`;
+                        tableHtml += `<td>${item.dedication1 || ''}</td>`;
+                        tableHtml += `<td>${item.project2 || ''}</td>`;
+                        tableHtml += `<td>${item.dedication2 || ''}</td>`;
+                        tableHtml += `<td class="${item.status === "Approved" ? 'text-success' : 'text-danger'}">${item.status}</td>`;
 
-                        // Mostrar el estado con colores
-                        if (item.status === "Aprobada") {
-                            tableHtml += `<td style="text-align: center; color: green; font-weight: bold;">${item.status}</td>`;
-                            tableHtml += '<td></td>'; // No se muestra botón para Aprobada
-                        } else if (item.status === "Pendiente") {
-                            tableHtml += `<td style="text-align: center; color: red; font-weight: bold;">${item.status}</td>`;
-                            tableHtml += `<td style="text-align: center;"><button class="btn btn-success btn-sm" onclick="approveTravel('${item.code}')">Approve</button></td>`;
+                        if (item.status === "Pending") {
+                            tableHtml += `<td><button class="btn btn-success btn-sm mx-1" onclick="approveTravel('${item.code}')">Approve</button>`;
+                            tableHtml += `<button class="btn btn-danger btn-sm mx-1" onclick="cancelTravel('${item.code}')">Cancel</button></td>`;
+                        } else if (item.status === "Approved") {
+                            tableHtml += `<td><button class="btn btn-danger btn-sm mx-1" onclick="cancelTravel('${item.code}')">Cancel</button></td>`;
                         } else {
-                            tableHtml += `<td style="text-align: center; color: gray;">${item.status}</td>`;
-                            tableHtml += '<td></td>'; // Acción vacía si el estado es desconocido
+                            tableHtml += '<td></td>';
                         }
 
                         tableHtml += '</tr>';
@@ -191,177 +181,212 @@
             });
         }
 
-
-
-
-
-
         function approveTravel(travelId) {
-            if (!confirm('¿Estás seguro de que deseas aprobar este viaje?')) {
-                return;
+            if (confirm('Are you sure you want to approve this travel?')) {
+                $.post('@Url.Action("ApproveTravel", "Personnels")', { id: travelId }, function (response) {
+                    alert(response.message);
+                    var personId = $('#personnelSelect').val();
+                    loadTravelData(personId);
+                });
             }
-
-            $.ajax({
-                url: '@Url.Action("ApproveTravel", "Personnels")',
-                type: 'POST',
-                data: { id: travelId },
-                success: function (response) {
-                    alert(response.message);
-                    if (response.success) {
-                        // Recargar los datos de viajes después de la aprobación
-                        var personId = $('#personnelSelect').val();
-                        loadTravelData(personId);
-                    }
-                },
-                error: function (error) {
-                    console.error("Error approving travel", error);
-                }
-            });
         }
 
-
-        function updateTravel(id, pId) {
-            // Recuperar los datos de los inputs en la fila correspondiente
-            var row = $('#row-' + id); // Selecciona la fila por ID
-            var destination = row.find("input[type='text']").eq(0).val();
-            var startDate = row.find("input[type='date']").eq(0).val();
-            var endDate = row.find("input[type='date']").eq(1).val();
-            var purpose = row.find("input[type='text']").eq(1).val();
-
-            // Llamar a la acción del controlador para actualizar
-            $.ajax({
-                url: '@Url.Action("ApproveTravel", "Personnels")',
-                type: 'POST',
-                data: {
-                    id: id,
-                    destination: destination,
-                    startDate: startDate,
-                    endDate: endDate,
-                    purpose: purpose
-                },
-                success: function (response) {
+        function cancelTravel(travelId) {
+            if (confirm('Are you sure you want to cancel this travel?')) {
+                $.post('@Url.Action("CancelTravel", "Personnels")', { id: travelId }, function (response) {
                     alert(response.message);
-                    loadTravelData(pId);
-                },
-                error: function (error) {
-                    // Manejar error
-                }
-            });
-        }
-
-        function removeTravel(id, pId) {
-            // Llamar a la acción del controlador para eliminar
-            $.ajax({
-                url: '@Url.Action("RemoveTravel", "Personnels")',
-                type: 'POST',
-                data: { id: id },
-                success: function (response) {
-                    alert(response.message);
-                    loadTravelData(pId);
-                    // Recargar la tabla o mostrar mensaje de éxito
-                },
-                error: function (error) {
-                    // Manejar error
-                }
-            });
-        }
-
-        function addTravel(personId) {
-            var row = $('#new-row');
-            var destination = row.find("input[type='text']").eq(0).val();
-            var startDate = row.find("input[type='date']").eq(0).val();
-            var endDate = row.find("input[type='date']").eq(1).val();
-            var purpose = row.find("input[type='text']").eq(1).val();
-
-            // Verificar que los campos no estén vacíos
-            if (!destination || !startDate || !endDate || !purpose) {
-                alert('Please fill in all fields.');
-                return;
+                    var personId = $('#personnelSelect').val();
+                    loadTravelData(personId);
+                });
             }
-
-            // Llamar a la acción del controlador para agregar un nuevo viaje
-            $.ajax({
-                url: '@Url.Action("AddTravel", "Personnels")',
-                type: 'POST',
-                data: {
-                    personId: personId,
-                    destination: destination,
-                    startDate: startDate,
-                    endDate: endDate,
-                    purpose: purpose
-                },
-                success: function (response) {
-                    alert(response.message);
-                    if (response.success) {
-                        loadTravelData(personId); // Recargar la tabla
-                    }
-                },
-                error: function (error) {
-                    // Manejar el error
-                    console.error("Error adding travel", error);
-                }
-            });
         }
     </script>
 }
 
+
 <style>
-    .person-result {
-        cursor: pointer;
-        padding: 5px;
+    /* General styles */
+    h2, h3 {
+        font-weight: bold;
+        text-align: center;
     }
 
-        .person-result:hover {
-            background-color: #eee;
-        }
+    .text-primary {
+        color: #007bff;
+    }
 
-        .person-result.active {
-            background-color: #4c87c6;
-        }
+    .text-secondary {
+        color: #6c757d;
+    }
+
+    .text-success {
+        color: #28a745;
+        font-weight: bold;
+    }
+
+    .text-danger {
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    .text-muted {
+        color: #6c757d;
+    }
+
+    /* Search results container */
+    #searchResults {
+        max-height: 200px; 
+        overflow-y: auto;
+        background-color: #f8f9fa; 
+        border: 1px solid #ddd; 
+        border-radius: 5px; 
+        padding: 10px;
+        display: none;
+    }
+
+    .person-result {
+        cursor: pointer;
+        padding: 5px 10px;
+        margin-bottom: 5px;
+        border-radius: 4px;
+        transition: background-color 0.2s ease-in-out;
+    }
+
+    .person-result:hover {
+        background-color: #007bff;
+        color: white;
+    }
+
+    .person-result.active {
+        background-color: #0056b3;
+        color: white;
+    }
+
+    /* Card styles */
+    .card {
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        border: none;
+        background: linear-gradient(145deg, #ffffff, #e6e6e6);
+        border-radius: 8px;
+    }
+
+    .card-body {
+        padding: 20px;
+    }
+
+    .card-title {
+        color: #333;
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+    }
 
     .card-detail-label {
         font-weight: bold;
     }
 
-    .card-title {
-        font-weight: bold;
-    }
-
-    #searchResults {
-        max-height: 200px; /* Ajusta esto según tus necesidades */
-        overflow-y: auto;
-        display: none; /* Inicialmente oculto */
-    }
-
-    /* Estilos para la tabla */
+    /* Table styles */
     .table {
         width: 100%;
-        border-collapse: collapse; /* Para bordes más definidos */
-        margin-bottom: 1rem; /* Espaciado debajo de la tabla */
+        margin-top: 20px;
+        border-collapse: collapse;
     }
+
+    .table th {
+        background-color: #343a40;
+        color: white;
+        text-align: center;
+        padding: 10px;
+        font-size: 14px;
+    }
+
+    .table td {
+        text-align: center;
+        padding: 8px;
+        vertical-align: middle;
+        font-size: 13px;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: #f1f1f1;
+    }
+
+    .table-bordered {
+        border: 1px solid #ddd;
+    }
+
+    .table-bordered td, .table-bordered th {
+        border: 1px solid #ddd;
+    }
+
+    /* Button styles */
+    .btn {
+        font-size: 12px;
+        padding: 5px 10px;
+        border-radius: 4px;
+        transition: all 0.3s ease-in-out;
+    }
+
+    .btn-success {
+        background-color: #28a745;
+        border: none;
+        color: white;
+    }
+
+    .btn-success:hover {
+        background-color: #218838;
+        color: white;
+    }
+
+    .btn-danger {
+        background-color: #dc3545;
+        border: none;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background-color: #c82333;
+        color: white;
+    }
+
+    .btn-sm {
+        font-size: 11px;
+    }
+
+    /* Enhanced hover effect for buttons */
+    .btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Container spacing */
+    .container {
+        padding: 20px;
+    }
+
+    /* Highlighted table row */
+    .table tbody tr td {
+        transition: background-color 0.3s ease-in-out;
+    }
+
+    .table tbody tr:hover td {
+        background-color: #f8f9fa;
+    }
+
+    
+    /* Responsive adjustments */
+    @@media (max-width: 768px) {
+        .card-title {
+            font-size: 1.2rem;
+        }
+
+        .btn {
+            font-size: 10px;
+            padding: 4px 8px;
+        }
 
         .table th, .table td {
-            padding: 0.75rem;
-            vertical-align: top;
-            border-top: 1px solid #dee2e6;
+            font-size: 12px;
         }
-
-        .table thead th {
-            vertical-align: bottom;
-            border-bottom: 2px solid #dee2e6;
-        }
-
-        .table tbody + tbody {
-            border-top: 2px solid #dee2e6;
-        }
-
-    .table-sm th,
-    .table-sm td {
-        padding: 0.3rem;
-    }
-
-    h2 {
-        text-align: center;
-        font-weight: bold;
     }
 </style>
+
