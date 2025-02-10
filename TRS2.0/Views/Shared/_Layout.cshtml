@@ -4,17 +4,29 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - TRS3.0</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="/css/bootstrap.min.css" />
+
+    <!-- FullCalendar -->
     <link rel="stylesheet" href="/css/fullcalendar.min.css" />
-    <link rel="stylesheet" href="/css/site.css" asp-append-version="true" />
+
+    <!-- DataTables -->
     <link rel="stylesheet" href="/css/dataTables.bootstrap4.min.css" />
     <link rel="stylesheet" href="/css/jquery.dataTables.css" />
+
+    <!-- Site Custom Styles -->
+    <link rel="stylesheet" href="/css/site.css" asp-append-version="true" />
+
+    <!-- 🔹 Agregar referencia a _Layout.cshtml.css -->
+    <link rel="stylesheet" href="~/css/layout-styles.css" asp-append-version="true">
 </head>
+
 
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom mb-3">
             <div class="container-fluid">
                 <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
                     <img src="~/Images/logo.png" alt="TRS 2.0 Logo" style="height: 50px;"> <!-- Ajusta la ruta y el tamaño según tus necesidades -->
@@ -76,7 +88,7 @@
             <nav class="navbar navbar-expand-lg navbar-light bg-light">
                 <div class="container-fluid">
                     <!-- Botón para Details & Wps -->
-                    <a class="navbar-brand btn btn-outline-primary me-2" href="@Url.Action("Details", "Projects", new { id = ViewBag.ProjId })">
+                    <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("Details", "Projects", new { id = ViewBag.ProjId })">
                         Details & Wps
                     </a>
 
@@ -84,7 +96,7 @@
                     <span class="vertical-separator"></span>
 
                     <!-- Botón para Effort Plan -->
-                    <a class="navbar-brand btn btn-outline-primary me-2" href="@Url.Action("EffortPlan", "Projects", new { projId = ViewBag.ProjId })">
+                    <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("EffortPlan", "Projects", new { projId = ViewBag.ProjId })">
                         Effort Plan
                     </a>
 
@@ -92,19 +104,19 @@
                     <span class="vertical-separator"></span>
 
                     <!-- Botón para Personnel Selection -->
-                    <a class="navbar-brand btn btn-outline-primary" href="@Url.Action("PersonnelSelection", "Projects", new { projId = ViewBag.ProjId })">
+                    <a class="navbar-brand btn btn-outline-primary text-dark" href="@Url.Action("PersonnelSelection", "Projects", new { projId = ViewBag.ProjId })">
                         Personnel Selection
                     </a>
                     <!-- Separador -->
                     <span class="vertical-separator"></span>
 
                     <!-- Botón para Personnel Effort Plan -->
-                    <a class="navbar-brand btn btn-outline-primary" href="@Url.Action("PersonnelEffortPlan", "Projects", new { projId = ViewBag.ProjId })">
+                    <a class="navbar-brand btn btn-outline-primary text-dark" href="@Url.Action("PersonnelEffortPlan", "Projects", new { projId = ViewBag.ProjId })">
                         Personnel Effort Plan
                     </a>
 
                     <!-- Botón para Personnel Project Report -->
-                    <a class="navbar-brand btn btn-outline-primary" href="@Url.Action("ProjectReport", "Projects", new { projId = ViewBag.ProjId })">
+                    <a class="navbar-brand btn btn-outline-primary text-dark" href="@Url.Action("ProjectReport", "Projects", new { projId = ViewBag.ProjId })">
                         Project Report
                     </a>
 
@@ -125,44 +137,44 @@
                         TempData.Keep("SelectedPersonId"); // Mantener el valor para su uso posterior
 
                         <!-- Actualizar los enlaces del menú para incluir el SelectedPersonId -->
-                        <a class="navbar-brand btn btn-outline-primary me-2"
+                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark"
                            href="@Url.Action("Calendar", "Personnels", new { id = TempData["SelectedPersonId"] })">
                             Calendar
                         </a>
                         <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2"
+                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark"
                            href="@Url.Action("Dedication", "Personnels", new { id = TempData["SelectedPersonId"] })">
                             Dedication
                         </a>
                         <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2"
+                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark"
                            href="@Url.Action("ExternalRate", "Personnels", new { id = TempData["SelectedPersonId"] })">
                             External Rate
                         </a>
                         <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2"
+                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark"
                            href="@Url.Action("Travels", "Personnels", new { id = TempData["SelectedPersonId"] })">
                             Travels
                         </a>
                         <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2"
+                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark"
                            href="@Url.Action("LoginLog", "Personnels", new { id = TempData["SelectedPersonId"] })">
                             LoginLog
                         </a>
                     }
                     else
                     {
-                        <a class="navbar-brand btn btn-outline-primary me-2" href="@Url.Action("Calendar", "Personnels")">
+                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("Calendar", "Personnels")">
                             Calendar
                         </a>
                         <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2" href="@Url.Action("Dedication", "Personnels")">Dedication</a>
+                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("Dedication", "Personnels")">Dedication</a>
                         <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2" href="@Url.Action("ExternalRate", "Personnels")">External Rate</a>
+                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("ExternalRate", "Personnels")">External Rate</a>
                         <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2" href="@Url.Action("Travels", "Personnels")">Travels</a>
+                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("Travels", "Personnels")">Travels</a>
                         <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary" href="@Url.Action("LoginLog", "Personnels")">Login Log</a>
+                        <a class="navbar-brand btn btn-outline-primary text-dark" href="@Url.Action("LoginLog", "Personnels")">Login Log</a>
                     }
                 </div>
             </nav>
@@ -186,7 +198,7 @@
     <script src="/js/datatables.min.js"></script>
     <script src="/js/dataTables.bootstrap4.min.js"></script>
     <script src="/js/bootstrap.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src='~/js/index.global.min.js'></script>
     <script src='~/js/locales-all.global.min.js'></script>

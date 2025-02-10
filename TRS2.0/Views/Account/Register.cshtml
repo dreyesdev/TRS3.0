@@ -4,21 +4,62 @@
     ViewData["Title"] = "Register";
 }
 
-<h2>Register</h2>
+<!-- Vista de Registro Mejorada -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css">    
+    <style>
+        body {
+            background: linear-gradient(to right, darkblue, #2575fc);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-<div class="row">
-    <div class="col-md-4">
-        <form asp-action="Register">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <div class="form-group">
-                <label asp-for="BSCID" class="control-label"></label>
-                <input asp-for="BSCID" class="form-control" />
-                <span asp-validation-for="BSCID" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <button type="submit" class="btn btn-primary">Register</button>
-            </div>
+        .register-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .form-control {
+            border-radius: 5px;
+        }
+
+        .btn-primary {
+            background: #2575fc;
+            border: none;
+            transition: background 0.3s;
+        }
+
+            .btn-primary:hover {
+                background: #1a5ac6;
+            }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <h3 class="text-center">Crear Cuenta</h3>
+        <p class="text-center text-muted">Regístrate con tus datos</p>
+        <form method="post" action="/Account/Register">
+            <div class="mb-3">
+                <label class="form-label">BSCID</label>
+                <input type="text" class="form-control" name="BSCID" required>
+            </div>            
+            <button type="submit" class="btn btn-primary w-100 mt-3">Registrarse</button>
         </form>
+        <p class="text-center mt-3">¿Ya tienes cuenta? <a href="/Account/Login">Inicia Sesión</a></p>
     </div>
-</div>
+</body>
+</html>
+
 

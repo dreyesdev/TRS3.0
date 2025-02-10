@@ -124,8 +124,8 @@ namespace TRS2._0.Controllers
                     <html>
                     <body>
                         <p>Greetings, {personnel.Name},</p>
-                        <p>You now have access to the TRS 3.0 web application, which is currently under development.</p>
-                        <p>To access the site, please use the following link: <a href='https://opstrs03.bsc.es/'>TRS 3.0 - Beta</a></p>
+                        <p>You now have access to the TRS 3.0 web application.</p>
+                        <p>To access the site, please use the following link: <a href='https://opstrs03.bsc.es/'>TRS 3.0</a></p>
                         <p>Your login credentials are:</p>
                         <ul>
                             <li><strong>Username:</strong> {model.BSCID}</li>
@@ -174,15 +174,16 @@ namespace TRS2._0.Controllers
                 var user = await _userManager.FindByEmailAsync(model.Email);
                 if (user == null)
                 {
-                    return RedirectToAction(nameof(ForgotPasswordConfirmation));
+                    return RedirectToAction(nameof(Login)); // Redirigir en lugar de mostrar vista de confirmación
                 }
 
                 var code = await _userManager.GeneratePasswordResetTokenAsync(user);
                 var callbackUrl = Url.Action(nameof(ResetPassword), "Account", new { code }, protocol: HttpContext.Request.Scheme);
-                await _emailSender.SendEmailAsync(model.Email, "Reset Password", $"Please reset your password by clicking <a href='{callbackUrl}'>here</a>. Your new password is {code}");
+                await _emailSender.SendEmailAsync(model.Email, "Reset Password",
+                    $"Please reset your password by clicking <a href='{callbackUrl}'>here</a>");
 
                 _logger.LogInformation($"Password reset email sent to {model.Email}.");
-                return RedirectToAction(nameof(ForgotPasswordConfirmation));
+                return RedirectToAction(nameof(Login)); // Se elimina ForgotPasswordConfirmation
             }
 
             _logger.LogWarning("Invalid forgot password attempt.");
@@ -207,13 +208,13 @@ namespace TRS2._0.Controllers
             var user = await _userManager.FindByEmailAsync(model.Email);
             if (user == null)
             {
-                return RedirectToAction(nameof(ResetPasswordConfirmation));
+                return RedirectToAction(nameof(Login)); // Redirigir en lugar de mostrar vista de confirmación
             }
 
             var result = await _userManager.ResetPasswordAsync(user, model.Code, model.Password);
             if (result.Succeeded)
             {
-                return RedirectToAction(nameof(ResetPasswordConfirmation));
+                return RedirectToAction(nameof(Login)); // Se elimina ResetPasswordConfirmation
             }
 
             foreach (var error in result.Errors)
@@ -274,23 +275,31 @@ namespace TRS2._0.Controllers
         private string GeneratePassword()
         {
             const int length = 12;
-            const string valid = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
-            const string nonAlphanumeric = "!@#$%^&*()-_=+<>,.?/";
+            const string uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            const string lowercase = "abcdefghijklmnopqrstuvwxyz";
+            const string digits = "0123456789";
+            const string specialChars = "!@#$%^&*()-_=+<>,.?/";
 
-            StringBuilder res = new StringBuilder();
             Random rnd = new Random();
 
-            // Ensure at least one non-alphanumeric character and one digit
-            res.Append(nonAlphanumeric[rnd.Next(nonAlphanumeric.Length)]);
-            res.Append(valid[rnd.Next(10, 36)]); // Adds a digit
+            // Aseguramos que haya al menos un carácter de cada tipo
+            string password =
+                uppercase[rnd.Next(uppercase.Length)].ToString() +
+                lowercase[rnd.Next(lowercase.Length)] +
+                digits[rnd.Next(digits.Length)] +
+                specialChars[rnd.Next(specialChars.Length)];
 
-            for (int i = 2; i < length; i++)
+            // Llenamos el resto con caracteres aleatorios de todos los tipos
+            string allChars = uppercase + lowercase + digits + specialChars;
+            for (int i = 4; i < length; i++)
             {
-                res.Append(valid[rnd.Next(valid.Length)]);
+                password += allChars[rnd.Next(allChars.Length)];
             }
 
-            return res.ToString();
+            // Mezclar aleatoriamente los caracteres de la contraseña
+            return new string(password.ToCharArray().OrderBy(x => rnd.Next()).ToArray());
         }
+
 
         private string HashPassword(string password)
         {

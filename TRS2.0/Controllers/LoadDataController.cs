@@ -26,7 +26,7 @@ namespace TRS2._0.Controllers
                 // Configura JobDataMap con los parámetros específicos para esta acción
                 var jobDataMap = new JobDataMap
                 {
-                    {"Action", "UpdateMonthlyPMs"},
+                    {"Action", "UpdateMonthlyPMs  "},
             
                 };
 
@@ -493,6 +493,40 @@ namespace TRS2._0.Controllers
             }
         }
 
+        [HttpGet("/AdjustGlobalEffort")]
+
+        public async Task<IActionResult> TriggerAdjustGlobalEffortJob()
+        {
+            try
+            {
+                var scheduler = await _schedulerFactory.GetScheduler();
+                var jobKey = new JobKey("LoadDataServiceJob");
+
+                // Configura JobDataMap con los parámetros específicos para esta acción
+                var jobDataMap = new JobDataMap
+                {
+                    {"Action", "AdjustGlobalEffort"}
+                };
+
+                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
+
+                if (await scheduler.CheckExists(jobKey))
+                {
+                    await scheduler.TriggerJob(jobKey, jobDataMap);
+                    return Ok("El trabajo de ajuste de esfuerzo global se ha iniciado.");
+                }
+                else
+                {
+                    return NotFound("El trabajo de ajuste de esfuerzo global no se encontró.");
+                }
+            }
+
+            catch (Exception ex)
+            {
+                // Manejo adecuado de excepciones con un código de error HTTP 500
+                return StatusCode(500, $"Error al iniciar el trabajo de ajuste de esfuerzo global: {ex.Message}");
+            }
+        }
 
 
     }

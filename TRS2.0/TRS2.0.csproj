@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="wwwroot\css\layout-styles.css" />
     <None Include="wwwroot\Images\logo.png" />
   </ItemGroup>
 

@@ -102,6 +102,8 @@ namespace TRS2._0.Controllers
                 return NotFound();
             }
 
+            var maxhoursthismonth = await _workCalendarService.CalculateMaxHoursForPersonInMonth(validPersonId, currentYear, currentMonth);
+
             // Obtener WPs para la persona en el rango de fecha especificado
             var wpxPersons = await _context.Wpxpeople
                 .Include(wpx => wpx.PersonNavigation)
@@ -174,7 +176,7 @@ namespace TRS2._0.Controllers
                 WorkPackages = wpxPersons.Select(wpx =>
                 {
                     var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
-                    var estimatedHours = RoundToNearestHalfOrWhole((hoursPerDayWithDedication.Values.Sum()) * effort);
+                    var estimatedHours = RoundToNearestHalfOrWhole(maxhoursthismonth * effort);
                     var isLocked = projectLocks.Any(l => l.ProjectId == wpx.WpNavigation.ProjId && (l.IsLocked == true));
                     return new WorkPackageInfoTS
                     {

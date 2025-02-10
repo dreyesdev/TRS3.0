@@ -28,16 +28,18 @@ namespace TRS2._0.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly ILogger<AdminController> _logger;
+        private readonly LoadDataService _loadDataService;
         private readonly string _logDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Logs");
 
 
-        public AdminController(WorkCalendarService workCalendarService, TRSDBContext context, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, ILogger<AdminController> logger)
+        public AdminController(WorkCalendarService workCalendarService, TRSDBContext context, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, ILogger<AdminController> logger, LoadDataService loadDataService)
         {
             _workCalendarService = workCalendarService;
             _context = context;
             _userManager = userManager;
             _roleManager = roleManager;
             _logger = logger;
+            _loadDataService = loadDataService;
         }
 
         public async Task<IActionResult> Index()
@@ -559,10 +561,75 @@ namespace TRS2._0.Controllers
             var result = await _workCalendarService.AdjustEffortAsync(model.WpId, model.PersonId, model.Month);
             return Json(new { message = result });
         }
+
+        [HttpPost]
+        public async Task<IActionResult> AutoFillTimesheetsByDateRange([FromBody] DateRangeModel dateRange)
+        {
+            try
+            {
+                // Llama al servicio para ejecutar el proceso con el rango proporcionado
+                
+                await _loadDataService.AutoFillTimesheetsByDateRangeAsync(dateRange.StartDate, dateRange.EndDate);
+
+                return Json(new { success = true, message = "Timesheets actualizados correctamente." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al ajustar las timesheets: {ex.Message}");
+                return Json(new { success = false, message = "Error al ajustar las timesheets." });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> GenerateAdjustmentReport([FromBody] DateRangeModel dateRange)
+        {
+            try
+            {
+                _logger.LogInformation($"✅ Iniciando generación del informe para fechas: {dateRange.StartDate} - {dateRange.EndDate}");
+
+                var employeesToAdjust = await _loadDataService.GetAdjustmentData(dateRange.StartDate, dateRange.EndDate);
+
+                if (employeesToAdjust == null || employeesToAdjust.Count == 0)
+                {
+                    _logger.LogWarning("⚠️ No hay empleados con ajustes en este período.");
+                    return StatusCode(500, new { success = false, message = "No se encontraron empleados para ajustar." });
+                }
+
+                _logger.LogInformation($"🔍 Se encontraron {employeesToAdjust.Count} empleados para procesar.");
+
+                // **Crear el CSV con separadores adecuados (; en lugar de ,)**
+                var csvBuilder = new StringBuilder();
+                csvBuilder.AppendLine("ID Persona;Nombre;Apellido;Departamento;Grupo;Mes;Work Package;Proyecto;Effort Asignado;Effort Esperado;Días Laborables;Días Ajustados;Estado");
+
+                foreach (var employee in employeesToAdjust)
+                {
+                    var estado = employee.AjustadoAutomaticamente == "Sí" ? "Ajustado" : "Requiere Revisión";
+                    csvBuilder.AppendLine($"{employee.PersonId};{employee.Nombre};{employee.Apellido};{employee.Departamento};{employee.Grupo};{employee.Mes};{employee.WorkPackage};{employee.Proyecto};{employee.EffortAsignado};{employee.EffortEsperado};{employee.DiasLaborables};{employee.DiasAjustados};{estado}");
+                }
+
+                // **Forzar UTF-8 con BOM para que Excel detecte bien el archivo**
+                byte[] bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csvBuilder.ToString())).ToArray();
+                var stream = new MemoryStream(bytes);
+
+                return File(stream, "text/csv", "Ajustes_Timesheets.csv");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"❌ Error en GenerateAdjustmentReport: {ex.Message} - {ex.StackTrace}");
+                return StatusCode(500, new { success = false, message = "Error interno al generar el informe." });
+            }
+        }
+
+
+
+
     }
 
 
 }
+
+
+
 
 
 public class FolderPathModel
@@ -575,4 +642,10 @@ public class AdjustEffortRequest
     public int WpId { get; set; }
     public int PersonId { get; set; }
     public DateTime Month { get; set; }
+}
+
+public class DateRangeModel
+{
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
 }

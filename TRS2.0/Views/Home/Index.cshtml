@@ -2,9 +2,51 @@
     ViewData["Title"] = "Time Recording System (TRS)";
 }
 
-<div class="welcome-container">
-    <div class="hero-section">
+<!-- Improved Landing Page -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to TRS</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css">
+    <style>
+        body {
+            background: #002147; /* Corporate dark blue */
+            color: white;
+            text-align: center;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        .hero {
+            max-width: 700px;
+            padding: 20px;
+        }
+
+        .btn-custom {
+            background: #0056b3;
+            color: white;
+            padding: 12px 24px;
+            font-size: 18px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+
+            .btn-custom:hover {
+                background: #004494;
+            }
+    </style>
+</head>
+<body>
+    <div class="hero">
         <h1>Welcome to TRS</h1>
-        <p>Join thousands of researchers improving their productivity with TRS.</p>
+        <p class="lead">Time Recording System - Track and manage your working hours efficiently.</p>
+        <a href="/Account/Login" class="btn btn-custom">Log In</a>
     </div>
-</div>
+</body>
+</html>
+

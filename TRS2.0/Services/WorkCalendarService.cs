@@ -9,6 +9,7 @@ using Newtonsoft.Json.Linq;
 using TRS2._0.Models.ViewModels;
 using static TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel;
 using System.Diagnostics;
+using Serilog;
 namespace TRS2._0.Services;
 
 public class WorkCalendarService
@@ -1009,6 +1010,7 @@ public class WorkCalendarService
         return $"Éxito: El esfuerzo para la persona {personId} en el paquete de trabajo {wpId} ha sido ajustado al {effortPercentage:P2} para el mes {month:MMMM yyyy}.";
     }
 
+    
     public async Task<decimal> CalculateMaxHoursForPersonInMonth(int personId, int year, int month)
     {
         // Obtener afiliaciones activas de la persona para el mes

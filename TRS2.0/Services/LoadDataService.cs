@@ -13,6 +13,7 @@ using System.Timers;
 using Newtonsoft.Json.Linq;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using OfficeOpenXml;
 
 
 
@@ -142,7 +143,7 @@ namespace TRS2._0.Services
             // Determinar el año actual
             var currentYear = DateTime.UtcNow.Year;
 
-            // Establecer los límites de cálculo: 5 años hacia atrás y 5 años hacia adelante desde el año actual
+            // Establecer los límites de cálculo: 5 años hacia atrás y 5 años hacia adelante desde el año actual, el primer valor  es el que marca los años atras y adelante 
             var lowerLimit = new DateTime(currentYear - 1, 1, 1); // Inicio del rango permitido
             var upperLimit = new DateTime(currentYear + 1, 1, 31); // Fin del rango permitido
 
@@ -1716,7 +1717,7 @@ namespace TRS2._0.Services
             }
         }
 
-        // PENDIENTE: ES NECESARIO QUE AJUSTAR LA FECHA MÁXIMA SEGÚN SE DECIDA EN PRINCIPIO NO DEBE SER MAYOR QUE EL DÍA ACTUAL, SE ESTAN RELLENANDO TIMESHEETS A TIEMPO FUTURO//
+        // PENDIENTE: ES NECESARIO AJUSTAR LA FECHA MÁXIMA SEGÚN SE DECIDA EN PRINCIPIO NO DEBE SER MAYOR QUE EL DÍA ACTUAL, SE ESTAN RELLENANDO TIMESHEETS A TIEMPO FUTURO//
         public async Task AutoFillTimesheetsForInvestigatorsInSingleWPWithEffortAsync()
         {
             var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ProcesarInvestigadoresWP.txt");
@@ -1855,6 +1856,269 @@ namespace TRS2._0.Services
                 logger.Dispose();
             }
         }
+
+
+        public async Task AutoFillTimesheetsByDateRangeAsync(DateTime startDate, DateTime endDate)
+        {
+            var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "AutoFillTimesheetsByDateRangeLog.txt");
+            var logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
+            try
+            {
+                logger.Information($"Inicio del proceso AutoFillTimesheetsByDateRange para el rango {startDate:yyyy-MM} a {endDate:yyyy-MM}");
+
+                for (var date = new DateTime(startDate.Year, startDate.Month, 1);
+                     date <= new DateTime(endDate.Year, endDate.Month, 1);
+                     date = date.AddMonths(1))
+                {
+                    var monthStart = new DateTime(date.Year, date.Month, 1);
+                    var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
+                    logger.Information($"Procesando el mes: {monthStart:yyyy-MM}");
+
+                    var allWpxPeople = await _context.Wpxpeople
+                        .Include(wpx => wpx.PersonNavigation)
+                        .Include(wpx => wpx.WpNavigation)
+                            .ThenInclude(wp => wp.Proj)
+                        .Where(wpx =>
+                            wpx.WpNavigation.StartDate <= monthEnd &&
+                            wpx.WpNavigation.EndDate >= monthStart &&
+                            _context.Wpxpeople.Count(w => w.Person == wpx.Person && w.WpNavigation.StartDate <= monthEnd && w.WpNavigation.EndDate >= monthStart) == 1 &&
+                            _context.Projectxpeople.Count(p => p.Person == wpx.Person && p.Proj.Start <= monthEnd && p.Proj.End >= monthStart) == 1)
+                        .ToListAsync();
+
+                    logger.Information($"Encontrados {allWpxPeople.Count} investigadores con un único WP en el mes {monthStart:yyyy-MM}");
+
+                    foreach (var wpx in allWpxPeople)
+                    {
+                        try
+                        {
+                            var personName = wpx.PersonNavigation.Name ?? "SIN NOMBRE";
+                            var personSurname = wpx.PersonNavigation.Surname ?? "SIN APELLIDO";
+                            var projectAcronym = wpx.WpNavigation?.Proj?.Acronim ?? "SIN PROYECTO";
+
+                            var monthlyEffort = await _context.Persefforts
+                                .Where(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == monthStart.Year && pe.Month.Month == monthStart.Month)
+                                .SumAsync(pe => pe.Value);
+
+                            if (monthlyEffort <= 0)
+                            {
+                                logger.Warning($"[{personName} {personSurname}] [{projectAcronym}] - WP={wpx.Wp}, Mes={monthStart:yyyy-MM}: Effort es 0 o negativo. Omitiendo.");
+                                continue;
+                            }
+
+                            var maxEffortForMonth = await _context.PersMonthEfforts
+                                .Where(pme => pme.PersonId == wpx.Person && pme.Month.Year == monthStart.Year && pme.Month.Month == monthStart.Month)
+                                .Select(pme => pme.Value)
+                                .FirstOrDefaultAsync();
+
+                            // **🔹 Corregir Effort Erróneo**
+                            if (monthlyEffort > maxEffortForMonth)
+                            {
+                                logger.Warning($"[{personName} {personSurname}] [{projectAcronym}] - WP={wpx.Wp}, Mes={monthStart:yyyy-MM}: Effort incorrecto ({monthlyEffort}), ajustado a {maxEffortForMonth}.");
+                                monthlyEffort = maxEffortForMonth;
+                            }
+
+                            bool ajusteCompleto = Math.Abs((decimal)monthlyEffort - (decimal)maxEffortForMonth) <= 0.001m;
+                            string tipoAjuste = ajusteCompleto ? "AJUSTE COMPLETO" : "AJUSTE INCOMPLETO";
+
+                            var validWorkDays = new List<DateTime>();
+                            for (var day = monthStart; day <= monthEnd; day = day.AddDays(1))
+                            {
+                                if (day.DayOfWeek == DayOfWeek.Saturday || day.DayOfWeek == DayOfWeek.Sunday) continue;
+                                if (await _workCalendarService.IsHoliday(day)) continue;
+                                validWorkDays.Add(day);
+                            }
+
+                            var leaveDays = await _context.Leaves
+                                .Where(l => l.PersonId == wpx.Person && l.Day >= monthStart && l.Day <= monthEnd && (l.Type == 1 || l.Type == 2 || l.Type == 3))
+                                .Select(l => l.Day)
+                                .ToListAsync();
+
+                            validWorkDays = validWorkDays.Except(leaveDays).ToList();
+
+                            if (validWorkDays.Count == 0)
+                            {
+                                logger.Warning($"[{personName} {personSurname}] [{projectAcronym}] - WP={wpx.Wp}, Mes={monthStart:yyyy-MM}: No hay días hábiles después de bajas. Omitiendo.");
+                                continue;
+                            }
+
+                            var maxHoursForMonth = await _workCalendarService.CalculateMaxHoursForPersonInMonth(wpx.Person, monthStart.Year, monthStart.Month);
+
+                            
+                            // **🔹 Selección de método de cálculo**
+                            decimal totalMonthlyHours;
+                            if (ajusteCompleto)
+                            {
+                                totalMonthlyHours = maxHoursForMonth * maxEffortForMonth; // Método tradicional
+                            }
+                            else
+                            {
+                                totalMonthlyHours = monthlyEffort * maxHoursForMonth; // Regla de 3
+                            }
+
+                            // **🔹 Repartir las horas entre los días válidos**
+                            var rawDailyHours = totalMonthlyHours / validWorkDays.Count;
+
+                            // **🔹 Redondear a múltiplos de 0.5**
+                            var adjustedDailyHours = Math.Round(rawDailyHours * 2, MidpointRounding.AwayFromZero) / 2;
+
+                            if (adjustedDailyHours == 0) adjustedDailyHours = 0.5m;
+
+                            logger.Information($"[{personName} {personSurname}] [{projectAcronym}] - {tipoAjuste} - WP={wpx.Wp}, Mes={monthStart:yyyy-MM}: TotalHoras={totalMonthlyHours}, Días Laborables={validWorkDays.Count}, Horas/día={adjustedDailyHours}");
+
+                            foreach (var day in validWorkDays)
+                            {
+                                var existingTimesheet = await _context.Timesheets
+                                    .FirstOrDefaultAsync(ts => ts.WpxPersonId == wpx.Id && ts.Day == day);
+
+                                if (existingTimesheet == null)
+                                {
+                                    _context.Timesheets.Add(new Timesheet
+                                    {
+                                        WpxPersonId = wpx.Id,
+                                        Day = day,
+                                        Hours = adjustedDailyHours
+                                    });
+
+                                    logger.Information($"[{personName} {personSurname}] [{projectAcronym}] - {tipoAjuste} - Creado registro de Timesheet en {day:yyyy-MM-dd} con {adjustedDailyHours:F2} horas");
+                                }
+                                else
+                                {
+                                    decimal horasPrevias = existingTimesheet.Hours;
+                                    existingTimesheet.Hours = adjustedDailyHours;
+
+                                    logger.Information($"[{personName} {personSurname}] [{projectAcronym}] - {tipoAjuste} - Actualizado registro de Timesheet en {day:yyyy-MM-dd}. Antes: {horasPrevias:F2} horas, Ahora: {adjustedDailyHours:F2} horas");
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.Error($"Error procesando [{wpx.PersonNavigation.Name} {wpx.PersonNavigation.Surname}] [{wpx.WpNavigation.Proj.Acronim}] - WP {wpx.Wp} en {monthStart:yyyy-MM}: {ex.Message}");
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+                    logger.Information($"Finalizado procesamiento para el mes {monthStart:yyyy-MM}");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Error general en AutoFillTimesheetsByDateRange: {ex.Message}");
+            }
+
+            finally
+            {
+                logger.Dispose();
+            }
+        }
+
+
+
+        public async Task<List<dynamic>> GetAdjustmentData(DateTime startDate, DateTime endDate)
+        {
+            var employeesToAdjust = new List<dynamic>();
+
+            for (var date = new DateTime(startDate.Year, startDate.Month, 1);
+                 date <= new DateTime(endDate.Year, endDate.Month, 1);
+                 date = date.AddMonths(1))
+            {
+                var monthStart = new DateTime(date.Year, date.Month, 1);
+                var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
+                // **Obtener SOLO empleados con `PersMonthEfforts.Value > 0`**
+                var employees = await _context.Wpxpeople
+                    .Include(wpx => wpx.PersonNavigation) // Solo para acceder a PersonId
+                    .Include(wpx => wpx.WpNavigation)
+                        .ThenInclude(wp => wp.Proj)
+                    .Where(wpx =>
+                        _context.PersMonthEfforts.Any(pme => pme.PersonId == wpx.Person && pme.Month.Year == monthStart.Year && pme.Month.Month == monthStart.Month && pme.Value > 0) &&
+                        wpx.WpNavigation.StartDate <= monthEnd &&
+                        wpx.WpNavigation.EndDate >= monthStart &&
+                        _context.Wpxpeople.Count(w => w.Person == wpx.Person && w.WpNavigation.StartDate <= monthEnd && w.WpNavigation.EndDate >= monthStart) == 1 &&
+                        _context.Projectxpeople.Count(p => p.Person == wpx.Person && p.Proj.Start <= monthEnd && p.Proj.End >= monthStart) == 1)
+                    .ToListAsync();
+
+                foreach (var wpx in employees)
+                {
+                    try
+                    {
+                        _logger.LogInformation($"🔍 Procesando persona {wpx.Person} - WP: {wpx.WpNavigation.Name}");
+
+                        var monthlyEffort = await _context.Persefforts
+                            .Where(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == monthStart.Year && pe.Month.Month == monthStart.Month)
+                            .SumAsync(pe => pe.Value);
+
+                        var maxEffortForMonth = await _context.PersMonthEfforts
+                            .Where(pme => pme.PersonId == wpx.Person && pme.Month.Year == monthStart.Year && pme.Month.Month == monthStart.Month)
+                            .Select(pme => pme.Value)
+                            .FirstOrDefaultAsync();
+
+                        var workingDays = await _workCalendarService.CalculateWorkingDays(monthStart.Year, monthStart.Month);
+                        var leaveDays = await _context.Leaves
+                            .Where(l => l.PersonId == wpx.Person && l.Day >= monthStart && l.Day <= monthEnd && (l.Type == 1 || l.Type == 2))
+                            .Select(l => l.Day)
+                            .ToListAsync();
+
+                        var effectiveWorkingDays = workingDays - leaveDays.Count;
+                        bool willBeAdjusted = Math.Abs((decimal)monthlyEffort - (decimal)maxEffortForMonth) < 0.001m;
+
+                        // **Obtener el nombre del Departamento**
+                        var departmentName = await _context.Departments
+                            .Where(d => d.Id == _context.Personnel
+                                .Where(p => p.Id == wpx.Person)
+                                .Select(p => p.Department)
+                                .FirstOrDefault())
+                            .Select(d => d.Name)
+                            .FirstOrDefaultAsync() ?? "SIN DEPARTAMENTO";
+
+                        // **Obtener el nombre del Grupo de Personal**
+                        var groupName = await _context.Personnelgroups
+                            .Where(g => g.Id == _context.Personnel
+                                .Where(p => p.Id == wpx.Person)
+                                .Select(p => p.PersonnelGroup)
+                                .FirstOrDefault())
+                            .Select(g => g.GroupName)
+                            .FirstOrDefaultAsync() ?? "SIN GRUPO";
+
+                        // **Marcar empleados que NO tienen el mes completo**
+                        string estado = willBeAdjusted ? "Sí" : "No (Requiere Ajuste)";
+
+                        employeesToAdjust.Add(new
+                        {
+                            PersonId = wpx.Person,
+                            Nombre = wpx.PersonNavigation.Name ?? "SIN NOMBRE",
+                            Apellido = wpx.PersonNavigation.Surname ?? "SIN APELLIDO",
+                            Departamento = departmentName,
+                            Grupo = groupName,
+                            Mes = monthStart.ToString("yyyy-MM"),
+                            WorkPackage = wpx.WpNavigation.Name ?? "SIN WP",
+                            Proyecto = wpx.WpNavigation.Proj.Acronim ?? "SIN PROYECTO",
+                            EffortAsignado = monthlyEffort,
+                            EffortEsperado = maxEffortForMonth,
+                            DiasLaborables = workingDays,
+                            DiasAjustados = effectiveWorkingDays,
+                            AjustadoAutomaticamente = estado
+                        });
+
+                        _logger.LogInformation($"✅ Ajuste agregado para {wpx.Person}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"❌ Error procesando persona {wpx.Person}: {ex.Message} - {ex.StackTrace}");
+                    }
+                }
+            }
+
+            return employeesToAdjust;
+        }
+
+
+
+
 
 
 
@@ -2026,7 +2290,102 @@ namespace TRS2._0.Services
             }
         }
 
+        public async Task AdjustGlobalEffortAsync()
+        {
+            DateTime startDate = new DateTime(2020, 1, 1);
+            DateTime endDate = new DateTime(2024, 12, 31);
 
+            var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "AdjustGlobalEffortLog.txt");
+            var logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
+            logger.Information("Inicio del proceso de ajuste global de esfuerzo");
+
+            var projects = await _context.Projects
+                .Where(p => (p.Start >= startDate && p.Start <= endDate) ||
+                            (p.EndReportDate >= startDate && p.EndReportDate <= endDate))
+                .Include(p => p.Wps)
+                .ToListAsync();
+
+            foreach (var project in projects)
+            {
+                var wpsWithPeople = project.Wps
+                    .Where(wp => _context.Wpxpeople.Any(wpx => wpx.Wp == wp.Id))
+                    .ToList();
+
+                if (!wpsWithPeople.Any())
+                {
+                    continue;
+                }
+
+                logger.Information($"Procesando Proyecto: {project.Acronim} ({project.SapCode})");
+
+                foreach (var wp in wpsWithPeople)
+                {
+                    logger.Information($"    - Work Package: {wp.Name} ({wp.Title})");
+
+                    var people = await _context.Wpxpeople
+                        .Where(wpx => wpx.Wp == wp.Id)
+                        .Include(wpx => wpx.PersonNavigation)
+                        .ToListAsync();
+
+                    foreach (var person in people)
+                    {
+                        logger.Information($"        * Persona: {person.PersonNavigation.Name} {person.PersonNavigation.Surname}");
+
+                        for (DateTime month = new DateTime(2020, 1, 1); month <= endDate; month = month.AddMonths(1))
+                        {
+                            logger.Information($"            - Procesando mes: {month:MMMM yyyy}");
+
+                            var totalHoursInTimesheets = await _context.Timesheets
+                                .Where(ts => ts.WpxPersonId == person.Id && ts.Day.Year == month.Year && ts.Day.Month == month.Month)
+                                .SumAsync(ts => (decimal?)ts.Hours) ?? 0;
+
+                            if (totalHoursInTimesheets == 0)
+                            {
+                                logger.Warning($"            - No hay horas registradas para este mes.");
+                                continue;
+                            }
+
+                            decimal maxHours = await _workCalendarService.CalculateMaxHoursForPersonInMonth(person.Person, month.Year, month.Month);
+                            if (maxHours == 0)
+                            {
+                                logger.Warning($"            - No se encontraron horas máximas definidas.");
+                                continue;
+                            }
+
+                            decimal effortPercentage = totalHoursInTimesheets / maxHours;
+
+                            var existingEffort = await _context.Persefforts
+                                .FirstOrDefaultAsync(pe => pe.WpxPerson == person.Id && pe.Month.Year == month.Year && pe.Month.Month == month.Month);
+
+                            if (existingEffort != null)
+                            {
+                                existingEffort.Value = effortPercentage;
+                                _context.Persefforts.Update(existingEffort);
+                            }
+                            else
+                            {
+                                var newEffort = new Perseffort
+                                {
+                                    WpxPerson = person.Id,
+                                    Month = new DateTime(month.Year, month.Month, 1),
+                                    Value = effortPercentage
+                                };
+                                _context.Persefforts.Add(newEffort);
+                            }
+
+                            await _context.SaveChangesAsync();
+                            logger.Information($"            - Esfuerzo ajustado al {effortPercentage:P2} para el mes {month:MMMM yyyy}.");
+                        }
+                    }
+                }
+            }
+
+            logger.Information("Proceso de ajuste global de esfuerzo finalizado");
+        }
 
 
 
@@ -2095,6 +2454,10 @@ namespace TRS2._0.Services
 
                 case "LoadOutOfContract":
                     await OutOfContractLoadAsync();
+                    break;
+        
+                 case "AdjustGlobalEffort":
+                    await AdjustGlobalEffortAsync();
                     break;
 
                 default:

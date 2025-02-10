@@ -4,36 +4,83 @@
     ViewData["Title"] = "Login";
 }
 
-<h2>Login</h2>
+<!-- Mejora visual para vistas de Login, Registro y Recuperación de Contraseña -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css">    
+    <style>
+        body {
+            background: linear-gradient(to right, darkblue, #2575fc);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-<div class="row">
-    <div class="col-md-4">
-        <form asp-action="Login">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <div class="form-group">
-                <label asp-for="BSCID" class="control-label"></label>
-                <input asp-for="BSCID" class="form-control" />
-                <span asp-validation-for="BSCID" class="text-danger"></span>
+        .auth-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .form-control {
+            border-radius: 5px;
+        }
+
+        .btn-primary {
+            background: #2575fc;
+            border: none;
+            transition: background 0.3s;
+        }
+
+            .btn-primary:hover {
+                background: #1a5ac6;
+            }
+
+        .social-icons i {
+            font-size: 24px;
+            margin: 10px;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+            .social-icons i:hover {
+                color: #2575fc;
+            }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h3 class="text-center">Bienvenido</h3>
+        <p class="text-center text-muted">Accede a tu cuenta</p>
+        <form method="post" action="/Account/Login">
+            <div class="mb-3">
+                <label class="form-label">Usuario</label>
+                <input type="text" class="form-control" name="BSCID" required>
             </div>
-            <div class="form-group">
-                <label asp-for="Password" class="control-label"></label>
-                <input asp-for="Password" class="form-control" type="password" />
-                <span asp-validation-for="Password" class="text-danger"></span>
+            <div class="mb-3">
+                <label class="form-label">Contraseña</label>
+                <input type="password" class="form-control" name="Password" required>
             </div>
-            <div class="form-group">
-                <div class="form-check">
-                    <input asp-for="RememberMe" class="form-check-input" />
-                    <label asp-for="RememberMe" class="form-check-label"></label>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <input type="checkbox" id="rememberMe" name="RememberMe">
+                    <label for="rememberMe">Recuérdame</label>
                 </div>
+                <a href="/Account/ForgotPassword" class="text-decoration-none">¿Olvidaste tu contraseña?</a>
             </div>
-            <div class="form-group">
-                <button type="submit" class="btn btn-primary">Login</button>
-            </div>
-            <div class="form-group">
-                <a asp-action="Register">No tengo usuario</a> |
-                <a asp-action="ForgotPassword">No recuerdo mi contraseña</a>
-            </div>
+            <button type="submit" class="btn btn-primary w-100 mt-3">Iniciar Sesión</button>
         </form>
+        <p class="text-center mt-3">¿No tienes cuenta? <a href="/Account/Register">Regístrate</a></p>
     </div>
-</div>
+</body>
+</html>
 

@@ -24,6 +24,7 @@
                         <button class="btn btn-success m-2" onclick="triggerJob('/CargaGruposPersonas')">Grupos de Personas</button>
                         <button class="btn btn-success m-2" onclick="triggerJob('/CargaLideres')">Líderes</button>
                         <button class="btn btn-success m-2" onclick="triggerJob('/CargaProyectos')">Proyectos</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/AdjustGlobalEffort')">Ajuste de Effort Global</button>
                     </div>
                 </div>
             </div>
@@ -222,6 +223,7 @@
         </div>
     </div>
 
+    <!-- Séptima fila: Ajuste de Esfuerzo -->
     <div class="container">
         <h3 class="text-center">Ajuste de Esfuerzo</h3>
         <form id="effort-adjustment-form">
@@ -249,6 +251,66 @@
             </div>
             <button type="button" class="btn btn-primary" onclick="adjustEffort()">Ajustar Esfuerzo</button>
         </form>
+    </div>
+
+    <!-- Octava fila: Ajustar Timesheets por Rango de Fechas -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4>Ajustar Timesheets por Rango de Fechas</h4>
+                </div>
+                <div class="card-body">
+                    <form id="adjust-timesheets-form">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="startDate" class="form-label">Fecha de Inicio</label>
+                                <input type="month" id="startDate" name="startDate" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="endDate" class="form-label">Fecha de Fin</label>
+                                <input type="month" id="endDate" name="endDate" class="form-control" required>
+                            </div>
+                            <div class="col-12">
+                                <button type="button" id="submitAdjustTimesheets" class="btn btn-primary w-100">
+                                    Ejecutar Proceso
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Novena fila: Generar Informe de Ajustes de Timesheets -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4>Generar Informe de Ajustes de Timesheets</h4>
+                </div>
+                <div class="card-body">
+                    <form id="generateReportForm">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="reportStartDate" class="form-label">Fecha de Inicio</label>
+                                <input type="month" id="reportStartDate" name="startDate" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="reportEndDate" class="form-label">Fecha de Fin</label>
+                                <input type="month" id="reportEndDate" name="endDate" class="form-control" required>
+                            </div>
+                            <div class="col-12">
+                                <button type="button" id="downloadReportBtn" class="btn btn-success w-100">
+                                    Descargar Informe
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -403,6 +465,83 @@
             const result = await response.json();
             alert(result.message);
         }
+
+            document.getElementById('submitAdjustTimesheets').addEventListener('click', async function () {
+                const startDateInput = document.getElementById('startDate').value;
+                const endDateInput = document.getElementById('endDate').value;
+                console.log(startDateInput, endDateInput);
+                if (!startDateInput || !endDateInput) {
+                    alert('Por favor, complete las fechas de inicio y fin.');
+                    return;
+                }
+
+                // Convertir los valores del campo "month" a fechas completas
+                const startDate = new Date(startDateInput + '-01'); // Añadir el día para crear una fecha válida
+                const endDate = new Date(endDateInput + '-01'); // Igual que arriba
+                console.log(startDate, endDate);
+                const response = await fetch('/Admin/AutoFillTimesheetsByDateRange', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        startDate: startDate.toISOString(),
+                        endDate: endDate.toISOString()
+                    })
+                });
+
+                const result = await response.json();
+                alert(result.message);
+            });
+
+
+        document.getElementById('downloadReportBtn').addEventListener('click', async function () {
+            const startDateInput = document.getElementById('reportStartDate').value;
+            const endDateInput = document.getElementById('reportEndDate').value;
+
+            console.log(startDateInput, endDateInput);
+
+            if (!startDateInput || !endDateInput) {
+                alert('Por favor, complete las fechas de inicio y fin.');
+                return;
+            }
+
+            // Convertir los valores del campo "month" a fechas completas
+            const startDate = new Date(startDateInput + '-01'); // Agregar el día para crear una fecha válida
+            const endDate = new Date(endDateInput + '-01'); // Mismo proceso
+
+            console.log("Fechas procesadas:", startDate, endDate);
+
+            try {
+                const response = await fetch('/Admin/GenerateAdjustmentReport', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        startDate: startDate.toISOString(),
+                        endDate: endDate.toISOString()
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Error al generar el informe.');
+                }
+
+                // Convertir la respuesta en un Blob y descargar el archivo
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'Ajustes_Timesheets.csv';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+
+                console.log("Informe descargado exitosamente.");
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Ocurrió un error al descargar el informe.');
+            }
+        });
+    
+
 
         document.addEventListener('DOMContentLoaded', loadProjects);
     </script>
