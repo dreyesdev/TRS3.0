@@ -158,6 +158,11 @@
                         </a>
                         <span class="vertical-separator"></span>
                         <a class="navbar-brand btn btn-outline-primary me-2 text-dark"
+                           href="@Url.Action("PendingTravels", "Personnels", new { id = TempData["SelectedPersonId"] })">
+                            Pending Travels
+                        </a>
+                        <span class="vertical-separator"></span>
+                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark"
                            href="@Url.Action("LoginLog", "Personnels", new { id = TempData["SelectedPersonId"] })">
                             LoginLog
                         </a>
@@ -174,6 +179,8 @@
                         <span class="vertical-separator"></span>
                         <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("Travels", "Personnels")">Travels</a>
                         <span class="vertical-separator"></span>
+                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("PendingTravels", "Personnels")">Pending Travels</a>
+                        <span class="vertical-separator"></span>
                         <a class="navbar-brand btn btn-outline-primary text-dark" href="@Url.Action("LoginLog", "Personnels")">Login Log</a>
                     }
                 </div>
@@ -183,11 +190,11 @@
 
     @RenderBody()
 
-    <footer class="border-top footer text-muted">
+   @*  <footer class="border-top footer text-muted">
         <div class="container">
             &copy; 2024 - TRS2.0 - <a asp-area="" asp-controller="Home" asp-action="Privacy">Contacto</a>
         </div>
-    </footer>
+    </footer> *@
 
     <!-- Incluye jQuery primero -->
     <script src="~/lib/jquery/dist/jquery.min.js"></script>

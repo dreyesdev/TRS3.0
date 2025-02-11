@@ -1,0 +1,79 @@
+﻿@model IEnumerable<dynamic>
+
+@{
+    ViewData["Title"] = "Pending Travels";
+}
+
+<h2 class="text-center my-4">Pending Travels</h2>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <table class="table table-hover table-bordered shadow">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>Code</th>
+                        <th>Person</th>
+                        <th style="width: 120px;">Start Date</th>
+                        <th style="width: 120px;">End Date</th>
+                        <th>Project 1</th>
+                        <th>Dedication 1</th>
+                        <th>Project 2</th>
+                        <th>Dedication 2</th>
+                        <th>Destiny</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td>@item.Code</td>
+                            <td>@item.PersonName</td>
+                            <td>@item.StartDate</td>
+                            <td>@item.EndDate</td>
+                            <td>@item.Project1</td>
+                            <td>@item.Dedication1</td>
+                            <td>@item.Project2</td>
+                            <td>@item.Dedication2</td>
+                            <td>@item.Destiny</td>
+                            <td class="font-weight-bold" style="color: @(item.Status == "Pending" ? "orange" : item.Status == "Approved" ? "green" : "red")">
+                                @item.Status
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-between">
+                                    <button class="btn btn-success btn-sm mx-1" onclick="approveTravel('@item.Code')">Approve</button>
+                                    <button class="btn btn-danger btn-sm mx-1" onclick="cancelTravel('@item.Code')">Cancel</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function approveTravel(travelId) {
+            if (confirm('Are you sure you want to approve this travel?')) {
+                $.post('@Url.Action("ApproveTravel", "Travel")', { id: travelId }, function (response) {
+                    alert(response.message);
+                    location.reload();
+                });
+            }
+        }
+
+        function cancelTravel(travelId) {
+            if (confirm('Are you sure you want to cancel this travel?')) {
+                $.post('@Url.Action("CancelTravel", "Travel")', { id: travelId }, function (response) {
+                    alert(response.message);
+                    location.reload();
+                });
+            }
+        }
+    </script>
+}
+

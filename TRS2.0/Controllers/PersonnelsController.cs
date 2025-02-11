@@ -433,8 +433,9 @@ namespace TRS2._0.Controllers
                     Dedication1 = (decimal?)l.Dedication1 ?? 0m,
                     Project2 = string.IsNullOrWhiteSpace(l.Project2) ? "N/A" : l.Project2,
                     Dedication2 = (decimal?)l.Dedication2 ?? 0m,
-                    Status = l.Status == "3" ? "Approved" : "Pending"
+                    Status = l.Status == "3" ? "Approved" : l.Status == "2" ? "Cancelled" : "Pending"
                 })
+                .OrderBy(l => l.Status == "Pending" ? 0 : 1) // Ordena los viajes pendientes primero
                 .ToListAsync(); // Convierte el resultado en una lista
 
             // Si no hay viajes, retorna un mensaje informativo
@@ -445,6 +446,74 @@ namespace TRS2._0.Controllers
 
             // Devuelve la lista de viajes con éxito
             return Json(new { success = true, data = travels });
+        }
+
+        // Método para mostrar la vista de viajes pendientes
+        [HttpGet]
+        public async Task<IActionResult> PendingTravels()
+        {
+            var pendingTravels = await _context.Liquidations
+                .Where(l => l.Status == "4") 
+                .Select(l => new
+                {
+                    Code = l.Id.ToString(),
+                    PersonName = _context.Personnel
+                        .Where(p => p.Id == l.PersId)
+                        .Select(p => p.Name + " " + p.Surname)
+                        .FirstOrDefault(), // Obtiene el nombre completo de la persona
+                    StartDate = l.Start.ToString("yyyy-MM-dd"),
+                    EndDate = l.End.ToString("yyyy-MM-dd"),
+                    Project1 = l.Project1 ?? "N/A",
+                    Dedication1 = (decimal?)l.Dedication1 ?? 0m,
+                    Project2 = string.IsNullOrWhiteSpace(l.Project2) ? "N/A" : l.Project2,
+                    Dedication2 = (decimal?)l.Dedication2 ?? 0m,
+                    Destiny = l.Destiny,
+                    Status = l.Status == "3" ? "Approved" : l.Status == "2" ? "Cancelled" : "Pending"
+                })
+                .ToListAsync(); // Convierte el resultado en una lista
+
+            // Ordena los resultados en memoria
+            var orderedPendingTravels = pendingTravels
+                .OrderBy(l => l.Code.Substring(5, 2)) // Ordena por año
+                .ThenBy(l => l.Code.Substring(0, 4)) // Luego ordena por el número de viaje
+                .ToList();
+
+            return View(orderedPendingTravels);
+        }
+
+
+        [HttpGet]
+        public async Task<IActionResult> GetAllPendingTravels()
+        {
+            // Obtiene la lista de todos los viajes pendientes
+            var pendingTravels = await _context.Liquidations
+                .Where(l => l.Status == "4") // Filtra los viajes que están pendientes
+                .Select(l => new
+                {
+                    Code = l.Id.ToString(),
+                    PersonId = l.PersId,
+                    PersonName = _context.Personnel
+                        .Where(p => p.Id == l.PersId)
+                        .Select(p => p.Name + " " + p.Surname)
+                        .FirstOrDefault(), // Obtiene el nombre completo de la persona
+                    StartDate = l.Start.ToString("yyyy-MM-dd"),
+                    EndDate = l.End.ToString("yyyy-MM-dd"),
+                    Project1 = l.Project1 ?? "N/A",
+                    Dedication1 = (decimal?)l.Dedication1 ?? 0m,
+                    Project2 = string.IsNullOrWhiteSpace(l.Project2) ? "N/A" : l.Project2,
+                    Dedication2 = (decimal?)l.Dedication2 ?? 0m,
+                    Status = "Pending"
+                })
+                .ToListAsync(); // Convierte el resultado en una lista
+
+            // Si no hay viajes pendientes, retorna un mensaje informativo
+            if (pendingTravels == null || !pendingTravels.Any())
+            {
+                return Json(new { success = false, message = "No se encontraron viajes pendientes." });
+            }
+
+            // Devuelve la lista de viajes pendientes con éxito
+            return Json(new { success = true, data = pendingTravels });
         }
 
 
