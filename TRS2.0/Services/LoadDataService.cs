@@ -623,69 +623,73 @@ namespace TRS2._0.Services
                     return new JsonResult(new { success = false, message = "No associated project records found for liquidation." });
                 }
 
-                // Agrupar por proyecto y mes
-                var groupedByProjectMonth = liqDayProjects
-                    .GroupBy(ld => new { ld.ProjId, Month = ld.Day.Month, Year = ld.Day.Year })
+                // Agrupar por proyecto, mes y persona
+                var groupedByProjectMonthPerson = liqDayProjects
+                    .GroupBy(ld => new { ld.ProjId, ld.PersId, Month = ld.Day.Month, Year = ld.Day.Year })
                     .ToList();
 
-                foreach (var group in groupedByProjectMonth)
+                foreach (var group in groupedByProjectMonthPerson)
                 {
                     var projectId = group.Key.ProjId;
+                    var personId = group.Key.PersId;
                     var month = group.Key.Month;
                     var year = group.Key.Year;
 
                     // Obtener esfuerzo total para el grupo
                     var totalEffortForMonth = group.Sum(ld => ld.PMs);
 
-                    // Encontrar WP "TRAVELS"
-                    var relatedWpxPeople = await _context.Wpxpeople
+                    // Encontrar WP "TRAVELS" asociado a la persona
+                    var travelsWpx = await _context.Wpxpeople
                         .Include(wpx => wpx.WpNavigation)
-                        .Where(wpx => wpx.WpNavigation.ProjId == projectId)
-                        .ToListAsync();
+                        .FirstOrDefaultAsync(wpx => wpx.WpNavigation.ProjId == projectId && wpx.Person == personId && wpx.WpNavigation.Name == "TRAVELS");
 
-                    var travelsWpx = relatedWpxPeople.FirstOrDefault(wpx => wpx.WpNavigation.Name == "TRAVELS");
                     if (travelsWpx == null)
                     {
-                        logger.Information($"No 'TRAVELS' WP found for Project ID: {projectId}. Skipping adjustments.");
+                        logger.Information($"No 'TRAVELS' WP found for Project ID: {projectId} and Person ID: {personId}. Skipping adjustments.");
                         continue;
                     }
 
-                    // Ajustar esfuerzos en "TRAVELS"
-                    var travelsEffortForMonth = await _context.Persefforts
-                        .Where(pe => pe.WpxPerson == travelsWpx.Id && pe.Month.Month == month && pe.Month.Year == year)
+                    // Obtener todos los viajes en el mismo mes, proyecto y persona
+                    var allTravelsForMonth = await _context.liqdayxproject
+                        .Where(ld => ld.ProjId == projectId && ld.PersId == personId && ld.Day.Month == month && ld.Day.Year == year && ld.LiqId != liquidationId)
+                        .ToListAsync();
+
+                    // Obtener esfuerzo en otros paquetes de trabajo (excluyendo "TRAVELS") para la persona
+                    var otherEffortsForMonth = await _context.Persefforts
+                        .Where(pe => pe.WpxPersonNavigation.Person == personId && pe.WpxPersonNavigation.WpNavigation.ProjId == projectId && pe.WpxPerson != travelsWpx.Id && pe.Month.Month == month && pe.Month.Year == year)
                         .SumAsync(pe => pe.Value);
 
-                    if (travelsEffortForMonth >= totalEffortForMonth)
+                    // Ajustar esfuerzos en "TRAVELS" si es necesario
+                    var effortEntry = await _context.Persefforts
+                        .FirstOrDefaultAsync(pe => pe.WpxPerson == travelsWpx.Id && pe.Month.Month == month && pe.Month.Year == year);
+
+                    if (effortEntry != null)
                     {
-                        logger.Information($"Sufficient PMs available in 'TRAVELS'. Adjusting effort by {totalEffortForMonth}.");
-
-                        var effortEntry = await _context.Persefforts
-                            .FirstOrDefaultAsync(pe => pe.WpxPerson == travelsWpx.Id && pe.Month.Month == month && pe.Month.Year == year);
-
-                        if (effortEntry != null)
+                        if (allTravelsForMonth.Count == 0)
                         {
-                            effortEntry.Value -= totalEffortForMonth;
-                            _context.Persefforts.Update(effortEntry);
-                        }
-                    }
-                    else if (travelsEffortForMonth > 0)
-                    {
-                        logger.Warning($"Partial PM adjustment in 'TRAVELS'. Available: {travelsEffortForMonth}, Required: {totalEffortForMonth}.");
-
-                        totalEffortForMonth -= travelsEffortForMonth;
-
-                        var effortEntry = await _context.Persefforts
-                            .FirstOrDefaultAsync(pe => pe.WpxPerson == travelsWpx.Id && pe.Month.Month == month && pe.Month.Year == year);
-
-                        if (effortEntry != null)
-                        {
+                            // Si solo hay un viaje, eliminar todo el esfuerzo de "TRAVELS"
                             effortEntry.Value = 0;
                             _context.Persefforts.Update(effortEntry);
                         }
-                    }
-                    else
-                    {
-                        logger.Warning($"No PMs available in 'TRAVELS' for Project ID: {projectId}, Month: {month}, Year: {year}.");
+                        else
+                        {
+                            var totalTravelEffort = allTravelsForMonth.Sum(ld => ld.PMs);
+                            
+
+                            if (otherEffortsForMonth >= totalTravelEffort)
+                            {                                
+                                effortEntry.Value = 0;
+                                _context.Persefforts.Update(effortEntry);
+                                logger.Information($"Enough effort in project. TRAVELS effort adjusted to 0.");
+                            }
+                            else
+                            {
+                                var effortToAdjust = totalTravelEffort - otherEffortsForMonth;
+                                effortEntry.Value -= effortToAdjust;
+                                _context.Persefforts.Update(effortEntry);
+                                logger.Information($"TRAVELS adjusted to: {effortEntry}.");
+                            }
+                        }
                     }
                 }
 
@@ -694,7 +698,7 @@ namespace TRS2._0.Services
                 logger.Information($"Deleted {liqDayProjects.Count} records from liqdayxproject.");
 
                 // Actualizar estado de la liquidación
-                liquidation.Status = "7"; // Cancelada
+                liquidation.Status = "6"; // Cancelada
                 _context.Liquidations.Update(liquidation);
                 logger.Information($"Liquidation ID {liquidationId} marked as canceled.");
 
@@ -710,7 +714,6 @@ namespace TRS2._0.Services
                 return new JsonResult(new { success = false, message = $"Error canceling liquidation: {ex.Message}" });
             }
         }
-
 
 
 
