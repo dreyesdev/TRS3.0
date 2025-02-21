@@ -29,4 +29,22 @@ namespace TRS2._0.Controllers
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
     }
+
+    [Route("diagnostic")]
+    public class DiagnosticController : Controller
+    {
+        private readonly IConfiguration _configuration;
+
+        public DiagnosticController(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
+        [HttpGet("db")]
+        public IActionResult GetDatabaseConnection()
+        {
+            var connectionString = _configuration.GetConnectionString("DefaultConnection");
+            return Ok($"Base de datos en uso: {connectionString}");
+        }
+    }
 }

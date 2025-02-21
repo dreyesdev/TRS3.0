@@ -26,7 +26,7 @@ namespace TRS2._0.Controllers
                 // Configura JobDataMap con los parámetros específicos para esta acción
                 var jobDataMap = new JobDataMap
                 {
-                    {"Action", "UpdateMonthlyPMs  "},
+                    {"Action", "UpdateMonthlyPMs"},
             
                 };
 

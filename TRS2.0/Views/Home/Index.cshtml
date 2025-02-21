@@ -45,7 +45,10 @@
     <div class="hero">
         <h1>Welcome to TRS</h1>
         <p class="lead">Time Recording System - Track and manage your working hours efficiently.</p>
-        <a href="/Account/Login" class="btn btn-custom">Log In</a>
+        @if (!User.Identity.IsAuthenticated)
+        {
+            <a href="/Account/Login" class="btn btn-custom">Log In</a>
+        }
     </div>
 </body>
 </html>

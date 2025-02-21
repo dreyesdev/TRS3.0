@@ -1,0 +1,51 @@
+﻿@model TRS2._0.Models.ViewModels.ReportErrorViewModel
+
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-warning text-dark">
+            <h2 class="mb-0"><i class="bi bi-exclamation-circle"></i> Reportar un Error</h2>
+        </div>
+        <div class="card-body">
+
+            <!-- ✅ Mensajes de Éxito/Error -->
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle"></i> @TempData["SuccessMessage"]
+                </div>
+            }
+
+            @if (TempData["ErrorMessage"] != null)
+            {
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> @TempData["ErrorMessage"]
+                </div>
+            }
+
+            <form asp-controller="ProjectManager" asp-action="SubmitErrorReport" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label asp-for="Title" class="form-label"></label>
+                    <input asp-for="Title" class="form-control" required />
+                    <span asp-validation-for="Title" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Description" class="form-label"></label>
+                    <textarea asp-for="Description" class="form-control" rows="4" required></textarea>
+                    <span asp-validation-for="Description" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Attachment" class="form-label"></label>
+                    <input asp-for="Attachment" type="file" class="form-control" />
+                </div>
+
+                <button type="submit" class="btn btn-warning">
+                    <i class="bi bi-send"></i> Enviar Reporte
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+

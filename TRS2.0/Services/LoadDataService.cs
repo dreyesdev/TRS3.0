@@ -14,6 +14,7 @@ using Newtonsoft.Json.Linq;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using OfficeOpenXml;
+using System.Composition;
 
 
 
@@ -55,7 +56,7 @@ namespace TRS2._0.Services
         {
             // Ruta del archivo de logs para registrar el proceso
             var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "MonthlyPM.txt");
-
+            
             // Configuración del logger para este proceso
             var logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
@@ -144,8 +145,8 @@ namespace TRS2._0.Services
             var currentYear = DateTime.UtcNow.Year;
 
             // Establecer los límites de cálculo: 5 años hacia atrás y 5 años hacia adelante desde el año actual, el primer valor  es el que marca los años atras y adelante 
-            var lowerLimit = new DateTime(currentYear - 1, 1, 1); // Inicio del rango permitido
-            var upperLimit = new DateTime(currentYear + 1, 1, 31); // Fin del rango permitido
+            var lowerLimit = new DateTime(currentYear - 3, 1, 1); // Inicio del rango permitido
+            var upperLimit = new DateTime(currentYear + 3, 1, 31); // Fin del rango permitido
 
             // Obtener el rango de fechas del primer y último contrato
             var start = contracts.First().Start < lowerLimit ? lowerLimit : contracts.First().Start; // Limitar al rango inferior
@@ -768,8 +769,8 @@ namespace TRS2._0.Services
 
                     if (!parseResp)
                     {
+                        resp = 0; // Asignar resp a null si falla el parseo   
                         personalLogger.Error($"Failed to parse essential field Resp for Personnel {fields[3]} {fields[2]}");
-                        continue; // Si Resp es esencial y falla su parseo, continua con la siguiente línea
                     }
 
 
@@ -835,14 +836,31 @@ namespace TRS2._0.Services
                         personalLogger.Information($"Personnel {personnel.Name} {personnel.Surname} updated in database.");
                     }
                 }
+                try
+                {
+                    await _context.SaveChangesAsync(); // Guardar todos los cambios en la base de datos
+                
+                    // Código para cargar personal
+                    personalLogger.Information("Carga de personal finalizada.");
+                }
+                catch (DbUpdateException dbEx) // Captura excepciones específicas de Entity Framework
+                {
+                    personalLogger.Error($"Error al cargar personal: {dbEx.Message}");
+                    personalLogger.Error($"Detalles: {dbEx.InnerException?.Message}"); // Muestra el mensaje de la excepción interna
+                }
+                catch (Exception ex)
+                {
+                    personalLogger.Error($"Error al cargar personal: {ex.Message}");
+                }
 
-                await _context.SaveChangesAsync(); // Guardar todos los cambios en la base de datos
-                personalLogger.Information("Carga de personal finalizada.");
-                personalLogger.Dispose();
+                finally
+                {
+                    personalLogger.Dispose();
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                Console.WriteLine($"Error al cargar personal: {ex.Message}");
             }
         }
 
@@ -890,6 +908,12 @@ namespace TRS2._0.Services
                     {
                         logger.Error("Error al parsear campos esenciales de la línea: {Line}", line);
                         continue;
+                    }
+
+                    if (dedication < 0 || dedication > 100)
+                    {
+                        logger.Error($"Valor inválido en dedication: {dedication}. Se ignorará esta línea: {line}");
+                        continue; // Evita procesar la línea con valores erróneos
                     }
 
                     // Convertir el porcentaje a decimal para `Reduc`
@@ -1058,6 +1082,8 @@ namespace TRS2._0.Services
 
                     var groupName = fields[1];
                     var existingGroup = await _context.Personnelgroups.FirstOrDefaultAsync(pg => pg.Id == id);
+
+                    logger.Information("Base de datos activa: {Database}", _context.Database.GetDbConnection().Database);
 
                     if (existingGroup == null)
                     {
@@ -1317,7 +1343,7 @@ namespace TRS2._0.Services
             try
             {
                 var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiI5NDUyNTYxNC0xZDMxLTRmZmQtOWFmMC1hNmFkNjY1ZThlYjEiLCJ1bmlxdWVfbmFtZSI6InRyc0Bic2MuZXMiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL2FjY2Vzc2NvbnRyb2xzZXJ2aWNlLzIwMTAvMDcvY2xhaW1zL2lkZW50aXR5cHJvdmlkZXIiOiJBU1AuTkVUIElkZW50aXR5IiwiQXNwTmV0LklkZW50aXR5LlNlY3VyaXR5U3RhbXAiOiIxYTU1ZTYwZC1hYmU4LTRjMzgtYmQwYS04YjIwNWI4ZWM4ZWQiLCJDb21wYW55SWQiOiIyMzU1MyIsIlVzZXJJZCI6IjI0NjE4NTIiLCJqdGkiOiI3OWZiZDQ4OC04NGU1LTQ2MTUtYWY3MC04OTU0MmJkYjFjM2YiLCJuYmYiOjE3MjI0MTk0MjEsImV4cCI6MTczMDE5NTQyMSwiaWF0IjoxNzIyNDE5NDIxLCJpc3MiOiJMT0NBTCBBVVRIT1JJVFkiLCJhdWQiOiJodHRwczovL3dvZmZ1LmNvbS8ifQ.-i4k6h7dK8v3NnL6p696-t6nxSWQm01UwRHLrBg_n4s");
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _bearerToken);
 
                 var response = await httpClient.GetAsync("https://app.woffu.com/api/v1/users/2160572/agreements/events");
                 response.EnsureSuccessStatusCode();
@@ -1362,7 +1388,7 @@ namespace TRS2._0.Services
             try
             {
                 var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiI5NDUyNTYxNC0xZDMxLTRmZmQtOWFmMC1hNmFkNjY1ZThlYjEiLCJ1bmlxdWVfbmFtZSI6InRyc0Bic2MuZXMiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL2FjY2Vzc2NvbnRyb2xzZXJ2aWNlLzIwMTAvMDcvY2xhaW1zL2lkZW50aXR5cHJvdmlkZXIiOiJBU1AuTkVUIElkZW50aXR5IiwiQXNwTmV0LklkZW50aXR5LlNlY3VyaXR5U3RhbXAiOiIxYTU1ZTYwZC1hYmU4LTRjMzgtYmQwYS04YjIwNWI4ZWM4ZWQiLCJDb21wYW55SWQiOiIyMzU1MyIsIlVzZXJJZCI6IjI0NjE4NTIiLCJqdGkiOiI3OWZiZDQ4OC04NGU1LTQ2MTUtYWY3MC04OTU0MmJkYjFjM2YiLCJuYmYiOjE3MjI0MTk0MjEsImV4cCI6MTczMDE5NTQyMSwiaWF0IjoxNzIyNDE5NDIxLCJpc3MiOiJMT0NBTCBBVVRIT1JJVFkiLCJhdWQiOiJodHRwczovL3dvZmZ1LmNvbS8ifQ.-i4k6h7dK8v3NnL6p696-t6nxSWQm01UwRHLrBg_n4s");
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _bearerToken);
 
                 var response = await httpClient.GetAsync("https://app.woffu.com/api/v1/users");
                 response.EnsureSuccessStatusCode();
@@ -1581,7 +1607,7 @@ namespace TRS2._0.Services
                         .Where(l => l.PersonId == personId)
                         .ToDictionary(l => l.Day, l => l);
 
-                    await Task.Delay(1000);
+                    await Task.Delay(650);
 
                     var requestsResponse = await _httpClient.GetAsync($"https://app.woffu.com/api/v1/users/{userId}/requests");
                     if (!requestsResponse.IsSuccessStatusCode)
@@ -2032,24 +2058,31 @@ namespace TRS2._0.Services
                 var monthStart = new DateTime(date.Year, date.Month, 1);
                 var monthEnd = monthStart.AddMonths(1).AddDays(-1);
 
-                // **Obtener SOLO empleados con `PersMonthEfforts.Value > 0`**
-                var employees = await _context.Wpxpeople
-                    .Include(wpx => wpx.PersonNavigation) // Solo para acceder a PersonId
-                    .Include(wpx => wpx.WpNavigation)
-                        .ThenInclude(wp => wp.Proj)
-                    .Where(wpx =>
-                        _context.PersMonthEfforts.Any(pme => pme.PersonId == wpx.Person && pme.Month.Year == monthStart.Year && pme.Month.Month == monthStart.Month && pme.Value > 0) &&
-                        wpx.WpNavigation.StartDate <= monthEnd &&
-                        wpx.WpNavigation.EndDate >= monthStart &&
-                        _context.Wpxpeople.Count(w => w.Person == wpx.Person && w.WpNavigation.StartDate <= monthEnd && w.WpNavigation.EndDate >= monthStart) == 1 &&
-                        _context.Projectxpeople.Count(p => p.Person == wpx.Person && p.Proj.Start <= monthEnd && p.Proj.End >= monthStart) == 1)
-                    .ToListAsync();
+                // Consulta LINQ traducida de SQL
+                var employees = await (from pf in _context.Persefforts
+                                       join wxp in _context.Wpxpeople on pf.WpxPerson equals wxp.Id
+                                       where pf.Value != 0 && pf.Month.Year == monthStart.Year && pf.Month.Month == monthStart.Month
+                                       group pf by new { wxp.Person, pf.Month } into g
+                                       where g.Count() == 1
+                                       select new
+                                       {
+                                           Person = g.Key.Person,
+                                           Month = g.Key.Month
+                                       }).ToListAsync();
 
-                foreach (var wpx in employees)
+                foreach (var employee in employees)
                 {
                     try
                     {
-                        _logger.LogInformation($"🔍 Procesando persona {wpx.Person} - WP: {wpx.WpNavigation.Name}");
+                        var wpx = await _context.Wpxpeople
+                            .Include(w => w.PersonNavigation)
+                            .Include(w => w.WpNavigation)
+                                .ThenInclude(wp => wp.Proj)
+                            .FirstOrDefaultAsync(w => w.Person == employee.Person);
+
+                        if (wpx == null) continue;
+
+                        _logger.LogInformation($"🔍 Procesando persona {wpx.Person} - WP: {wpx.WpNavigation?.Name ?? "SIN WP"}");
 
                         var monthlyEffort = await _context.Persefforts
                             .Where(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == monthStart.Year && pe.Month.Month == monthStart.Month)
@@ -2069,7 +2102,7 @@ namespace TRS2._0.Services
                         var effectiveWorkingDays = workingDays - leaveDays.Count;
                         bool willBeAdjusted = Math.Abs((decimal)monthlyEffort - (decimal)maxEffortForMonth) < 0.001m;
 
-                        // **Obtener el nombre del Departamento**
+                        // Obtener el nombre del Departamento
                         var departmentName = await _context.Departments
                             .Where(d => d.Id == _context.Personnel
                                 .Where(p => p.Id == wpx.Person)
@@ -2078,7 +2111,7 @@ namespace TRS2._0.Services
                             .Select(d => d.Name)
                             .FirstOrDefaultAsync() ?? "SIN DEPARTAMENTO";
 
-                        // **Obtener el nombre del Grupo de Personal**
+                        // Obtener el nombre del Grupo de Personal
                         var groupName = await _context.Personnelgroups
                             .Where(g => g.Id == _context.Personnel
                                 .Where(p => p.Id == wpx.Person)
@@ -2087,19 +2120,19 @@ namespace TRS2._0.Services
                             .Select(g => g.GroupName)
                             .FirstOrDefaultAsync() ?? "SIN GRUPO";
 
-                        // **Marcar empleados que NO tienen el mes completo**
+                        // Marcar empleados que NO tienen el mes completo
                         string estado = willBeAdjusted ? "Sí" : "No (Requiere Ajuste)";
 
                         employeesToAdjust.Add(new
                         {
                             PersonId = wpx.Person,
-                            Nombre = wpx.PersonNavigation.Name ?? "SIN NOMBRE",
-                            Apellido = wpx.PersonNavigation.Surname ?? "SIN APELLIDO",
+                            Nombre = wpx.PersonNavigation?.Name ?? "SIN NOMBRE",
+                            Apellido = wpx.PersonNavigation?.Surname ?? "SIN APELLIDO",
                             Departamento = departmentName,
                             Grupo = groupName,
                             Mes = monthStart.ToString("yyyy-MM"),
-                            WorkPackage = wpx.WpNavigation.Name ?? "SIN WP",
-                            Proyecto = wpx.WpNavigation.Proj.Acronim ?? "SIN PROYECTO",
+                            WorkPackage = wpx.WpNavigation?.Name ?? "SIN WP",
+                            Proyecto = wpx.WpNavigation?.Proj?.Acronim ?? "SIN PROYECTO",
                             EffortAsignado = monthlyEffort,
                             EffortEsperado = maxEffortForMonth,
                             DiasLaborables = workingDays,
@@ -2111,13 +2144,14 @@ namespace TRS2._0.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError($"❌ Error procesando persona {wpx.Person}: {ex.Message} - {ex.StackTrace}");
+                        _logger.LogError($"❌ Error procesando persona: {ex.Message} - {ex.StackTrace}");
                     }
                 }
             }
 
             return employeesToAdjust;
         }
+
 
 
 

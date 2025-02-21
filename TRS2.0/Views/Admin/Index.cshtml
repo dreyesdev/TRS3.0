@@ -16,14 +16,17 @@
                 </div>
                 <div class="card-body">
                     <div class="d-flex flex-wrap">
-                        <button class="btn btn-success m-2" onclick="triggerJob('/Carga')">Carga de Datos</button>
+                        <h4>Orden: Proyectos, Grupos de Personal, Personal, Lideres, Dedicaciones y Afiliaciones, Carga de Out of Contract Liquidaciones, Bajas y Vacaciones, Generacion PM Mensuales </h4>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaProyectos')">Proyectos</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaGruposPersonas')">Grupos de Personas</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaPersonal')">Carga de Personal</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaLideres')">Líderes</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaAfiliacionesYDedicaciones')">Afiliaciones y Dedicaciones</button>
                         <button class="btn btn-success m-2" onclick="triggerJob('/Liquidaciones')">Liquidaciones</button>
                         <button class="btn btn-success m-2" onclick="triggerJob('/ProcesaLiquidaciones')">Procesar Liquidaciones</button>
-                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaPersonal')">Carga de Personal</button>
-                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaAfiliacionesYDedicaciones')">Afiliaciones y Dedicaciones</button>
-                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaGruposPersonas')">Grupos de Personas</button>
-                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaLideres')">Líderes</button>
-                        <button class="btn btn-success m-2" onclick="triggerJob('/CargaProyectos')">Proyectos</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/ProcesoLiquidacionesAvd')">Procesar Liquidaciones Adv</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/UpdateLeaveTable')">Ausencias y Vacaciones</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/Carga')">PMs Mensuales</button>      
                         <button class="btn btn-success m-2" onclick="triggerJob('/AdjustGlobalEffort')">Ajuste de Effort Global</button>
                     </div>
                 </div>

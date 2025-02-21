@@ -9,6 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="CargaAfiliacionesYDedicacionesLog20240403.txt" />
+    <None Remove="CargaPersonalLog20241024.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="wwwroot\css\layout-styles.css" />
     <None Include="wwwroot\Images\logo.png" />
   </ItemGroup>

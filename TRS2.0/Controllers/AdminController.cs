@@ -175,7 +175,7 @@ namespace TRS2._0.Controllers
             // Ruta para el archivo de log
             var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ProcesamientoTimesheetLog.txt");
             var basePath = Path.GetDirectoryName(Path.Combine(Directory.GetCurrentDirectory(), "Logs"));
-    var errorFolderPath = Path.Combine(basePath, "Archivos a tratar");
+            var errorFolderPath = Path.Combine(basePath, "Archivos a tratar");
 
             // Crear carpeta de errores si no existe
             if (!Directory.Exists(errorFolderPath))
