@@ -145,8 +145,8 @@ namespace TRS2._0.Services
             var currentYear = DateTime.UtcNow.Year;
 
             // Establecer los límites de cálculo: 5 años hacia atrás y 5 años hacia adelante desde el año actual, el primer valor  es el que marca los años atras y adelante 
-            var lowerLimit = new DateTime(currentYear - 3, 1, 1); // Inicio del rango permitido
-            var upperLimit = new DateTime(currentYear + 3, 1, 31); // Fin del rango permitido
+            var lowerLimit = new DateTime(currentYear - 7, 1, 1); // Inicio del rango permitido
+            var upperLimit = new DateTime(currentYear + 7, 1, 31); // Fin del rango permitido
 
             // Obtener el rango de fechas del primer y último contrato
             var start = contracts.First().Start < lowerLimit ? lowerLimit : contracts.First().Start; // Limitar al rango inferior
