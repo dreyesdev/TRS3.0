@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using TRS2._0.Models.DataModels;
 using TRS2._0.Services;
 using Quartz;
+using Quartz.Impl;
 using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
 using Serilog;
 using Serilog.Events;
@@ -77,7 +78,7 @@ builder.Services.AddScoped<LoadDataService>();
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("Smtp"));
 builder.Services.AddTransient<IEmailSender, EmailSender>();
 
-// Configuración de Quartz
+// Configuración de Quartz para ejecutar `LoadDataService` diariamente a la 1:00 AM
 builder.Services.AddQuartz(q =>
 {
     q.UseMicrosoftDependencyInjectionJobFactory();
@@ -86,10 +87,14 @@ builder.Services.AddQuartz(q =>
     q.AddJob<LoadDataService>(opts => opts
         .WithIdentity(jobKey)
         .StoreDurably());
+
+    q.AddTrigger(opts => opts
+        .ForJob(jobKey)
+        .WithIdentity("DailyLoadTrigger")
+        .WithSchedule(CronScheduleBuilder.DailyAtHourAndMinute(1, 0))); // 1:00 AM
 });
 
-builder.Services.AddQuartzHostedService(
-    q => q.WaitForJobsToComplete = true);
+builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
 var app = builder.Build();
 

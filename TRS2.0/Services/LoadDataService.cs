@@ -2424,6 +2424,72 @@ namespace TRS2._0.Services
             logger.Information("Proceso de ajuste global de esfuerzo finalizado");
         }
 
+        public async Task RunScheduledJobs()
+        {
+            var dataLoadPath = Path.Combine(Directory.GetCurrentDirectory(), "Dataload");
+
+            var processes = new List<(string Name, Func<Task> Process)>
+                            {
+                                ("Carga de Proyectos", () => LoadProjectsFromFileAsync(Path.Combine(dataLoadPath, "PROJECTES.txt"))),
+                                ("Carga de Grupos de Personal", () => LoadPersonnelGroupsFromFileAsync(Path.Combine(dataLoadPath, "GRUPS.txt"))),
+                                ("Carga de Personal", () => LoadPersonnelFromFileAsync(Path.Combine(dataLoadPath, "PERSONAL.txt"))),
+                                ("Carga de Líderes", () => LoadLeadersFromFileAsync(Path.Combine(dataLoadPath, "Leaders.txt"))),
+                                ("Carga de Dedicaciones y Afiliaciones", () => LoadAffiliationsAndDedicationsFromFileAsync(Path.Combine(dataLoadPath, "DEDICACIO3.txt"))),
+                                ("Carga de Out of Contract", () => OutOfContractLoadAsync()), // No necesita archivo
+                                ("Carga de Liquidaciones", () => LoadLiquidationsFromFileAsync(Path.Combine(dataLoadPath, "Liquid.txt"))),
+                                ("Procesamiento de Liquidaciones", () => ProcessLiquidationsAsync()),
+                                ("Procesamiento Avanzado de Liquidaciones", () => ProcessAdvancedLiquidationsAsync()),
+                                ("Actualización de Tabla de Ausencias", () => UpdateLeaveTableAsync()) // No necesita archivo
+                            };
+
+            foreach (var (processName, process) in processes)
+            {
+                var executionLog = new ProcessExecutionLog
+                {
+                    ProcessName = processName,
+                    ExecutionTime = DateTime.UtcNow
+                };
+
+                try
+                {
+                    var logFilePath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", $"{processName.Replace(" ", "")}.txt");
+                    var previousLogLines = File.Exists(logFilePath) ? await File.ReadAllLinesAsync(logFilePath) : new string[0];
+
+                    await process();
+
+                    var newLogLines = File.Exists(logFilePath) ? await File.ReadAllLinesAsync(logFilePath) : new string[0];
+                    var recentLogs = newLogLines.Except(previousLogLines)
+                                                .Where(line => line.Contains("[Warning]") || line.Contains("[Error]"))
+                                                .ToList();
+
+                    if (recentLogs.Any(log => log.Contains("[Error]")))
+                    {
+                        executionLog.Status = "Fallido"; // Mostrar en rojo
+                        executionLog.LogMessage = string.Join("\n", recentLogs.Where(log => log.Contains("[Error]")));
+                    }
+                    else if (recentLogs.Any(log => log.Contains("[Warning]")))
+                    {
+                        executionLog.Status = "Advertencias"; // Mostrar en amarillo
+                        executionLog.LogMessage = string.Join("\n", recentLogs.Where(log => log.Contains("[Warning]")));
+                    }
+                    else
+                    {
+                        executionLog.Status = "Exitoso"; // Mostrar en verde
+                        executionLog.LogMessage = "Proceso completado sin incidencias.";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    executionLog.Status = "Fallido";
+                    executionLog.LogMessage = ex.Message;
+                    _logger.LogError($"Error en {processName}: {ex.Message}");
+                }
+
+                _context.ProcessExecutionLogs.Add(executionLog);
+                await _context.SaveChangesAsync();
+            }
+        }
+
 
 
 

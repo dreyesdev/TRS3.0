@@ -11,6 +11,8 @@ namespace TRS2._0.Models.ViewModels
         public List<SelectListItem> People { get; set; }
         public List<SelectListItem> Users { get; set; }
         public List<SelectListItem> Roles { get; set; }
+
+        public List<ProcessExecutionLog> ProcessLogs { get; set; }
     }
 }
 

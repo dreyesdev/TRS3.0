@@ -59,11 +59,17 @@ namespace TRS2._0.Controllers
                     Text = p.Name
                 }).ToListAsync();
 
+            var logs = await _context.ProcessExecutionLogs
+                        .OrderByDescending(p => p.ExecutionTime)
+                        .Take(10)
+                        .ToListAsync();
+
             var users = await _userManager.Users.ToListAsync();
             var roles = await _roleManager.Roles.ToListAsync();
 
             var model = new AdminIndexViewModel
             {
+                ProcessLogs = logs,
                 DailyPMValues = pmValues,
                 People = people,
                 Users = users.Select(u => new SelectListItem { Value = u.Id, Text = u.UserName }).ToList(),
@@ -618,6 +624,13 @@ namespace TRS2._0.Controllers
                 _logger.LogError($"❌ Error en GenerateAdjustmentReport: {ex.Message} - {ex.StackTrace}");
                 return StatusCode(500, new { success = false, message = "Error interno al generar el informe." });
             }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RunDataLoadNow([FromServices] LoadDataService loadDataService)
+        {
+            await loadDataService.RunScheduledJobs();
+            return RedirectToAction("Index");
         }
 
 

@@ -7,6 +7,81 @@
 <h1 class="text-center my-4">Admin Dashboard</h1>
 
 <div class="container">
+
+    <form asp-action="RunDataLoadNow" asp-controller="Admin" method="post">
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-play"></i> Ejecutar Carga Ahora
+        </button>
+    </form>
+
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0"><i class="fas fa-tasks"></i> Estado de Procesos de Carga de Datos</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Proceso</th>
+                            <th>Hora de Ejecución</th>
+                            <th>Estado</th>
+                            <th>Detalles</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in Model.ProcessLogs)
+                        {
+                            <tr class="@(log.Status == "Exitoso" ? "table-success" : log.Status == "Advertencias" ? "table-warning" : "table-danger")">
+                                <td>@log.ProcessName</td>
+                                <td>@log.ExecutionTime.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>
+                                    <span class="badge @(log.Status == "Exitoso" ? "bg-success" : log.Status == "Advertencias" ? "bg-warning text-dark" : "bg-danger")">
+                                        @log.Status
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(log.LogMessage))
+                                    {
+                                        <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#logDetailsModal" onclick="showLogDetails('@log.LogMessage.Replace("\n", "<br>")')">
+                                            <i class="fas fa-info-circle"></i> Ver Detalles
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Sin detalles</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Detalles -->
+    <div class="modal fade" id="logDetailsModal" tabindex="-1" aria-labelledby="logDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="logDetailsModalLabel">Detalles del Proceso</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="logDetailsContent"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+
+
     <!-- Primera fila: Trabajos Automatizados -->
     <div class="row mb-4">
         <div class="col-12">
@@ -543,8 +618,10 @@
                 alert('Ocurrió un error al descargar el informe.');
             }
         });
-    
 
+        function showLogDetails(message) {
+            document.getElementById("logDetailsContent").innerHTML = message;
+        }
 
         document.addEventListener('DOMContentLoaded', loadProjects);
     </script>
