@@ -15,6 +15,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using OfficeOpenXml;
 using System.Composition;
+using ILogger = Serilog.ILogger;
 
 
 
@@ -30,6 +31,12 @@ namespace TRS2._0.Services
         private DateTime _nextTokenRenewalDate;
         private System.Timers.Timer _tokenRenewalTimer;
         private readonly string _tokenFilePath;
+        private readonly ILogger _fileLogger = new LoggerConfiguration()
+                                                .MinimumLevel.Debug()
+                                                .WriteTo.File(Path.Combine(Directory.GetCurrentDirectory(), "Logs", "CargaDiaria.txt"),
+                                                              rollingInterval: RollingInterval.Day)
+                                                .CreateLogger();
+
 
         public LoadDataService(TRSDBContext context, WorkCalendarService workCalendarService, ILogger<LoadDataService> logger)
         {
@@ -1556,9 +1563,7 @@ namespace TRS2._0.Services
             public string access_token { get; set; }
         }
 
-        public async Task 
-            
-            UpdateLeaveTableAsync()
+        public async Task UpdateLeaveTableAsync()
         {
             var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "CargaAusencias.txt");
             var logger = new LoggerConfiguration()
@@ -1607,7 +1612,7 @@ namespace TRS2._0.Services
                         .Where(l => l.PersonId == personId)
                         .ToDictionary(l => l.Day, l => l);
 
-                    await Task.Delay(650);
+                    await Task.Delay(1500);
 
                     var requestsResponse = await _httpClient.GetAsync($"https://app.woffu.com/api/v1/users/{userId}/requests");
                     if (!requestsResponse.IsSuccessStatusCode)
@@ -1908,23 +1913,29 @@ namespace TRS2._0.Services
 
                     logger.Information($"Procesando el mes: {monthStart:yyyy-MM}");
 
-                    var allWpxPeople = await _context.Wpxpeople
-                        .Include(wpx => wpx.PersonNavigation)
-                        .Include(wpx => wpx.WpNavigation)
-                            .ThenInclude(wp => wp.Proj)
-                        .Where(wpx =>
-                            wpx.WpNavigation.StartDate <= monthEnd &&
-                            wpx.WpNavigation.EndDate >= monthStart &&
-                            _context.Wpxpeople.Count(w => w.Person == wpx.Person && w.WpNavigation.StartDate <= monthEnd && w.WpNavigation.EndDate >= monthStart) == 1 &&
-                            _context.Projectxpeople.Count(p => p.Person == wpx.Person && p.Proj.Start <= monthEnd && p.Proj.End >= monthStart) == 1)
-                        .ToListAsync();
+                    var employees = await (from pf in _context.Persefforts
+                                           join wxp in _context.Wpxpeople on pf.WpxPerson equals wxp.Id
+                                           where pf.Value != 0 && pf.Month.Year == monthStart.Year && pf.Month.Month == monthStart.Month
+                                           group pf by new { wxp.Person, pf.Month } into g
+                                           where g.Count() == 1
+                                           select new
+                                           {
+                                               Person = g.Key.Person,
+                                               Month = g.Key.Month
+                                           }).ToListAsync();
 
-                    logger.Information($"Encontrados {allWpxPeople.Count} investigadores con un único WP en el mes {monthStart:yyyy-MM}");
+                    logger.Information($"Encontrados {employees.Count} investigadores con un único WP en el mes {monthStart:yyyy-MM}");
 
-                    foreach (var wpx in allWpxPeople)
+                    foreach (var employee in employees)
                     {
+                        var wpx = await _context.Wpxpeople
+                            .Include(w => w.PersonNavigation)
+                            .Include(w => w.WpNavigation)
+                                .ThenInclude(wp => wp.Proj)
+                            .FirstOrDefaultAsync(w => w.Person == employee.Person);
+
                         try
-                        {
+                        {   
                             var personName = wpx.PersonNavigation.Name ?? "SIN NOMBRE";
                             var personSurname = wpx.PersonNavigation.Surname ?? "SIN APELLIDO";
                             var projectAcronym = wpx.WpNavigation?.Proj?.Acronim ?? "SIN PROYECTO";
@@ -2428,6 +2439,18 @@ namespace TRS2._0.Services
         {
             var dataLoadPath = Path.Combine(Directory.GetCurrentDirectory(), "Dataload");
 
+            _fileLogger.Information("🧹 Eliminando todos los registros de ejecuciones exitosas...");
+
+            // 🔹 Eliminar TODOS los registros de ejecuciones exitosas
+            var successLogs = _context.ProcessExecutionLogs
+                .Where(p => p.Status == "Exitoso");
+
+            int deletedCount = await successLogs.CountAsync();
+            _context.ProcessExecutionLogs.RemoveRange(successLogs);
+            await _context.SaveChangesAsync();
+
+            _fileLogger.Information($"✅ {deletedCount} registros de ejecuciones exitosas eliminados.");
+
             var processes = new List<(string Name, Func<Task> Process)>
                             {
                                 ("Carga de Proyectos", () => LoadProjectsFromFileAsync(Path.Combine(dataLoadPath, "PROJECTES.txt"))),
@@ -2435,11 +2458,11 @@ namespace TRS2._0.Services
                                 ("Carga de Personal", () => LoadPersonnelFromFileAsync(Path.Combine(dataLoadPath, "PERSONAL.txt"))),
                                 ("Carga de Líderes", () => LoadLeadersFromFileAsync(Path.Combine(dataLoadPath, "Leaders.txt"))),
                                 ("Carga de Dedicaciones y Afiliaciones", () => LoadAffiliationsAndDedicationsFromFileAsync(Path.Combine(dataLoadPath, "DEDICACIO3.txt"))),
-                                ("Carga de Out of Contract", () => OutOfContractLoadAsync()), // No necesita archivo
+                                ("Carga de Out of Contract", () => OutOfContractLoadAsync()),
                                 ("Carga de Liquidaciones", () => LoadLiquidationsFromFileAsync(Path.Combine(dataLoadPath, "Liquid.txt"))),
                                 ("Procesamiento de Liquidaciones", () => ProcessLiquidationsAsync()),
                                 ("Procesamiento Avanzado de Liquidaciones", () => ProcessAdvancedLiquidationsAsync()),
-                                ("Actualización de Tabla de Ausencias", () => UpdateLeaveTableAsync()) // No necesita archivo
+                                ("Actualización de Tabla de Ausencias", () => UpdateLeaveTableAsync())
                             };
 
             foreach (var (processName, process) in processes)
@@ -2452,6 +2475,7 @@ namespace TRS2._0.Services
 
                 try
                 {
+                    _fileLogger.Information($"🔄 Iniciando proceso: {processName}");
                     var logFilePath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", $"{processName.Replace(" ", "")}.txt");
                     var previousLogLines = File.Exists(logFilePath) ? await File.ReadAllLinesAsync(logFilePath) : new string[0];
 
@@ -2464,17 +2488,17 @@ namespace TRS2._0.Services
 
                     if (recentLogs.Any(log => log.Contains("[Error]")))
                     {
-                        executionLog.Status = "Fallido"; // Mostrar en rojo
+                        executionLog.Status = "Fallido"; // 🔴 Rojo en la vista
                         executionLog.LogMessage = string.Join("\n", recentLogs.Where(log => log.Contains("[Error]")));
                     }
                     else if (recentLogs.Any(log => log.Contains("[Warning]")))
                     {
-                        executionLog.Status = "Advertencias"; // Mostrar en amarillo
+                        executionLog.Status = "Advertencias"; // 🟡 Amarillo en la vista
                         executionLog.LogMessage = string.Join("\n", recentLogs.Where(log => log.Contains("[Warning]")));
                     }
                     else
                     {
-                        executionLog.Status = "Exitoso"; // Mostrar en verde
+                        executionLog.Status = "Exitoso"; // ✅ Verde en la vista
                         executionLog.LogMessage = "Proceso completado sin incidencias.";
                     }
                 }
@@ -2482,95 +2506,120 @@ namespace TRS2._0.Services
                 {
                     executionLog.Status = "Fallido";
                     executionLog.LogMessage = ex.Message;
-                    _logger.LogError($"Error en {processName}: {ex.Message}");
+                    _fileLogger.Error($"Error en {processName}: {ex.Message}");
                 }
 
                 _context.ProcessExecutionLogs.Add(executionLog);
                 await _context.SaveChangesAsync();
             }
+
+            _fileLogger.Information("🎉 TODOS LOS PROCESOS SE HAN EJECUTADO CORRECTAMENTE.");
         }
+
 
 
 
 
         public async Task Execute(IJobExecutionContext context)
         {
-            var dataMap = context.MergedJobDataMap; // Obtener el JobDataMap
+                                    
+            var dataMap = context.MergedJobDataMap;
+            try { 
+                // ✅ Verificamos si la clave "Action" existe antes de acceder a ella
+                if (!dataMap.ContainsKey("Action"))
+                {
+                    _fileLogger.Information("⏳ Ejecutando `RunScheduledJobs()` porque Quartz no proporcionó una acción específica.");
+                    await RunScheduledJobs();
+                    _fileLogger.Information("✅ Finalizado `RunScheduledJobs()`.");
+                    return;
+                }
 
-            var action = dataMap.GetString("Action"); // Obtener el parámetro de acción
+                var action = dataMap.GetString("Action");
+                _fileLogger.Information($"🔄 Ejecutando acción específica: {action}");
 
-            switch (action)
-            {
-                case "UpdateMonthlyPMs":
-                    await UpdateMonthlyPMs();
-                    break;
-                case "LoadLiquidationsFromFile":
-                    var filePath = dataMap.GetString("FilePath"); // Asumir que "FilePath" también se pasa como parámetro
-                    await LoadLiquidationsFromFileAsync(filePath);
-                    break;
-                case "ProcessLiquidations":
-                    await ProcessLiquidationsAsync(); 
-                    break;
-                case "ProcessLiquidationsAdvanced":
-                    await ProcessAdvancedLiquidationsAsync();
-                    break;
-                case "LoadPersonnelFromFile":
-                    var filePath2 = dataMap.GetString("FilePath"); // Asumir que "FilePath" también se pasa como parámetro
-                    await LoadPersonnelFromFileAsync(filePath2);
-                    break;
+                switch (action)
+                {
+                    case "UpdateMonthlyPMs":
+                        await UpdateMonthlyPMs();
+                        break;
 
-                case "LoadAffiliationsAndDedicationsFromFile": // Nuevo caso para la acción de carga de afiliaciones y dedicaciones
-                    var filePath3 = dataMap.GetString("FilePath"); // Obtener la ruta del archivo desde JobDataMap
-                    await LoadAffiliationsAndDedicationsFromFileAsync(filePath3);
-                    break;
+                    case "LoadLiquidationsFromFile":
+                        var filePath = dataMap.GetString("FilePath");
+                        await LoadLiquidationsFromFileAsync(filePath);
+                        break;
 
-                case "LoadPersonnelGroupsFromFile": // Nuevo caso para la acción de carga de grupos de personal
-                    var filePath4 = dataMap.GetString("FilePath"); // Obtener la ruta del archivo desde JobDataMap
-                    await LoadPersonnelGroupsFromFileAsync(filePath4);
-                    break;
+                    case "ProcessLiquidations":
+                        await ProcessLiquidationsAsync();
+                        break;
 
-                case "LoadLeadersFromFile": // Nuevo caso para la acción de carga de líderes
-                    var filePath5 = dataMap.GetString("FilePath"); // Obtener la ruta del archivo desde JobDataMap
-                    await LoadLeadersFromFileAsync(filePath5);
-                    break;
+                    case "ProcessLiquidationsAdvanced":
+                        await ProcessAdvancedLiquidationsAsync();
+                        break;
 
-                case "LoadProjectsFromFile": // Nuevo caso para la acción de carga de proyectos
-                    var filePath6 = dataMap.GetString("FilePath"); // Obtener la ruta del archivo desde JobDataMap
-                    await LoadProjectsFromFileAsync(filePath6);
-                    break;
+                    case "LoadPersonnelFromFile":
+                        var filePath2 = dataMap.GetString("FilePath");
+                        await LoadPersonnelFromFileAsync(filePath2);
+                        break;
 
-                case "FetchAndSaveAgreementEvents":
-                    await FetchAndSaveAgreementEventsAsync();
-                    break;
+                    case "LoadAffiliationsAndDedicationsFromFile":
+                        var filePath3 = dataMap.GetString("FilePath");
+                        await LoadAffiliationsAndDedicationsFromFileAsync(filePath3);
+                        break;
 
-                case "UpdatePersonnelUserIds":
-                    await UpdatePersonnelUserIdsAsync();
-                    break;
-                
-                case "UpdateLeaveTable":    
-                    await UpdateLeaveTableAsync();
-                    break;
+                    case "LoadPersonnelGroupsFromFile":
+                        var filePath4 = dataMap.GetString("FilePath");
+                        await LoadPersonnelGroupsFromFileAsync(filePath4);
+                        break;
 
-                case "ProcessInvestigatorsTimesheet":
-                    await AutoFillTimesheetsForInvestigatorsInSingleWPWithEffortAsync();
-                    break;
+                    case "LoadLeadersFromFile":
+                        var filePath5 = dataMap.GetString("FilePath");
+                        await LoadLeadersFromFileAsync(filePath5);
+                        break;
 
-                case "LoadOutOfContract":
-                    await OutOfContractLoadAsync();
-                    break;
-        
-                 case "AdjustGlobalEffort":
-                    await AdjustGlobalEffortAsync();
-                    break;
+                    case "LoadProjectsFromFile":
+                        var filePath6 = dataMap.GetString("FilePath");
+                        await LoadProjectsFromFileAsync(filePath6);
+                        break;
 
-                default:
-                    _logger.LogError($"Acción desconocida: {action}");
-                    throw new ArgumentException("Acción no implementada para este trabajo.");
+                    case "FetchAndSaveAgreementEvents":
+                        await FetchAndSaveAgreementEventsAsync();
+                        break;
+
+                    case "UpdatePersonnelUserIds":
+                        await UpdatePersonnelUserIdsAsync();
+                        break;
+
+                    case "UpdateLeaveTable":
+                        await UpdateLeaveTableAsync();
+                        break;
+
+                    case "ProcessInvestigatorsTimesheet":
+                        await AutoFillTimesheetsForInvestigatorsInSingleWPWithEffortAsync();
+                        break;
+
+                    case "LoadOutOfContract":
+                        await OutOfContractLoadAsync();
+                        break;
+
+                    case "AdjustGlobalEffort":
+                        await AdjustGlobalEffortAsync();
+                        break;
+
+                    default:
+                        _logger.LogError($"❌ Acción desconocida: {action}");
+                        throw new ArgumentException("Acción no implementada para este trabajo.");
+                }
+
+                _logger.LogInformation($"✅ Acción `{action}` ejecutada correctamente.");
             }
+            catch (Exception ex)
+            {
+                _fileLogger.Error($"❌ Error en la ejecución: {ex.Message}");
+                throw;
+            }            
         }
-
-        
-
-
     }
 }
+
+
+

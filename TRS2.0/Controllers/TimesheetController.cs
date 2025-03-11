@@ -12,6 +12,7 @@ using QuestPDF.Previewer;
 using System.Drawing;
 using Microsoft.CodeAnalysis.Options;
 using System.Security.Claims;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 
 
@@ -137,8 +138,11 @@ namespace TRS2._0.Controllers
                                     .Where(pe => pe.WpxPersonNavigation.Person == personId && pe.Month >= startDate && pe.Month <= endDate)
                                     .ToListAsync();
 
+            var totalefforts = persefforts.Sum(pe => pe.Value);
+            
             // Calcular las horas totales trabajadas y el porcentaje utilizado
             var totalWorkHours = hoursPerDayWithDedication.Sum(entry => entry.Value);
+
             decimal percentageUsed = totalWorkHours > 0 ? hoursUsed / totalWorkHours * 100 : 0;
 
             // Agrupar horas de timesheets por día
@@ -714,8 +718,12 @@ namespace TRS2._0.Controllers
         [HttpGet]
         public async Task<IActionResult> ExportTimesheetToPdf2(int personId, int year, int month, int project)
         {
-            QuestPDF.Settings.License = LicenseType.Community;
+            QuestPDF.Settings.License = LicenseType.Professional;
+            var lastLoginDateInvestigator = await GetLastLoginDateForNextMonth(personId, year, month);
             var model = await GetTimesheetDataForPerson(personId, year, month, project);
+            var responsible = await _context.Personnel.FindAsync(model.Person.Resp);
+            var responsibleId = responsible.Id;
+            var lastLoginDateResponsible = await GetLastLoginDateForNextMonth(responsibleId, year, month);
             var totalhours = model.TotalHours;
             var totalhoursworkedonproject = model.WorkPackages.Sum(wp => wp.Timesheets.Sum(ts => ts.Hours));
             var totaldaysWorkedOnProject = Math.Ceiling(totalhoursworkedonproject / model.AffiliationHours);
@@ -1014,7 +1022,7 @@ namespace TRS2._0.Controllers
                                 {
                                     row.RelativeItem().Text("Date, name and signature of manager/supervisor:").FontSize(10);
                                     // Asume que tienes una variable para el nombre del manager/supervisor
-                                    row.ConstantItem(100).AlignRight().Text($"{model.Responsible}").FontSize(10);
+                                    row.ConstantItem(100).AlignRight().Text($"{model.Responsible}, {lastLoginDateResponsible:dd/MM/yyyy}").FontSize(10);
                                 });
                             });
                         });
@@ -1041,8 +1049,8 @@ namespace TRS2._0.Controllers
                                 {
                                     row.RelativeItem().Text("Date and signature of staff member:").FontSize(10);
                                     // Asume que model.Person contiene el nombre de la persona de la timesheet
-                                    // y usas DateTime.Now para la fecha actual
-                                    row.ConstantItem(100).AlignRight().Text($"{model.Person.Name} {model.Person.Surname}, {DateTime.Now:dd/MM/yyyy}").FontSize(10);
+                                    // y usas DateTime.Now para la fecha actual                                    
+                                    row.ConstantItem(100).AlignRight().Text($"{model.Person.Name} {model.Person.Surname}, {lastLoginDateInvestigator:dd/MM/yyyy}").FontSize(10);
                                 });
                             });
                         });
@@ -1066,7 +1074,34 @@ namespace TRS2._0.Controllers
             // Multiplicar por 2, redondear al entero más cercano y dividir por 2
             return Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2;
         }
+        public async Task<string> GetLastLoginDateForPerson(int personId, int year, int month)
+        {
+            var lastLogin = await _context.UserLoginHistories
+                .Where(x => x.PersonId == personId && x.LoginTime.Year == year && x.LoginTime.Month == month)
+                .OrderByDescending(x => x.LoginTime)
+                .Select(x => x.LoginTime)
+                .FirstOrDefaultAsync();
 
+            return lastLogin != default ? lastLogin.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
+        }
 
+        public async Task<string> GetLastLoginDateForNextMonth(int personId, int year, int month)
+        {
+            // Calcular el siguiente mes y el año correspondiente
+            month++;
+            if (month > 12)
+            {
+                month = 1;
+                year++;
+            }
+
+            var lastLogin = await _context.UserLoginHistories
+                .Where(x => x.PersonId == personId && x.LoginTime.Year == year && x.LoginTime.Month == month)
+                .OrderByDescending(x => x.LoginTime)
+                .Select(x => x.LoginTime)
+                .FirstOrDefaultAsync();
+
+            return lastLogin != default ? lastLogin.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
+        }
     }
 }

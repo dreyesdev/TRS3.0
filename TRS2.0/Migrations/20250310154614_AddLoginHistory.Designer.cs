@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TRS2._0.Models.DataModels;
 
@@ -11,9 +12,11 @@ using TRS2._0.Models.DataModels;
 namespace TRS2._0.Migrations
 {
     [DbContext(typeof(TRSDBContext))]
-    partial class TRSDBContextModelSnapshot : ModelSnapshot
+    [Migration("20250310154614_AddLoginHistory")]
+    partial class AddLoginHistory
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1089,12 +1092,13 @@ namespace TRS2._0.Migrations
                     b.Property<DateTime>("LoginTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("PersonId")
-                        .HasColumnType("int");
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PersonId");
+                    b.HasIndex("UserId");
 
                     b.ToTable("UserLoginHistories");
                 });
@@ -1387,13 +1391,13 @@ namespace TRS2._0.Migrations
 
             modelBuilder.Entity("TRS2._0.Models.UserLoginHistory", b =>
                 {
-                    b.HasOne("TRS2._0.Models.DataModels.Personnel", "Personnel")
+                    b.HasOne("TRS2._0.Models.DataModels.TRS2._0.Models.DataModels.ApplicationUser", "User")
                         .WithMany()
-                        .HasForeignKey("PersonId")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Personnel");
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("TRS2._0.Models.DataModels.Affiliation", b =>

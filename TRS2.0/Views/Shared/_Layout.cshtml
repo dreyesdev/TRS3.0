@@ -208,9 +208,11 @@
         </div>
     }
 
-    @RenderBody()
+    <div class="content-wrapper">
+        @RenderBody()
+    </div>
 
-    <footer class="border-top footer text-muted">
+    <footer class="footer">
         <div class="container">
             &copy; 2024 - TRS 3.0 - <a asp-area="" asp-controller="Home" asp-action="Privacy">Contacto</a>
         </div>
@@ -233,3 +235,4 @@
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
+

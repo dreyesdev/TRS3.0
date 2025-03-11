@@ -91,7 +91,7 @@ builder.Services.AddQuartz(q =>
     q.AddTrigger(opts => opts
         .ForJob(jobKey)
         .WithIdentity("DailyLoadTrigger")
-        .WithSchedule(CronScheduleBuilder.DailyAtHourAndMinute(1, 0))); // 1:00 AM
+        .WithSchedule(CronScheduleBuilder.DailyAtHourAndMinute(1, 00))); // 1:00 AM
 });
 
 builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);

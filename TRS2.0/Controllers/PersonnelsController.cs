@@ -274,15 +274,40 @@ namespace TRS2._0.Controllers
                 return Json(new List<object>()); // Devuelve una lista vacía si no hay personId
             }
 
-            var events = await _context.Leaves
-        .Where(l => l.PersonId == personId)
-        .Select(l => new
-        {
-            title = l.Type == 1 ? "Leave" : l.Type == 2 ? "Personal Holiday" : "No Contract Period",
-            start = l.Day.ToString("yyyy-MM-dd"),
-            color = l.Type == 1 ? "grey" : l.Type == 2 ? "lightblue" : "purple"
-        })
-        .ToListAsync();
+            var nationalHolidays = await _context.NationalHolidays
+                .Select(n => new
+                {
+                    title = n.Description,
+                    start = n.Date.ToString("yyyy-MM-dd"),
+                    color = "green"
+                })
+                .ToListAsync();
+
+            var travels = await _context.liqdayxproject
+                .Where(l => l.PersId == personId)
+                .Select(l => new
+                {
+                    title = "Travel",
+                    start = l.Day.ToString("yyyy-MM-dd"),
+                    color = "pink"
+                })
+                .ToListAsync();
+
+            var leaves = await _context.Leaves
+                .Where(l => l.PersonId == personId)
+                .Select(l => new
+                {
+                    title = l.Type == 1 ? "Leave" : l.Type == 2 ? "Personal Holiday" : l.Type == 3 ? "No Contract Period" : l.Type == 11 ? "Partial Leave" : "Partial Leave",
+                    start = l.Day.ToString("yyyy-MM-dd"),
+                    color = l.Type == 1 ? "darkorange" : l.Type == 2 ? "lightblue" : l.Type == 3 ? "red" : "lightcoral"
+                })
+                .ToListAsync();
+
+            // Unir las tres listas en una sola
+            var events = nationalHolidays.Cast<object>()
+                .Concat(travels.Cast<object>())
+                .Concat(leaves.Cast<object>())
+                .ToList();
 
             return Json(events);
         }

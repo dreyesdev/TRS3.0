@@ -9,6 +9,7 @@ using System.Security.Cryptography;
 using System.Text;
 using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
 using TRS2._0.Models.ViewModels;
+using TRS2._0.Models;
 
 namespace TRS2._0.Controllers
 {
@@ -55,10 +56,44 @@ namespace TRS2._0.Controllers
                     return View(model);
                 }
 
+                // Verificar si el usuario tiene el rol de administrador
+                var isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
+
+                int? personId = null;
+
+                // Solo buscar el PersonId si el usuario NO es administrador
+                if (!isAdmin)
+                {
+                    personId = await _context.Personnel
+                        .Where(p => p.BscId == model.BSCID)
+                        .Select(p => p.Id)
+                        .FirstOrDefaultAsync();
+
+                    if (personId == 0) // Si no se encuentra en Personnel
+                    {
+                        ModelState.AddModelError(string.Empty, "No personnel record found for this user.");
+                        return View(model);
+                    }
+                }
+
                 var result = await _signInManager.PasswordSignInAsync(user, model.Password, model.RememberMe, false);
                 if (result.Succeeded)
                 {
-                    _logger.LogInformation("User logged in.");
+                    _logger.LogInformation("User {0} logged in at {1}.", user.UserName, DateTime.UtcNow);
+
+                    // Si no es administrador, registrar el login en la base de datos
+                    if (!isAdmin)
+                    {
+                        var loginRecord = new UserLoginHistory
+                        {                            
+                            PersonId = personId.Value, // Se usa Value porque ya verificamos que no es nulo
+                            LoginTime = DateTime.UtcNow
+                        };
+
+                        _context.UserLoginHistories.Add(loginRecord);
+                        await _context.SaveChangesAsync();
+                    }
+
                     return RedirectToAction("Index", "Home");
                 }
 
@@ -68,6 +103,7 @@ namespace TRS2._0.Controllers
 
             return View(model);
         }
+
 
         [HttpPost]
         public async Task<IActionResult> Logout()
