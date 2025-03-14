@@ -81,17 +81,29 @@ namespace TRS2._0.Controllers
                 {
                     _logger.LogInformation("User {0} logged in at {1}.", user.UserName, DateTime.UtcNow);
 
-                    // Si no es administrador, registrar el login en la base de datos
+                    // Si no es administrador, registrar el login en la base de datos solo si NO existe un registro para hoy
                     if (!isAdmin)
                     {
-                        var loginRecord = new UserLoginHistory
-                        {                            
-                            PersonId = personId.Value, // Se usa Value porque ya verificamos que no es nulo
-                            LoginTime = DateTime.UtcNow
-                        };
+                        var today = DateTime.UtcNow.Date;
 
-                        _context.UserLoginHistories.Add(loginRecord);
-                        await _context.SaveChangesAsync();
+                        bool hasLoggedToday = await _context.UserLoginHistories
+                            .AnyAsync(l => l.PersonId == personId.Value && l.LoginTime.Date == today);
+
+                        if (!hasLoggedToday) // Solo registrar si no hay un registro previo hoy
+                        {
+                            var loginRecord = new UserLoginHistory
+                            {
+                                PersonId = personId.Value,
+                                LoginTime = DateTime.UtcNow
+                            };
+
+                            _context.UserLoginHistories.Add(loginRecord);
+                            await _context.SaveChangesAsync();
+                        }
+                        else
+                        {
+                            _logger.LogInformation("User {0} already logged in today. No duplicate record created.", user.UserName);
+                        }
                     }
 
                     return RedirectToAction("Index", "Home");
@@ -103,6 +115,7 @@ namespace TRS2._0.Controllers
 
             return View(model);
         }
+
 
 
         [HttpPost]

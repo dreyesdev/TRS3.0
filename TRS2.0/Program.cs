@@ -55,6 +55,19 @@ builder.Services.Configure<IdentityOptions>(options =>
     options.SignIn.RequireConfirmedEmail = false;
 });
 
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(60); // Expira la sesión tras 60 minutos de inactividad
+    options.SlidingExpiration = false; // No renueva la sesión automáticamente
+    options.Cookie.HttpOnly = true; // Protege la cookie contra accesos de JavaScript
+    options.Cookie.IsEssential = true; // Se mantiene en todas las políticas de privacidad
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Requiere HTTPS
+    options.Cookie.SameSite = SameSiteMode.Strict; // Evita el acceso de otras aplicaciones
+    options.LoginPath = "/Account/Login"; // Redirige al login tras expiración
+    options.AccessDeniedPath = "/Error/AccessDenied"; // Página de error si no tiene permisos
+});
+
+
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
@@ -128,6 +141,18 @@ try
 
     app.UseAuthentication();
     app.UseAuthorization();
+
+    // Asegúrate de que todos los usuarios deben estar autenticados
+    app.Use(async (context, next) =>
+    {
+        var path = context.Request.Path;
+        if (!context.User.Identity.IsAuthenticated && !path.StartsWithSegments("/Account") && !path.StartsWithSegments("/Error"))
+        {
+            context.Response.Redirect("/Account/Login");
+            return;
+        }
+        await next();
+    });
 
     app.UseStatusCodePagesWithReExecute("/Error/AccessDenied", "?statusCode={0}");
 

@@ -147,6 +147,9 @@ public class WorkCalendarService
                     totalPm += dailyPmValue * (1 - totalReduction);
                 }
             }
+
+            // Asegurarse de que totalPm no exceda 1
+            totalPm = Math.Min(totalPm, 1);
         }
 
         // Redondear el PM total a 2 decimales y devolverlo

@@ -151,9 +151,9 @@ namespace TRS2._0.Services
             // Determinar el año actual
             var currentYear = DateTime.UtcNow.Year;
 
-            // Establecer los límites de cálculo: 5 años hacia atrás y 5 años hacia adelante desde el año actual, el primer valor  es el que marca los años atras y adelante 
-            var lowerLimit = new DateTime(currentYear - 7, 1, 1); // Inicio del rango permitido
-            var upperLimit = new DateTime(currentYear + 7, 1, 31); // Fin del rango permitido
+            // Establecer los límites de cálculo: 2 años hacia atrás y 2 años hacia adelante desde el año actual, el primer valor  es el que marca los años atras y adelante 
+            var lowerLimit = new DateTime(currentYear - 2, 1, 1); // Inicio del rango permitido
+            var upperLimit = new DateTime(currentYear + 2, 1, 31); // Fin del rango permitido
 
             // Obtener el rango de fechas del primer y último contrato
             var start = contracts.First().Start < lowerLimit ? lowerLimit : contracts.First().Start; // Limitar al rango inferior
@@ -1928,11 +1928,34 @@ namespace TRS2._0.Services
 
                     foreach (var employee in employees)
                     {
-                        var wpx = await _context.Wpxpeople
+                        // ✅ Obtener la lista de WPs asignados a este empleado
+                        var wpxList = await _context.Wpxpeople
                             .Include(w => w.PersonNavigation)
                             .Include(w => w.WpNavigation)
                                 .ThenInclude(wp => wp.Proj)
-                            .FirstOrDefaultAsync(w => w.Person == employee.Person);
+                            .Where(w => w.Person == employee.Person)
+                            .ToListAsync();
+
+                        // ✅ Buscar el WP en el que tiene effort en este mes
+                        var wpxWithEffort = await _context.Persefforts
+                            .Where(pe => pe.Month == employee.Month && wpxList.Select(w => w.Id).Contains(pe.WpxPerson))
+                            .Select(pe => pe.WpxPerson) // ✅ Solo tomamos los WpxPersonId que tienen effort
+                            .FirstOrDefaultAsync();
+
+                        if (wpxWithEffort == 0) // Si no encuentra ninguno, lo omitimos
+                        {
+                            _logger.LogWarning($"[Empleado {employee.Person}] No tiene effort en ninguno de sus WPs en {employee.Month:yyyy-MM}. Omitiendo.");
+                            continue;
+                        }
+
+                        // ✅ Ahora obtenemos el objeto completo del WP correcto
+                        var wpx = wpxList.FirstOrDefault(w => w.Id == wpxWithEffort);
+
+                        if (wpx == null)
+                        {
+                            _logger.LogWarning($"[Empleado {employee.Person}] Error al obtener WP con effort en {employee.Month:yyyy-MM}. Omitiendo.");
+                            continue;
+                        }
 
                         try
                         {   
@@ -2462,7 +2485,8 @@ namespace TRS2._0.Services
                                 ("Carga de Liquidaciones", () => LoadLiquidationsFromFileAsync(Path.Combine(dataLoadPath, "Liquid.txt"))),
                                 ("Procesamiento de Liquidaciones", () => ProcessLiquidationsAsync()),
                                 ("Procesamiento Avanzado de Liquidaciones", () => ProcessAdvancedLiquidationsAsync()),
-                                ("Actualización de Tabla de Ausencias", () => UpdateLeaveTableAsync())
+                                ("Actualización de Tabla de Ausencias", () => UpdateLeaveTableAsync()),
+                                ("Carga de Esfuerzo Mensual", () => UpdateMonthlyPMs())
                             };
 
             foreach (var (processName, process) in processes)

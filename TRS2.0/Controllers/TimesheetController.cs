@@ -13,6 +13,7 @@ using System.Drawing;
 using Microsoft.CodeAnalysis.Options;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.AspNetCore.Authorization;
 
 
 
@@ -20,6 +21,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace TRS2._0.Controllers
 {
+    [Authorize]
     public class TimesheetController : Controller
     {
         private readonly ILogger<TimesheetController> _logger;
@@ -32,6 +34,8 @@ namespace TRS2._0.Controllers
             _context = context;
             _workCalendarService = workCalendarService;
         }
+
+        [Authorize(Roles = "Admin, ProjectManager")]
         public async Task<IActionResult> IndexAsync()
         {
             TempData.Remove("SelectedPersonId");
@@ -39,6 +43,7 @@ namespace TRS2._0.Controllers
             return View(await tRSDBContext.ToListAsync());
         }
 
+        [Authorize(Roles = "Admin, ProjectManager, User, Researcher")]
         public async Task<IActionResult> GetTimeSheetsForPerson(int? personId, int? year, int? month)
         {
             // Si no se proporciona un personId, obtiene el personId del usuario logueado
@@ -204,7 +209,7 @@ namespace TRS2._0.Controllers
             return View(viewModel);
         }
 
-
+        [Authorize(Roles = "Admin, ProjectManager, User, Researcher")]
         public async Task<TimesheetViewModel> GetTimesheetDataForPerson(int personId, int year, int month, int project)
         {
             // Determina el año y mes actual si no se proporcionan
