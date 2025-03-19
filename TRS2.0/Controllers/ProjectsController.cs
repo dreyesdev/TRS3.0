@@ -1644,7 +1644,7 @@ namespace TRS2._0.Controllers
                     {
                         if (entry.Efforts.ContainsKey(date))
                         {
-                            csv.Append($";{entry.Efforts[date].ToString("0.00", CultureInfo.InvariantCulture)}");
+                            csv.Append($";{entry.Efforts[date].ToString("0.00", new CultureInfo("es-ES"))}");
                         }
                         else
                         {
@@ -1738,7 +1738,8 @@ namespace TRS2._0.Controllers
 
                             // Calcular el porcentaje en base a las horas estimadas
                             var percentage = maxHoursPerMonth > 0 ? estimatedHours / maxHoursPerMonth : 0;
-                            csv.Append($";{percentage.ToString("0.00", CultureInfo.InvariantCulture)}");
+                            csv.Append($";{percentage.ToString("0.00", new CultureInfo("es-ES"))}");
+
                         }
                         else
                         {

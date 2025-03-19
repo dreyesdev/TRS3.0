@@ -10,21 +10,28 @@
         <div class="col-md-6">
             <h2>Person Selection</h2>
 
-            <!-- Dropdown para seleccionar personal -->
-            <select id="personnelSelect" class="form-control">
-                <option value="">Please select a person from the list below:</option>
-                @foreach (var person in Model)
-                {
-                    <option value="@person.Id">@person.Name @person.Surname</option>
-                }
-            </select>
+            <!-- Contenedor para seleccionar personal -->
+            <div id="personnelSelectContainer" class="custom-select">
+                <div id="personnelSelectHeader" class="person-result" data-person-id="">
+                    <span>Please select a person from the list below:</span>
+                </div>
+                <div id="personnelSelect" class="search-results-container" style="display: none;">
+                    @foreach (var person in Model)
+                    {
+                        <div class="person-result" data-person-id="@person.Id">
+                            <span>@person.Name @person.Surname</span> <span class="badge bg-primary">@person.DepartmentNavigation.Name</span>
+                        </div>
+                    }
+                </div>
+            </div>
 
             <!-- Barra de búsqueda -->
             <p>Or start typing here the name of the person:</p>
             <input type="text" id="searchTerm" class="form-control" placeholder="Start typing..." onkeyup="filterPersonnel()" />
 
             <!-- Resultados de búsqueda -->
-            <div id="searchResults"></div>
+            <div id="searchResults" class="search-results-container">
+            </div>
         </div>
 
         <!-- Columna de detalles del personal -->
@@ -39,10 +46,20 @@
 
 @section Scripts {
     <script>
-        document.getElementById('personnelSelect').addEventListener('change', function () {
-            var personId = this.value;
-            fetchPersonDetails(personId);
-            
+        document.getElementById('personnelSelectHeader').addEventListener('click', function () {
+            var personnelSelect = document.getElementById('personnelSelect');
+            if (personnelSelect.style.display === 'none' || personnelSelect.style.display === '') {
+                personnelSelect.style.display = 'block';
+            } else {
+                personnelSelect.style.display = 'none';
+            }
+        });
+
+        document.getElementById('personnelSelect').addEventListener('click', function (event) {
+            if (event.target && event.target.matches('div.person-result')) {
+                var personId = event.target.getAttribute('data-person-id');
+                fetchPersonDetails(personId);
+            }
         });
 
         function filterPersonnel() {
@@ -58,16 +75,14 @@
                     data.forEach(function (person) {
                         var personDiv = document.createElement('div');
                         personDiv.className = 'person-result';
-                        personDiv.textContent = person.name + ' ' + person.surname;
+                        personDiv.innerHTML = `<span>${person.name} ${person.surname}</span> <span class="badge bg-primary">${person.departmentName || 'N/A'}</span>`;
                         personDiv.setAttribute('data-person-id', person.id);
 
                         personDiv.onclick = function () {
-                            // Marcar el resultado seleccionado como activo y limpiar los demás
                             document.querySelectorAll('.person-result').forEach(function (el) {
                                 el.classList.remove('active');
                             });
                             this.classList.add('active');
-
                             fetchPersonDetails(person.id);
                         };
 
@@ -76,6 +91,7 @@
                 }
             });
         }
+
         function fetchPersonDetails(personId) {
             $.ajax({
                 url: '@Url.Action("GetPersonDetails", "Personnels")',
@@ -109,16 +125,25 @@
             document.getElementById('searchResults').style.display = 'none';
         }
 
-
         document.getElementById('searchResults').addEventListener('click', function (event) {
             if (event.target && event.target.matches('div.person-result')) {
                 var personId = event.target.getAttribute('data-person-id');
                 fetchPersonDetails(personId);
             }
         });
+
         // Mostrar la lista de resultados cuando el campo de búsqueda recibe el foco
         document.getElementById('searchTerm').addEventListener('focus', function () {
             document.getElementById('searchResults').style.display = 'block';
+        });
+
+        // Cerrar la lista de resultados cuando se hace clic fuera de ella
+        document.addEventListener('click', function (event) {
+            var personnelSelect = document.getElementById('personnelSelect');
+            var personnelSelectHeader = document.getElementById('personnelSelectHeader');
+            if (!personnelSelect.contains(event.target) && event.target !== personnelSelectHeader) {
+                personnelSelect.style.display = 'none';
+            }
         });
     </script>
 }
@@ -150,5 +175,50 @@
         overflow-y: auto;
         display: none; /* Inicialmente oculto */
     }
-</style>
 
+    .custom-select {
+        background-color: #f8f9fa;
+        border: 1px solid #ced4da;
+        padding: 10px;
+        border-radius: 8px;
+    }
+
+    .search-results-container {
+        max-height: 250px;
+        overflow-y: auto;
+        border: 1px solid #ced4da;
+        border-radius: 8px;
+        padding: 5px;
+        background-color: #fff;
+        margin-top: 10px;
+    }
+
+    .person-result {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+        .person-result:hover {
+            background-color: #f1f1f1;
+        }
+
+        .person-result.active {
+            background-color: #4c87c6;
+            color: white;
+        }
+
+    .badge {
+        padding: 5px 10px;
+        border-radius: 5px;
+        color: white;
+    }
+
+    .bg-primary {
+        background-color: #007bff;
+    }
+</style>

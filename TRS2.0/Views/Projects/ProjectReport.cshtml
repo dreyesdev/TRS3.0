@@ -324,9 +324,9 @@
                 var declaredHours = col.getAttribute('data-declared-hours');
                 var hoursInProject = col.getAttribute('data-hours-in-project');
                 if (declaredHours && hoursInProject) {
-                    rowData.push(`${declaredHours} | ${hoursInProject}`);
+                    rowData.push(`${declaredHours.replace('.', ',')} | ${hoursInProject.replace('.', ',')}`);
                 } else {
-                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim());
+                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
                 }
             });
             csvContent += rowData.join(";") + "\r\n";
@@ -341,6 +341,7 @@
         document.body.removeChild(link);
     }
 
+
     function exportPMsToCSV() {
         var csvContent = "data:text/csv;charset=utf-8,";
         var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
@@ -351,9 +352,9 @@
             cols.forEach(function (col) {
                 var totalEffort = col.getAttribute('data-total-effort');
                 if (totalEffort) {
-                    rowData.push(totalEffort);
+                    rowData.push(totalEffort.replace('.', ','));
                 } else {
-                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim());
+                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
                 }
             });
             csvContent += rowData.join(";") + "\r\n";
@@ -367,6 +368,7 @@
         link.click();
         document.body.removeChild(link);
     }
+
 
     function exportPMSforWPToCSV() {
         var projectId = @ViewBag.projId;

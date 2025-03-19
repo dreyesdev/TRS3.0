@@ -176,11 +176,11 @@ namespace TRS2._0.Controllers
             if (string.IsNullOrWhiteSpace(searchTerm))
             {
                 // Devolver una lista vacía si no hay término de búsqueda
-                return Json(new List<Personnel>());
+                return Json(new List<object>());
             }
 
             string[] searchParts = searchTerm.Split(' ');
-            IQueryable<Personnel> query = _context.Personnel;
+            IQueryable<Personnel> query = _context.Personnel.Include(p => p.DepartmentNavigation);
 
             if (searchParts.Length > 1)
             {
@@ -198,12 +198,18 @@ namespace TRS2._0.Controllers
             // Ordenar los resultados por apellido y nombre
             query = query.OrderBy(p => p.Surname).ThenBy(p => p.Name);
 
-            // Limitar los resultados a los primeros 10
-            var filteredPersonnel = await query.Take(10).ToListAsync();
+            // Limitar los resultados a los primeros 50
+            var filteredPersonnel = await query.Take(50)
+                .Select(p => new
+                {
+                    p.Id,
+                    p.Name,
+                    p.Surname,
+                    DepartmentName = p.DepartmentNavigation.Name
+                })
+                .ToListAsync();
 
             // Opcional: Guardar el ID de la primera persona encontrada en TempData
-            // Nota: Considera si realmente necesitas esta línea, ya que podría no ser relevante para la función de filtrado.
-            // Si decides mantenerla, asegúrate de manejar el caso donde filteredPersonnel puede estar vacío.
             if (filteredPersonnel.Any())
             {
                 TempData["SelectedPersonId"] = filteredPersonnel.First().Id;
@@ -211,6 +217,7 @@ namespace TRS2._0.Controllers
 
             return Json(filteredPersonnel);
         }
+
 
 
         [HttpGet]
