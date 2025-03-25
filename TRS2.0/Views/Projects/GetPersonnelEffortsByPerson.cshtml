@@ -66,6 +66,7 @@
                     {
                         foreach (var wp in projectEffort.WorkPackages)
                         {
+                            
                             foreach (var personnelEffort in wp.PersonnelEfforts)
                             {
                                 <tr>
@@ -123,21 +124,28 @@
                                         }
 
                                         <td class="@cellClass" style="@cellStyle">
-
-                                            @if (!isProjectLockedThisMonth)
+                                            @if (monthStatus.Month >= wp.StartDate && monthStatus.Month <= wp.EndDate)
                                             {
-                                                <input type="text" class="form-control input-effort"
-                                                       value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")"
-                                                       data-personid="@personnelEffort.PersonId"
-                                                       data-wpid="@wp.WpId"
-                                                       data-month="@monthStatus.Month.ToString("yyyy-MM-dd")"
-                                                       data-original-value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")" />
+                                                @if (!isProjectLockedThisMonth)
+                                                {
+                                                    <input type="text" class="form-control input-effort"
+                                                           value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")"
+                                                           data-personid="@personnelEffort.PersonId"
+                                                           data-wpid="@wp.WpId"
+                                                           data-month="@monthStatus.Month.ToString("yyyy-MM-dd")"
+                                                           data-original-value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")" />
+                                                }
+                                                else
+                                                {
+                                                    <span style="text-align:center; font-weight:bold; display:block;">@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")</span>
+                                                }
                                             }
                                             else
                                             {
-                                                <span style="text-align:center; font-weight:bold; display:block;">@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")</span>
+                                                <span style="background-color:black; display:block; height:100%;"></span>
                                             }
                                         </td>
+
                                     }
 
                                 </tr>

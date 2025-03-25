@@ -5,7 +5,17 @@
     <table class="table table-bordered table-striped table-hover">
         <thead class="thead-dark">
             <tr>
-                <th class="nombre-columna text-center">Nombre</th>
+                <th class="nombre-columna text-center">
+                    <div>Nombre</div>
+                    <div class="d-flex justify-content-between mt-2">
+                        <button id="lockAllButton" class="btn btn-success btn-sm btn-lock-all">
+                            Lock All
+                        </button>
+                        <button id="reopenAllButton" class="btn btn-danger btn-sm btn-reopen-all">
+                            Reopen All
+                        </button>
+                    </div>
+                </th>
                 @foreach (var monthDetail in Model.MonthDetails)
                 {
                     <th class="nombre-mes text-center">
@@ -66,7 +76,7 @@
                                     <button class="btn btn-warning w-100 mt-2" disabled>Overloaded</button>
                                     @if (isLocked)
                                     {
-                                        <button class="btn btn-danger w-100 mt-2" onclick="updateLockStatus('@person.Personnel.Id', '@monthDate.Year', '@monthDate.Month', '@ViewBag.ProjectId', '@ViewBag.PeriodId', '/Projects/Unlock')">Desbloquear</button>
+                                        <button class="btn btn-danger w-100 mt-2 unlock-button" onclick="updateLockStatus('@person.Personnel.Id', '@monthDate.Year', '@monthDate.Month', '@ViewBag.ProjectId', '@ViewBag.PeriodId', '/Projects/Unlock')">Desbloquear</button>
                                     }
 
                                 }
@@ -76,14 +86,14 @@
                                 @if (isLocked)
                                 {
                                     <div class="button-container mt-2">
-                                        <button class="btn btn-danger w-100" onclick="updateLockStatus('@person.Personnel.Id', '@monthDate.Year', '@monthDate.Month', '@ViewBag.ProjectId', '@ViewBag.PeriodId', '/Projects/Unlock')">Desbloquear</button>
+                                        <button class="btn btn-danger w-100 unlock-button" onclick="updateLockStatus('@person.Personnel.Id', '@monthDate.Year', '@monthDate.Month', '@ViewBag.ProjectId', '@ViewBag.PeriodId', '/Projects/Unlock')">Desbloquear</button>
                                         <!-- Enlace para descargar el Timesheet como PDF -->
-                                        <a href="@Url.Action("ExportTimesheetToPdf2", "Timesheet", new { personId = person.Personnel.Id, year = monthDate.Year, month = monthDate.Month, project = @ViewBag.ProjectId })" class="btn btn-info w-100 mt-2">Timesheet</a>
+                                        <a href="javascript:void(0);" class="btn btn-info w-100 mt-2" onclick="exportTimesheetWithDate('@person.Personnel.Id', '@monthDate.Year', '@monthDate.Month', '@ViewBag.ProjectId')">Timesheet</a>
                                     </div>
                                 }
                                 else
                                 {
-                                    <button class="btn btn-success w-100 mt-2" onclick="updateLockStatus('@person.Personnel.Id', '@monthDate.Year', '@monthDate.Month', '@ViewBag.ProjectId', '@ViewBag.PeriodId', '/Projects/Lock')">Bloquear</button>
+                                    <button class="btn btn-success w-100 mt-2 lock-button" onclick="updateLockStatus('@person.Personnel.Id', '@monthDate.Year', '@monthDate.Month', '@ViewBag.ProjectId', '@ViewBag.PeriodId', '/Projects/Lock')">Bloquear</button>
                                 }
                             }
                         </td>
@@ -105,7 +115,8 @@
         min-width: 130px; /* Ajusta según necesites */
         max-width: 175px;
     }
-    .table {
+
+    .table-container-period {
         max-height: 800px; /* Ajusta esto según la altura deseada */
         overflow-y: auto;
         overflow-x: auto; /* Habilita el scroll horizontal */
@@ -134,7 +145,43 @@
 
 
 <script>
+    document.body.addEventListener('click', function (event) {
+        if (event.target.matches('#lockAllButton')) {
+            console.log("🔒 Botón 'Lock All' presionado.");
+            var lockButtons = document.querySelectorAll('.lock-button');
+
+            if (lockButtons.length === 0) {
+                console.log("⚠️ No hay botones de bloqueo disponibles.");
+                return;
+            }
+
+            lockButtons.forEach(button => {
+                console.log("🔒 Ejecutando bloqueo en:", button);
+                button.click();
+            });
+        }
+
+        if (event.target.matches('#reopenAllButton')) {
+            console.log("🔓 Botón 'Reopen All' presionado.");
+            var unlockButtons = document.querySelectorAll('.unlock-button');
+
+            if (unlockButtons.length === 0) {
+                console.log("⚠️ No hay botones de desbloqueo disponibles.");
+                return;
+            }
+
+            unlockButtons.forEach(button => {
+                console.log("🔓 Ejecutando desbloqueo en:", button);
+                button.click();
+            });
+        }
+    });
+
+
+
+
     function updateLockStatus(personId, year, month, projectId, periodId, actionUrl) {
+        console.log("Updating lock status:", { personId, year, month, projectId, periodId, actionUrl });
         var data = { personId: personId, projectId: projectId, year: year, month: month };
 
         $.ajax({
@@ -163,5 +210,13 @@
             }
         });
     }
+
+    function exportTimesheetWithDate(personId, year, month, projectId) {
+        var manualDate = document.getElementById('manualDate').value;
+        var url = '@Url.Action("ExportTimesheetToPdf2", "Timesheet")' + '?personId=' + personId + '&year=' + year + '&month=' + month + '&project=' + projectId + '&manualDate=' + manualDate;
+        window.location.href = url;
+    }
+
+    
 </script>
 

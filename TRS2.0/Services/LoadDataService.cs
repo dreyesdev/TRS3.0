@@ -2363,8 +2363,8 @@ namespace TRS2._0.Services
 
         public async Task AdjustGlobalEffortAsync()
         {
-            DateTime startDate = new DateTime(2020, 1, 1);
-            DateTime endDate = new DateTime(2024, 12, 31);
+            DateTime startDate = new DateTime(2018, 1, 1);
+            DateTime endDate = new DateTime(2025, 12, 31);
 
             var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "AdjustGlobalEffortLog.txt");
             var logger = new LoggerConfiguration()

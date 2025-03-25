@@ -105,7 +105,9 @@ builder.Services.AddQuartz(q =>
        .ForJob(jobKey)
        .WithIdentity("DailyLoadTrigger")
        .WithSchedule(CronScheduleBuilder.DailyAtHourAndMinute(1, 00)
-           .WithMisfireHandlingInstructionFireAndProceed())); // 1:00 AM con manejo de misfire
+           .WithMisfireHandlingInstructionFireAndProceed()) // 1:00 AM con manejo de misfire
+       .StartNow());
+
 });
 
 builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);

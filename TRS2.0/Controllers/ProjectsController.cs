@@ -60,7 +60,7 @@ namespace TRS2._0.Controllers
             // Filtra los proyectos en función del año seleccionado, si se ha proporcionado un año
             if (selectedYear.HasValue)
             {
-                projectsQuery = projectsQuery.Where(p => p.Start.Value.Year <= selectedYear && p.End.Value.Year >= selectedYear);
+                projectsQuery = projectsQuery.Where(p => p.Start.Value.Year <= selectedYear && p.EndReportDate.Year >= selectedYear);
             }
 
             var projects = projectsQuery.ToList();
@@ -636,8 +636,8 @@ namespace TRS2._0.Controllers
                 {
                     WpId = wp.Id,
                     WpName = wp.Name,
-                    StartDate = adjustedProjectStartDate,
-                    EndDate = adjustedProjectEndDate,
+                    StartDate = wp.StartDate,
+                    EndDate = wp.EndDate,
                     PersonnelEfforts = wpxPersons.Where(wpx => wpx.Wp == wp.Id)
                                          .Select(wpx => new PersonnelEffort
                                          {
@@ -829,7 +829,7 @@ namespace TRS2._0.Controllers
             }
 
             DateTime projectStartDate = (DateTime)project.Start;
-            DateTime projectEndDate = (DateTime)project.End;
+            DateTime projectEndDate = (DateTime)project.EndReportDate;
 
 
             // Asegúrate de que projectStartDate y projectEndDate no sean null
@@ -1611,31 +1611,33 @@ namespace TRS2._0.Controllers
                 {
                     foreach (var wpxperson in wp.Wpxpeople)
                     {
-                        if (!personEfforts.ContainsKey(wpxperson.PersonNavigation.Name))
+                        var personKey = $"{wpxperson.PersonNavigation.Surname}, {wpxperson.PersonNavigation.Name}";
+
+                        if (!personEfforts.ContainsKey(personKey))
                         {
-                            personEfforts[wpxperson.PersonNavigation.Name] = new Dictionary<string, Dictionary<DateTime, double>>();
+                            personEfforts[personKey] = new Dictionary<string, Dictionary<DateTime, double>>();
                         }
 
-                        if (!personEfforts[wpxperson.PersonNavigation.Name].ContainsKey(wp.Name))
+                        if (!personEfforts[personKey].ContainsKey(wp.Name))
                         {
-                            personEfforts[wpxperson.PersonNavigation.Name][wp.Name] = new Dictionary<DateTime, double>();
+                            personEfforts[personKey][wp.Name] = new Dictionary<DateTime, double>();
                         }
 
                         foreach (var perseffort in wpxperson.Persefforts)
                         {
                             if (perseffort.Month >= startDate && perseffort.Month <= endDate)
                             {
-                                personEfforts[wpxperson.PersonNavigation.Name][wp.Name][perseffort.Month] = (double)perseffort.Value;
+                                personEfforts[personKey][wp.Name][perseffort.Month] = (double)perseffort.Value;
                             }
                         }
                     }
                 }
 
-                // Ordenar por WpName
+                // Ordenar por WpName y luego por Surname
                 var orderedPersonEfforts = personEfforts
                     .SelectMany(person => person.Value.Select(wp => new { PersonName = person.Key, WpName = wp.Key, Efforts = wp.Value }))
                     .OrderBy(entry => entry.WpName)
-                    .ThenBy(entry => entry.PersonName);
+                    .ThenBy(entry => entry.PersonName.Split(',')[0]); // Ordenar por Surname
 
                 foreach (var entry in orderedPersonEfforts)
                 {
@@ -1663,6 +1665,7 @@ namespace TRS2._0.Controllers
                 return StatusCode(500, "Error interno del servidor");
             }
         }
+
 
         [HttpPost]
         public async Task<IActionResult> ExportPmsAuditoria([FromBody] ExportRequest request)

@@ -14,6 +14,7 @@ using Microsoft.CodeAnalysis.Options;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.AspNetCore.Authorization;
+using System.Linq;
 
 
 
@@ -85,7 +86,7 @@ namespace TRS2._0.Controllers
             // Obtener las horas diarias iniciales con dedicación
             var hoursPerDayWithDedication = await _workCalendarService.CalculateDailyWorkHoursWithDedication(validPersonId, currentYear, currentMonth);
 
-            // Ajustar las horas por día considerando las bajas de tipo 11 y 12
+            // Ajustar las horas por día considerando las bajas de tipo 11 y 12 (Parciales)
             foreach (var day in hoursPerDayWithDedication.Keys.ToList())
             {
                 if (leaveReductions.TryGetValue(day, out var reduction))
@@ -144,9 +145,15 @@ namespace TRS2._0.Controllers
                                     .ToListAsync();
 
             var totalefforts = persefforts.Sum(pe => pe.Value);
-            
-            // Calcular las horas totales trabajadas y el porcentaje utilizado
-            var totalWorkHours = hoursPerDayWithDedication.Sum(entry => entry.Value);
+
+
+            // Calcular las horas totales trabajadas excluyendo los días con bajas y festivos
+            var totalWorkHours = hoursPerDayWithDedication
+                                .Where(entry => !leavesthismonth.Any(leave => leave.Day == entry.Key) && !holidays.Contains(entry.Key))
+                                .Sum(entry => entry.Value);
+
+
+
 
             decimal percentageUsed = totalWorkHours > 0 ? hoursUsed / totalWorkHours * 100 : 0;
 
@@ -721,9 +728,14 @@ namespace TRS2._0.Controllers
 
 
         [HttpGet]
-        public async Task<IActionResult> ExportTimesheetToPdf2(int personId, int year, int month, int project)
+        public async Task<IActionResult> ExportTimesheetToPdf2(int personId, int year, int month, int project, string manualDate = null)
         {
             QuestPDF.Settings.License = LicenseType.Professional;
+            DateTime? selectedDate = null;
+            if (!string.IsNullOrEmpty(manualDate))
+            {
+                selectedDate = DateTime.ParseExact(manualDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+            }
             var lastLoginDateInvestigator = await GetLastLoginDateForNextMonth(personId, year, month);
             var model = await GetTimesheetDataForPerson(personId, year, month, project);
             var responsible = await _context.Personnel.FindAsync(model.Person.Resp);
@@ -735,6 +747,27 @@ namespace TRS2._0.Controllers
 
             decimal roundedtotalHours = Math.Round(totalhours * 2, MidpointRounding.AwayFromZero) / 2;
             decimal roundedtotalHoursWorkedOnProject = Math.Round(totalhoursworkedonproject * 2, MidpointRounding.AwayFromZero) / 2;
+
+            DateTime? finalDateInvestigator = null;
+            DateTime? finalDateResponsible = null;
+
+            if (!string.IsNullOrEmpty(lastLoginDateInvestigator))
+            {
+                finalDateInvestigator = DateTime.Parse(lastLoginDateInvestigator);
+            }
+            else if (selectedDate.HasValue)
+            {
+                finalDateInvestigator = selectedDate;
+            }
+
+            if (!string.IsNullOrEmpty(lastLoginDateResponsible))
+            {
+                finalDateResponsible = DateTime.Parse(lastLoginDateResponsible);
+            }
+            else if (selectedDate.HasValue)
+            {
+                finalDateResponsible = selectedDate;
+            }
 
             var document = Document.Create(document =>
             {
@@ -755,7 +788,7 @@ namespace TRS2._0.Controllers
                             var monthName = new DateTime(year, month, 1).ToString("MMMM", CultureInfo.CreateSpecificCulture("en"));
                             col.Item().AlignCenter().Text($"{model.Person.Name} {model.Person.Surname} Timesheet").Bold().FontSize(14);
                             col.Item().AlignCenter().Text($"{monthName} {year}").FontSize(12);
-                            col.Item().AlignCenter().Text($"{model.ProjectData.Contract} - {model.ProjectData.Acronim}").Bold().FontSize(14);
+                            col.Item().AlignCenter().Text($"REF: {model.ProjectData.Contract} - {model.ProjectData.Acronim}").Bold().FontSize(14);
                         });
 
                         row.ConstantItem(180).Column(col =>
@@ -861,11 +894,11 @@ namespace TRS2._0.Controllers
 
                                             if (isHoliday)
                                             {
-                                                cellBackground = "#FFD700"; // Gold
+                                                cellBackground = "#008000"; // Verde para National Holidays
                                             }
                                             else if (hasTravel && !isFuture)
                                             {
-                                                cellBackground = "#90EE90"; // Light green
+                                                cellBackground = "#FF69B4"; // Rosado Saturado para Travel Days
                                             }
                                             else if (isWeekend || isFuture)
                                             {
@@ -942,8 +975,8 @@ namespace TRS2._0.Controllers
                                                     { "#FFA07A", "Absence" },
                                                     { "#ADD8E6", "Vacation" },
                                                     { "#800080", "Out of Contract" },
-                                                    { "#90EE90", "Travel Days" },
-                                                    { "#FFD700", "National Holidays" }
+                                                    { "#FF69B4", "Travel Days" },
+                                                    { "#008000", "National Holidays" }
                                                 };
 
                                     col.Item().Row(row =>
@@ -1027,7 +1060,7 @@ namespace TRS2._0.Controllers
                                 {
                                     row.RelativeItem().Text("Date, name and signature of manager/supervisor:").FontSize(10);
                                     // Asume que tienes una variable para el nombre del manager/supervisor
-                                    row.ConstantItem(100).AlignRight().Text($"{model.Responsible}, {lastLoginDateResponsible:dd/MM/yyyy}").FontSize(10);
+                                    row.ConstantItem(100).AlignRight().Text($"{model.Responsible}, {finalDateResponsible:dd/MM/yyyy}").FontSize(10);
                                 });
                             });
                         });
@@ -1052,10 +1085,11 @@ namespace TRS2._0.Controllers
 
                                 innerCol.Item().Row(row =>
                                 {
-                                    row.RelativeItem().Text("Date and signature of staff member:").FontSize(10);
+                                    row.RelativeItem().Text("Date, name and signature of staff member:").FontSize(10);
                                     // Asume que model.Person contiene el nombre de la persona de la timesheet
                                     // y usas DateTime.Now para la fecha actual                                    
-                                    row.ConstantItem(100).AlignRight().Text($"{model.Person.Name} {model.Person.Surname}, {lastLoginDateInvestigator:dd/MM/yyyy}").FontSize(10);
+                                    row.ConstantItem(100).AlignRight().Text($"{model.Person.Name} {model.Person.Surname}, {finalDateInvestigator:dd/MM/yyyy}").FontSize(10);
+
                                 });
                             });
                         });
@@ -1069,7 +1103,7 @@ namespace TRS2._0.Controllers
             document.GeneratePdf(stream); // Descomentar para generar el PDF
             stream.Seek(0, SeekOrigin.Begin);
 
-            var pdfFileName = $"Timesheet_{personId}_{year}_{month}.pdf";
+            var pdfFileName = $"Timesheet_{model.Person.Surname},{model.Person.Name}_{year}_{month}.pdf";
             return File(stream.ToArray(), "application/pdf", pdfFileName);
         }
 

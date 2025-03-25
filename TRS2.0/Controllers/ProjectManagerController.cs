@@ -315,6 +315,25 @@ public class ProjectManagerController : Controller
             string username = smtpSettings["Username"];
             string password = smtpSettings["Password"];
 
+            // Obtener el usuario logueado
+            var loggedInUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == User.Identity.Name);
+
+
+            // Inicializar variables para nombre y apellido
+            string name = string.Empty;
+            string surname = string.Empty;
+
+            if (loggedInUser != null)
+            {
+                // Obtener la información de Personnel usando el BscId
+                var personnel = await _context.Personnel.FirstOrDefaultAsync(p => p.BscId == loggedInUser.UserName);
+                if (personnel != null)
+                {
+                    name = personnel.Name;
+                    surname = personnel.Surname;
+                }
+            }
+
             using (var client = new SmtpClient(host, port))
             {
                 client.Credentials = new NetworkCredential(username, password);
@@ -323,7 +342,7 @@ public class ProjectManagerController : Controller
                 var mailMessage = new MailMessage
                 {
                     From = new MailAddress($"{username}@bsc.es"), // Usa el usuario autenticado
-                    Subject = $"Nuevo Reporte de Error: {model.Title}",
+                    Subject = $"Nuevo Reporte de Error de {name} {surname}: {model.Title}",
                     Body = $"<h3>Detalles del Error</h3>" +
                            $"<p><strong>Título:</strong> {model.Title}</p>" +
                            $"<p><strong>Descripción:</strong></p><p>{model.Description}</p>",

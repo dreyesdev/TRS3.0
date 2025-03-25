@@ -726,8 +726,10 @@ public class WorkCalendarService
                 .SelectMany(ap => _context.AffHours.Where(ah => ah.AffId == ap.AffId && currentDate >= ah.StartDate && currentDate <= ah.EndDate))
                 .FirstOrDefault()?.Hours ?? 0;
 
+            // Seleccionar la dedicación con el valor Type más alto
             var currentDedication = dedications
                 .Where(d => currentDate >= d.Start && currentDate <= d.End)
+                .OrderByDescending(d => d.Type) // Ordenar por Type de mayor a menor
                 .FirstOrDefault()?.Reduc;
 
             // Si no se encuentra dedicación específica o Reduc es 0.00, asume una jornada completa

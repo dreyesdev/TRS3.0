@@ -52,15 +52,15 @@
                         {
                             foreach (var personnelEffort in wp.PersonnelEfforts)
                             {
-                                var personnelInfo = personnelInfosList.FirstOrDefault(pi => pi.PersonId == personnelEffort.PersonId);
-
+                                var personnelInfo = personnelInfosList.FirstOrDefault(pi => pi.PersonId == personnelEffort.PersonId);                                
                                 <tr>
                                     <td>
-                                        <a href="#" class="person-link" data-personid="@personnelEffort.PersonId">@personnelEffort.PersonName</a>
+                                        <a href="/Projects/GetPersonnelEffortsByPerson/@ViewBag.projId/@personnelEffort.PersonId" class="person-link" target="_blank" data-personid="@personnelEffort.PersonId">@personnelEffort.PersonName</a>
                                     </td>
                                     <td>
-                                        <a href="#" class="wp-link" data-wpid="@wp.WpId">@wp.WpName</a>
+                                        <a href="/Projects/PersonnelEffortPlan/@ViewBag.projId/@wp.WpId" class="wp-link" target="_blank" data-wpid="@wp.WpId">@wp.WpName</a>
                                     </td>
+
 
                                     @foreach (var month in Model.UniqueMonths)
                                     {
@@ -154,21 +154,29 @@
                                         var effortValue = personnelEffort.Efforts.ContainsKey(month) ? personnelEffort.Efforts[month] : 0.00M;
 
                                         <td class="@cellClass" style="@cellStyle">
-                                            @if (isActiveMonth && !isLocked) // Permite edición solo si el mes está activo y no está bloqueado
+                                            @if (month >= wp.StartDate && month <= wp.EndDate)
                                             {
-                                                <input type="text" class="form-control input-effort"
-                                                       value="@effortValue.ToString("0.00", CultureInfo.InvariantCulture)"
-                                                       data-personid="@personnelEffort.PersonId"
-                                                       data-wpid="@wp.WpId"
-                                                       data-month="@month.ToString("yyyy-MM-dd")"
-                                                       data-original-value="@effortValue.ToString("0.00", CultureInfo.InvariantCulture)" />
+                                                @if (isActiveMonth && !isLocked) // Permite edición solo si el mes está activo y no está bloqueado
+                                                {
+                                                    <input type="text" class="form-control input-effort"
+                                                           value="@effortValue.ToString("0.00", CultureInfo.InvariantCulture)"
+                                                           data-personid="@personnelEffort.PersonId"
+                                                           data-wpid="@wp.WpId"
+                                                           data-month="@month.ToString("yyyy-MM-dd")"
+                                                           data-original-value="@effortValue.ToString("0.00", CultureInfo.InvariantCulture)" />
+                                                }
+                                                else
+                                                {
+                                                    <span style="display: block; text-align: center; text-size-adjust:auto; font-weight: bold;">@effortValue.ToString("0.00", CultureInfo.InvariantCulture)</span>
+                                                    // Muestra el valor como texto si está bloqueado o no es un mes activo
+                                                }
                                             }
                                             else
                                             {
-                                                <span style="display: block; text-align: center; text-size-adjust:auto; font-weight: bold;">@effortValue.ToString("0.00", CultureInfo.InvariantCulture)</span>
-                                                // Muestra el valor como texto si está bloqueado o no es un mes activo
+                                                <span style="background-color:black; display:block; height:100%;"></span>
                                             }
                                         </td>
+
                                     }
                                 </tr>
                             }
@@ -343,6 +351,7 @@ else
                 window.location.href = '/Projects/PersonnelEffortPlan/' + projId + '/' + wpid;
             });
         });
+
         document.querySelectorAll('.person-link').forEach(link => {
             link.addEventListener('click', function (event) {
                 event.preventDefault();
@@ -351,6 +360,7 @@ else
                 window.location.href = '/Projects/GetPersonnelEffortsByPerson/' + projId + '/' + personId;
             });
         });
+
 
         document.getElementById('exportCsvButton').addEventListener('click', function () {
             var csvContent = "data:text/csv;charset=utf-8,";

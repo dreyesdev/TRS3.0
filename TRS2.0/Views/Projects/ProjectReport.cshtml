@@ -239,6 +239,10 @@
     <button type="button" class="btn btn-success" id="exportPMSforWPToCSV" onclick="exportPMSforWPToCSV()" style="display:none;">Exportar PMs por WP a CSV</button>
     <!-- Botón para exportar PMs Auditoria -->
     <button type="button" class="btn btn-success" id="exportPMSforAuditoria" onclick="exportPMSforAuditoriaToCSV()" style="display:none;">Exportar PMs Auditoria</button>
+            <div class="form-group d-inline-block">
+                <label for="manualDate">Fecha Manual:</label>
+                <input type="date" id="manualDate" class="form-control" />
+            </div>
 </div>
 
 
@@ -446,7 +450,8 @@
                 a.remove();
             })
             .catch(error => console.error('Error:', error));
-    }
+    }   
+
 </script>
 
 
