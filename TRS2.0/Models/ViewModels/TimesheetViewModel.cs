@@ -40,6 +40,9 @@ namespace TRS2._0.Models.ViewModels
 
         public string Responsible { get; set; }
 
+        public Dictionary<DateTime, decimal> HoursForOtherProjects { get; set; }
+        public decimal TotalHoursForOtherProjects { get; set; } // Nueva propiedad
+
 
     }
 

@@ -17,16 +17,21 @@ namespace TRS2._0.Models.ViewModels
 
         public List<DateTime> GetUniqueMonths()
         {
-            var uniqueMonths = new HashSet<DateTime>();
-            foreach (var wpInfo in WorkPackages)
+            if (Project == null || !Project.Start.HasValue)
+                return new List<DateTime>();
+
+            var start = new DateTime(Project.Start.Value.Year, Project.Start.Value.Month, 1);
+            var end = new DateTime(Project.EndReportDate.Year, Project.EndReportDate.Month, 1);
+
+            var months = new List<DateTime>();
+            for (var date = start; date <= end; date = date.AddMonths(1))
             {
-                for (var date = wpInfo.StartDate; date <= wpInfo.EndDate; date = date.AddMonths(1))
-                {
-                    uniqueMonths.Add(new DateTime(date.Year, date.Month, 1));
-                }
+                months.Add(date);
             }
-            return uniqueMonths.OrderBy(d => d).ToList();
+
+            return months;
         }
+
 
         public List<DateTime> GetMonthsForProject()
         {
@@ -98,12 +103,16 @@ namespace TRS2._0.Models.ViewModels
             private List<DateTime> GetActiveMonths()
             {
                 var months = new List<DateTime>();
-                for (var date = StartDate; date <= EndDate; date = date.AddMonths(1))
+                var start = new DateTime(StartDate.Year, StartDate.Month, 1);
+                var end = new DateTime(EndDate.Year, EndDate.Month, 1);
+
+                for (var date = start; date <= end; date = date.AddMonths(1))
                 {
-                    months.Add(new DateTime(date.Year, date.Month, 1));
+                    months.Add(date);
                 }
                 return months;
             }
+
         }
 
         public class PersonnelEffort

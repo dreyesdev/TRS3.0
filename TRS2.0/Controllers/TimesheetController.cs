@@ -193,7 +193,7 @@ namespace TRS2._0.Controllers
                 {
                     var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
                     var estimatedHours = RoundToNearestHalfOrWhole(maxhoursthismonth * effort);
-                    var isLocked = projectLocks.Any(l => l.ProjectId == wpx.WpNavigation.ProjId && (l.IsLocked == true));
+                    var isLocked = projectLocks.Any(l => l.ProjectId == wpx.WpNavigation.ProjId && l.PersonId == personId && (l.IsLocked == true));
                     return new WorkPackageInfoTS
                     {
                         WpId = wpx.Wp,
@@ -319,6 +319,24 @@ namespace TRS2._0.Controllers
                         group => group.Key,
                         group => group.Sum(ts => ts.Hours)
                     );
+            var hoursForOtherProjects = new Dictionary<DateTime, decimal>();
+            decimal totalHoursForOtherProjects = 0;
+
+            foreach (var day in hoursPerDayWithDedication.Keys)
+            {
+                var maxHoursForDay = hoursPerDayWithDedication[day];
+                if (maxHoursForDay > 0)
+                {
+                    var assignedHours = totalWorkHoursWithDedication.ContainsKey(day) ? totalWorkHoursWithDedication[day] : 0;
+                    var otherProjectHours = maxHoursForDay - assignedHours;
+                    hoursForOtherProjects[day] = otherProjectHours;
+                    totalHoursForOtherProjects += otherProjectHours;
+                }
+                else
+                {
+                    hoursForOtherProjects[day] = 0;
+                }
+            }
 
             var viewModel = new TimesheetViewModel
             {
@@ -354,7 +372,9 @@ namespace TRS2._0.Controllers
                         Timesheets = timesheets.Where(ts => ts.WpxPersonId == wpx.Id).ToList()
                     };
                 }).ToList(),
-                HoursUsed = hoursUsed
+                HoursUsed = hoursUsed,
+                HoursForOtherProjects = hoursForOtherProjects,
+                TotalHoursForOtherProjects = totalHoursForOtherProjects // Añadir la suma total de horas para otros proyectos
             };
 
             ViewBag.PercentageUsed = percentageUsed.ToString("0.0", CultureInfo.InvariantCulture);
@@ -786,9 +806,10 @@ namespace TRS2._0.Controllers
                         row.RelativeItem().Column(col =>
                         {
                             var monthName = new DateTime(year, month, 1).ToString("MMMM", CultureInfo.CreateSpecificCulture("en"));
-                            col.Item().AlignCenter().Text($"{model.Person.Name} {model.Person.Surname} Timesheet").Bold().FontSize(14);
-                            col.Item().AlignCenter().Text($"{monthName} {year}").FontSize(12);
-                            col.Item().AlignCenter().Text($"REF: {model.ProjectData.Contract} - {model.ProjectData.Acronim}").Bold().FontSize(14);
+                            col.Item().AlignCenter().Text($"{model.Person.Name} {model.Person.Surname} Timesheet").Bold().FontSize(12);
+                            col.Item().AlignCenter().Text($"{monthName} {year}").FontSize(10);
+                            col.Item().AlignCenter().Text($"REF: {model.ProjectData.Contract} - {model.ProjectData.Acronim}").Bold().FontSize(12);
+                            col.Item().AlignCenter().Text($"{model.ProjectData.Title}").FontSize(10);
                         });
 
                         row.ConstantItem(180).Column(col =>
@@ -928,16 +949,29 @@ namespace TRS2._0.Controllers
 
                                     tabla.Footer(footer =>
                                     {
-                                        footer.Cell().ColumnSpan(1).Background("#0055A4").Padding(2).AlignMiddle().AlignCenter().Text("Total Hours").Bold().FontColor("#FFFFFF").FontSize(8);
-
+                                        // Fila "Total Hours" con borde inferior azul
+                                        footer.Cell().BorderVertical(1).BorderColor("#00BFFF").BorderBottom(1).Background("#0055A4").Padding(2).AlignCenter().Text("Total Hours").FontColor("#FFFFFF").FontSize(8);
                                         for (int day = 1; day <= DateTime.DaysInMonth(year, month); day++)
                                         {
                                             var totalHoursForDay = model.WorkPackages.Sum(wp => wp.Timesheets.FirstOrDefault(ts => ts.Day.Day == day)?.Hours ?? 0);
                                             decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay * 2, MidpointRounding.AwayFromZero) / 2;
-                                            footer.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursForDay}").ExtraBold().FontColor("#FFFFFF").FontSize(8);
+                                            footer.Cell().BorderVertical(1).BorderColor("#00BFFF").BorderBottom(1).Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursForDay}").ExtraBold().FontColor("#FFFFFF").FontSize(8);
                                         }
-                                        footer.Cell().Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursWorkedOnProject}").ExtraBold().FontColor("#FFFFFF").Bold().FontSize(8);
+                                        footer.Cell().BorderBottom(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursWorkedOnProject}").ExtraBold().FontColor("#FFFFFF").Bold().FontSize(8);
+
+                                        // Nueva fila "Other Projects"
+                                        footer.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text("Other Projects").FontColor("#FFFFFF").FontSize(8);
+                                        for (int day = 1; day <= DateTime.DaysInMonth(year, month); day++)
+                                        {
+                                            var date = new DateTime(year, month, day);
+                                            var otherProjectHoursForDay = model.HoursForOtherProjects.ContainsKey(date) ? model.HoursForOtherProjects[date] : 0;
+                                            var isHolidayOrLeave = model.Holidays.Any(h => h.Date == date) || model.LeavesthisMonth.Any(l => l.Day == date);
+                                            decimal roundedOtherProjectHoursForDay = isHolidayOrLeave ? 0 : Math.Round(otherProjectHoursForDay * 2, MidpointRounding.AwayFromZero) / 2;
+                                            footer.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedOtherProjectHoursForDay:0.#}").ExtraBold().FontColor("#FFFFFF").FontSize(8);
+                                        }
+                                        footer.Cell().Background("#0055A4").Padding(2).AlignCenter().Text($"{model.TotalHoursForOtherProjects:0.#}").ExtraBold().FontColor("#FFFFFF").Bold().FontSize(8);
                                     });
+
                                 });
 
 

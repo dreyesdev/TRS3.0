@@ -62,7 +62,7 @@
                                     </td>
 
 
-                                    @foreach (var month in Model.UniqueMonths)
+                                    @foreach (var month in Model.GetMonthsForProject())
                                     {
                                         var monthStatus = personnelInfo?.MonthlyStatuses.FirstOrDefault(ms => ms.Month == month);
                                         var cellClass = "effort-cell"; // Clase por defecto
@@ -159,15 +159,17 @@
                                                 @if (isActiveMonth && !isLocked) // Permite edición solo si el mes está activo y no está bloqueado
                                                 {
                                                     <input type="text" class="form-control input-effort"
-                                                           value="@effortValue.ToString("0.00", CultureInfo.InvariantCulture)"
+                                                           value="@(effortValue == 0 ? "0" : effortValue.ToString("0.00", CultureInfo.InvariantCulture))"
                                                            data-personid="@personnelEffort.PersonId"
                                                            data-wpid="@wp.WpId"
                                                            data-month="@month.ToString("yyyy-MM-dd")"
-                                                           data-original-value="@effortValue.ToString("0.00", CultureInfo.InvariantCulture)" />
+                                                           data-original-value="@(effortValue == 0 ? "0" : effortValue.ToString("0.00", CultureInfo.InvariantCulture))" />
                                                 }
                                                 else
                                                 {
-                                                    <span style="display: block; text-align: center; text-size-adjust:auto; font-weight: bold;">@effortValue.ToString("0.00", CultureInfo.InvariantCulture)</span>
+                                                    <span style="display: block; text-align: center; text-size-adjust:auto; font-weight: bold;">
+                                                        @(effortValue == 0 ? "0" : effortValue.ToString("0.00", CultureInfo.InvariantCulture))
+                                                    </span>
                                                     // Muestra el valor como texto si está bloqueado o no es un mes activo
                                                 }
                                             }
@@ -363,24 +365,56 @@ else
 
 
         document.getElementById('exportCsvButton').addEventListener('click', function () {
-            var csvContent = "data:text/csv;charset=utf-8,";
-            var rows = document.querySelectorAll('.main-effort-plan-table table tr');
+            var csvBody = ""; // Aquí se construye el contenido real del CSV
+
+            // Construir manualmente los encabezados
+            var headerRow = ["Personal", "WP"];
+            document.querySelectorAll('.main-effort-plan-table thead th').forEach(th => {
+                const divs = th.querySelectorAll("div");
+                let headerText = "";
+
+                if (divs.length === 3) {
+                    const month = divs[0].innerText.trim();
+                    const year = divs[1].innerText.trim();
+                    const index = divs[2].innerText.trim();
+                    headerText = `${month} ${year} ${index}`;
+                }
+
+                if (headerText) {
+                    headerRow.push(headerText);
+                }
+            });
+
+            csvBody += headerRow.join(";") + "\r\n";
+
+            // Recorrer las filas del cuerpo
+            var rows = document.querySelectorAll('.main-effort-plan-table table tbody tr');
 
             rows.forEach(function (row) {
-                var cols = row.querySelectorAll('th, td');
+                var cols = row.querySelectorAll('td');
                 var rowData = [];
                 cols.forEach(function (col) {
                     var input = col.querySelector('input');
+                    let value = "";
+
                     if (input) {
-                        rowData.push(input.value.replace(/(\r\n|\n|\r)/gm, "").trim());
+                        value = input.value.replace(/(\r\n|\n|\r)/gm, "").trim();
                     } else {
-                        rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim());
+                        value = col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim();
                     }
+
+                    // Convertir punto decimal a coma si es numérico
+                    if (!isNaN(value) && value.includes(".")) {
+                        value = value.replace(".", ",");
+                    }
+
+                    rowData.push(value);
                 });
-                csvContent += rowData.join(";") + "\r\n";
+                csvBody += rowData.join(";") + "\r\n";
             });
 
-            var encodedUri = 'data:text/csv;charset=utf-8;base64,' + btoa(unescape(encodeURIComponent(csvContent)));
+            // Codificación del contenido final sin que se mezcle con la cabecera
+            var encodedUri = 'data:text/csv;charset=utf-8;base64,' + btoa(unescape(encodeURIComponent(csvBody)));
             var link = document.createElement("a");
             link.setAttribute("href", encodedUri);
             link.setAttribute("download", "personnel_effort_plan.csv");
@@ -388,6 +422,8 @@ else
             link.click();
             document.body.removeChild(link);
         });
+
+
 
         $(document).ready(function () {
             var table = $('#effortPlanTable tbody');

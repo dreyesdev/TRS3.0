@@ -129,15 +129,15 @@
                                                 @if (!isProjectLockedThisMonth)
                                                 {
                                                     <input type="text" class="form-control input-effort"
-                                                           value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")"
+                                                           value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? (personnelEffort.Efforts[monthStatus.Month] == 0 ? "0" : personnelEffort.Efforts[monthStatus.Month].ToString("0.00")) : "0")"
                                                            data-personid="@personnelEffort.PersonId"
                                                            data-wpid="@wp.WpId"
                                                            data-month="@monthStatus.Month.ToString("yyyy-MM-dd")"
-                                                           data-original-value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")" />
+                                                           data-original-value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? (personnelEffort.Efforts[monthStatus.Month] == 0 ? "0" : personnelEffort.Efforts[monthStatus.Month].ToString("0.00")) : "0")" />
                                                 }
                                                 else
                                                 {
-                                                    <span style="text-align:center; font-weight:bold; display:block;">@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? personnelEffort.Efforts[monthStatus.Month].ToString("0.00") : "0.00")</span>
+                                                    <span style="text-align:center; font-weight:bold; display:block;">@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? (personnelEffort.Efforts[monthStatus.Month] == 0 ? "0" : personnelEffort.Efforts[monthStatus.Month].ToString("0.00")) : "0")</span>
                                                 }
                                             }
                                             else

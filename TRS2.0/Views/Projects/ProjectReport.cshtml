@@ -231,14 +231,18 @@
     <div id="reportPeriodsSection"></div>
     <button type="button" class="btn btn-primary" id="addReportPeriodBtn" onclick="loadReportPeriodForm()">Add Reporting Periods</button>
     <button type="button" class="btn btn-secondary" id="cancelReportPeriodBtn" onclick="cancelReportPeriodForm()" style="display:none;">Cancel</button>
-    <!-- Botón para exportar horas a CSV -->
-    <button type="button" class="btn btn-success" id="exportHoursBtn" onclick="exportHoursToCSV()" style="display:none;">Exportar horas a CSV</button>
-    <!-- Botón para exportar PMs a CSV -->
-    <button type="button" class="btn btn-success" id="exportPMsBtn" onclick="exportPMsToCSV()" style="display:none;">Exportar PMs a CSV</button>
+            <!-- Botones separados para exportar horas -->
+            <button type="button" class="btn btn-success btn-smaller-text" id="exportDeclaredHoursBtn" onclick="exportDeclaredHoursToCSV()" style="display:none;">Exportar Horas Declaradas a CSV</button>
+            <button type="button" class="btn btn-success btn-smaller-text" id="exportEstimatedHoursBtn" onclick="exportEstimatedHoursToCSV()" style="display:none;">Exportar Horas Estimadas a CSV</button>
+
+            <!-- Botón original comentado por si se necesita más adelante -->
+            <!-- <button type="button" class="btn btn-success" id="exportHoursBtn" onclick="exportHoursToCSV()" style="display:none;">Exportar horas a CSV</button> -->
+            <!-- Botón para exportar PMs a CSV -->
+            <button type="button" class="btn btn-success btn-smaller-text" id="exportPMsBtn" onclick="exportPMsToCSV()" style="display:none;">Exportar PMs a CSV</button>
     <!-- Botón para exportar PMs por WP a CSV -->
-    <button type="button" class="btn btn-success" id="exportPMSforWPToCSV" onclick="exportPMSforWPToCSV()" style="display:none;">Exportar PMs por WP a CSV</button>
+            <button type="button" class="btn btn-success btn-smaller-text" id="exportPMSforWPToCSV" onclick="exportPMSforWPToCSV()" style="display:none;">Exportar PMs por WP a CSV</button>
     <!-- Botón para exportar PMs Auditoria -->
-    <button type="button" class="btn btn-success" id="exportPMSforAuditoria" onclick="exportPMSforAuditoriaToCSV()" style="display:none;">Exportar PMs Auditoria</button>
+            <button type="button" class="btn btn-success btn-smaller-text" id="exportPMSforAuditoria" onclick="exportPMSforAuditoriaToCSV()" style="display:none;">Exportar PMs Auditoria</button>
             <div class="form-group d-inline-block">
                 <label for="manualDate">Fecha Manual:</label>
                 <input type="date" id="manualDate" class="form-control" />
@@ -269,10 +273,12 @@
                 success: function (data) {
                     $('#detallesPeriodoContainer').html(data);
                     $('#detallesPeriodoContainer').show();
-                    $('#exportHoursBtn').show(); // Mostrar el botón de exportar horas
+                    // $('#exportHoursBtn').show(); // Mostrar el botón de exportar horas
                     $('#exportPMsBtn').show(); // Mostrar el botón de exportar PMs
                     $('#exportPMSforWPToCSV').show(); // Mostrar el botón de exportar PMs por WP
                     $('#exportPMSforAuditoria').show(); // Mostrar el botón de exportar PMs Auditoria
+                    $('#exportDeclaredHoursBtn').show(); // Mostrar el botón de exportar horas declaradas
+                    $('#exportEstimatedHoursBtn').show(); // Mostrar el botón de exportar horas estimadas
 
                     // Guardar las fechas del periodo seleccionado
                     $('#exportPMSforWPToCSV').data('start-date', startDate);
@@ -340,6 +346,60 @@
         var link = document.createElement("a");
         link.setAttribute("href", encodedUri);
         link.setAttribute("download", "horas_periodo.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportDeclaredHoursToCSV() {
+        var csvContent = "data:text/csv;charset=utf-8,";
+        var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+
+        rows.forEach(function (row) {
+            var cols = row.querySelectorAll('th, td');
+            var rowData = [];
+            cols.forEach(function (col) {
+                var declaredHours = col.getAttribute('data-declared-hours');
+                if (declaredHours) {
+                    rowData.push(declaredHours.replace('.', ','));
+                } else {
+                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
+                }
+            });
+            csvContent += rowData.join(";") + "\r\n";
+        });
+
+        var encodedUri = encodeURI(csvContent);
+        var link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "horas_declaradas.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportEstimatedHoursToCSV() {
+        var csvContent = "data:text/csv;charset=utf-8,";
+        var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+
+        rows.forEach(function (row) {
+            var cols = row.querySelectorAll('th, td');
+            var rowData = [];
+            cols.forEach(function (col) {
+                var hoursInProject = col.getAttribute('data-hours-in-project');
+                if (hoursInProject) {
+                    rowData.push(hoursInProject.replace('.', ','));
+                } else {
+                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
+                }
+            });
+            csvContent += rowData.join(";") + "\r\n";
+        });
+
+        var encodedUri = encodeURI(csvContent);
+        var link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "horas_estimadas.csv");
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -523,6 +583,13 @@
         font-weight: bold;
         color: #0056b3; /* Cambia al color que prefieras */
         text-shadow: 2px 2px 4px rgba(0,0,0,0.2); /* Añade una ligera sombra */
+    }
+
+    .btn-smaller-text {
+        font-size: 0.85rem; /* Reduce un poco el tamaño del texto */
+        padding-left: 10px;
+        padding-right: 10px;
+        white-space: nowrap; /* Evita el salto de línea */
     }
     </style>
 

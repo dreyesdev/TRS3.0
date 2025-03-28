@@ -1,11 +1,12 @@
 ﻿@model TRS2._0.Models.ViewModels.PeriodDetailsViewModel
 @using System.Globalization
 
-<div class="table-responsive mx-3 mb-4">
+<div class="table-wrapper-custom table-responsive mx-3 mb-4">
     <table class="table table-bordered table-striped table-hover">
         <thead class="thead-dark">
             <tr>
-                <th class="nombre-columna text-center">
+                <th class="nombre-columna text-center sticky-header sticky-col">
+
                     <div>Nombre</div>
                     <div class="d-flex justify-content-between mt-2">
                         <button id="lockAllButton" class="btn btn-success btn-sm btn-lock-all">
@@ -18,7 +19,7 @@
                 </th>
                 @foreach (var monthDetail in Model.MonthDetails)
                 {
-                    <th class="nombre-mes text-center">
+                    <th class="nombre-mes text-center sticky-header">
                         <div style="border-bottom: 1px solid white; margin-bottom: 2px; margin-top: 8px; text-align: center; font-weight: bold;">@monthDetail.Key</div>
                         <div style="text-align: center; font-weight: bold;">@monthDetail.Value</div>
                     </th>
@@ -29,7 +30,7 @@
             @foreach (var person in Model.Persons.OrderBy(p => p.Personnel.Surname))
             {
                 <tr>
-                    <td class="font-weight-bold">@person.Personnel.Surname, @person.Personnel.Name </td>
+                    <td class="font-weight-bold sticky-col">@person.Personnel.Surname, @person.Personnel.Name </td>
                     @foreach (var monthDetail in Model.MonthDetails)
                     {
                         var monthDate = DateTime.Parse(monthDetail.Value);
@@ -140,6 +141,46 @@
         .button-container .btn {
             margin-bottom: 5px; /* Espacio entre los botones */
         }
+
+    .table-wrapper-custom {
+        max-height: 700px;
+        overflow: auto;
+        position: relative;
+        border: 1px solid #ccc;
+    }
+
+    table {
+        border-collapse: separate !important;
+        border-spacing: 0;
+        width: max-content;
+        min-width: 100%;
+    }
+
+    th,
+    td {
+        min-width: 120px;
+        max-width: 300px;
+        white-space: nowrap;
+    }
+
+    .sticky-header {
+        position: sticky;
+        top: 0;
+        background-color: #343a40 !important; /* el fondo oscuro del thead */
+        color: white;
+        z-index: 10;
+    }
+
+    .sticky-col {
+        position: sticky;
+        left: 0;
+        background-color: white;
+        z-index: 9;
+    }
+
+    .sticky-header.sticky-col {
+        z-index: 11;
+    }
 </style>
 
 

@@ -566,11 +566,17 @@ namespace TRS2._0.Controllers
                                                      .Where(wpx => workPackages.Select(wp => wp.Id).Contains(wpx.Wp))
                                                      .ToListAsync();
 
+            var wpxPersonIdsListed = wpxPersons.Select(wpx => wpx.Id).ToList();
+
+
             // Obtener esfuerzos del personal y mapearlos
             var persefforts = await _context.Persefforts
-                    .Include(pe => pe.WpxPersonNavigation)
-                    .Where(pe => pe.Month >= adjustedProjectStartDate && pe.Month <= adjustedProjectEndDate)
-                    .ToListAsync();
+                                            .Include(pe => pe.WpxPersonNavigation)
+                                            .Where(pe => wpxPersonIdsListed.Contains(pe.WpxPerson) &&
+                                                         pe.Month >= adjustedProjectStartDate &&
+                                                         pe.Month <= adjustedProjectEndDate)
+                                            .ToListAsync();
+
 
             var projectMonthLocksAllPersons = await _context.ProjectMonthLocks
                     .Where(l => l.ProjectId == projId &&

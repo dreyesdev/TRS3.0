@@ -2,7 +2,6 @@
 
 @{
     ViewData["Title"] = "Personnel Selection";
-    // Ordena WorkPackages para que "Travels" esté al final, independientemente de mayúsculas/minúsculas.
     var orderedWorkPackages = Model.WorkPackages
         .OrderBy(wp => wp.Name.Equals("travels", StringComparison.OrdinalIgnoreCase))
         .ThenBy(wp => wp.Name)
@@ -11,109 +10,82 @@
 
 <div class="container mt-3">
     <div class="row">
-        <!-- Encapsula los detalles del proyecto en una tarjeta -->
+        <!-- Detalles del proyecto -->
         <div class="col-md-6">
             <div class="card">
-                <div class="card-header text-center">
-                    Project Details
-                </div>
+                <div class="card-header text-center">Project Details</div>
                 <div class="card-body">
                     <dl class="row detail-item">
-                        <div class="row detail-item">
-                            <dt class="col-sm-4 text-sm-right">Acronym</dt>
-                            <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.ProjectDetails.Acronim)</dd>
-                        </div>
+                        <dt class="col-sm-4 text-sm-right">Acronym</dt>
+                        <dd class="col-sm-8">@Html.DisplayFor(model => model.ProjectDetails.Acronim)</dd>
                     </dl>
                     <dl class="row detail-item">
-                        <div class="row detail-item">
-                            <dt class="col-sm-4 text-sm-right">Title</dt>
-                            <dd class="col-sm-8">@Html.DisplayFor(model => model.ProjectDetails.Title)</dd>
-                        </div>
+                        <dt class="col-sm-4 text-sm-right">Title</dt>
+                        <dd class="col-sm-8">@Html.DisplayFor(model => model.ProjectDetails.Title)</dd>
                     </dl>
                     <dl class="row detail-item">
-                        <div class="row detail-item">
-                            <dt class="col-sm-4 text-sm-right">Contract</dt>
-                            <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.ProjectDetails.Contract)</dd>
-                        </div>
+                        <dt class="col-sm-4 text-sm-right">Contract</dt>
+                        <dd class="col-sm-8">@Html.DisplayFor(model => model.ProjectDetails.Contract)</dd>
                     </dl>
                     <dl class="row detail-item">
-                        <div class="row detail-item">
-                            <dt class="col-sm-4 text-sm-right">Start Date</dt>
-                            <dd class="col-sm-8 d-inline-block">@(Model.ProjectDetails.Start.HasValue ? Model.ProjectDetails.Start.Value.ToString("dd-MM-yyyy") : string.Empty)</dd>
-                        </div>
+                        <dt class="col-sm-4 text-sm-right">Start Date</dt>
+                        <dd class="col-sm-8">@(Model.ProjectDetails.Start?.ToString("dd-MM-yyyy") ?? string.Empty)</dd>
                     </dl>
                     <dl class="row detail-item">
-                        <div class="row detail-item">
-                            <dt class="col-sm-4 text-sm-right">End Date</dt>
-                            <dd class="col-sm-8 d-inline-block">@(Model.ProjectDetails.End.HasValue ? Model.ProjectDetails.End.Value.ToString("dd-MM-yyyy") : string.Empty)</dd>
-                        </div>
+                        <dt class="col-sm-4 text-sm-right">End Date</dt>
+                        <dd class="col-sm-8">@(Model.ProjectDetails.End?.ToString("dd-MM-yyyy") ?? string.Empty)</dd>
                     </dl>
                     <dl class="row detail-item">
-                        <div class="row detail-item">
-                            <dt class="col-sm-4 text-sm-right">Project Investigator</dt>
-                            <dd class="col-sm-8 d-inline-block">@ViewBag.PiFullName</dd>
-                        </div>
+                        <dt class="col-sm-4 text-sm-right">Project Investigator</dt>
+                        <dd class="col-sm-8">@ViewBag.PiFullName</dd>
                     </dl>
                     <dl class="row detail-item">
-                        <div class="row detail-item">
-                            <dt class="col-sm-4 text-sm-right">Project Manager</dt>
-                            <dd class="col-sm-8 d-inline-block">@ViewBag.PmFullName</dd>
-                        </div>
+                        <dt class="col-sm-4 text-sm-right">Project Manager</dt>
+                        <dd class="col-sm-8">@ViewBag.PmFullName</dd>
                     </dl>
                     <dl class="row detail-item">
-                        <div class="row detail-item">
-                            <dt class="col-sm-4 text-sm-right">Finance Manager</dt>
-                            <dd class="col-sm-8 d-inline-block">@ViewBag.FmFullName</dd>
-                        </div>
+                        <dt class="col-sm-4 text-sm-right">Finance Manager</dt>
+                        <dd class="col-sm-8">@ViewBag.FmFullName</dd>
                     </dl>
                     <dl class="row detail-item">
-                        <div class="row detail-item">
-                            <dt class="col-sm-4 text-sm-right">Type</dt>
-                            <dd class="col-sm-8 d-inline-block">@Html.DisplayFor(model => model.ProjectDetails.Type)</dd>
-                        </div>
+                        <dt class="col-sm-4 text-sm-right">Type</dt>
+                        <dd class="col-sm-8">@Html.DisplayFor(model => model.ProjectDetails.Type)</dd>
                     </dl>
 
-                    <!-- Tarjeta para Third Parties -->
                     <div class="card mt-4">
-                        <div style="text-align: center; background-color: black; color: white; font-size: 24px; font-weight: bold;">
-                            Third Parties
-                        </div>
-
+                        <div class="card-header">Third Parties</div>
                         <div class="card-body">
                             <div class="row">
-                                <!-- Cada tick en su propia columna dentro de esta fila -->
                                 <div class="col">
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="upcCheck" disabled @((Model.ProjectDetails.TpsUpc == 1) ? "checked" : "")>
+                                        <input class="form-check-input" type="checkbox" id="upcCheck" disabled @(Model.ProjectDetails.TpsUpc == 1 ? "checked" : "")>
                                         <label class="form-check-label" for="upcCheck">UPC</label>
                                     </div>
                                 </div>
                                 <div class="col">
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="icreaCheck" disabled @((Model.ProjectDetails.TpsIcrea == 1) ? "checked" : "")>
+                                        <input class="form-check-input" type="checkbox" id="icreaCheck" disabled @(Model.ProjectDetails.TpsIcrea == 1 ? "checked" : "")>
                                         <label class="form-check-label" for="icreaCheck">ICREA</label>
                                     </div>
                                 </div>
                                 <div class="col">
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="csicCheck" disabled @((Model.ProjectDetails.TpsCsic == 1) ? "checked" : "")>
+                                        <input class="form-check-input" type="checkbox" id="csicCheck" disabled @(Model.ProjectDetails.TpsCsic == 1 ? "checked" : "")>
                                         <label class="form-check-label" for="csicCheck">CSIC</label>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-        </div>
-        </div>
-    
 
-            <div class="col-md-6">
-            <!-- Selección de Personal -->
-            <div class="card mb-3">
-                <div class="card-header text-center">
-                    Person Selection
                 </div>
+            </div>
+        </div>
+
+        <!-- Selección de personal -->
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header text-center">Person Selection</div>
                 <div class="card-body">
                     <select id="personnelSelect" class="form-control mb-2">
                         <option value="">Please select a person from the list below:</option>
@@ -122,47 +94,36 @@
                             <option value="@person.Id">@person.Surname, @person.Name</option>
                         }
                     </select>
-
-                <!-- Barra de búsqueda -->
-                <p class="mb-1">Or start typing here the name of the person:</p> <!-- Reducí el margen inferior -->
+                    <p class="mb-1">Or start typing here the name of the person:</p>
                     <input type="text" id="searchTerm" class="form-control mb-2" placeholder="Start typing..." onkeyup="filterPersonnel()" />
-                    <div id="searchResults" style="max-height: 200px; overflow-y: auto;"></div> <!-- Estilo para scroll vertical -->
-                <!-- Resultados de búsqueda -->
-                <div id="searchResults"></div>
-            </div>
-            <hr />
-            <!-- Columna de detalles del personal -->
+                    <div id="searchResults" style="max-height: 200px; overflow-y: auto;"></div>
+                </div>
+                <hr />
                 <div class="card mt-3">
-                    <div class="card-header text-center">
-                        Person Details
-                    </div>
-                <div id="personDetails" class="card-body">
-                    <!-- Aquí se cargarán los detalles del personal -->
+                    <div class="card-header text-center">Person Details</div>
+                    <div id="personDetails" class="card-body"></div>
                 </div>
             </div>
         </div>
     </div>
-    </div>
-    <hr>
-<!-- Código para la sección de asignación de personal a paquetes de trabajo -->
-    
 </div>
-<!-- Nuevo título "Personnel in Work Packages" -->
+
+<hr />
 <h3 class="text-center my-style">Personnel in Work Packages</h3>
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-md-12">
-            <div class="table-responsive">
-                <table class="table table-bordered">
+            <div class="project-personnel-wrapper">
+                <table class="table table-bordered sticky-table">
                     <thead>
                         <tr>
-                            <th class="sticky-header sticky-name-header name-column">People involved in @Model.ProjectDetails.Acronim project</th>
+                            <th class="sticky-header sticky-col name-column">People involved in @Model.ProjectDetails.Acronim project</th>
                             @foreach (var wp in orderedWorkPackages)
                             {
-                                <th class="sticky-header wp-column">@wp.Name</th> <!-- Encabezados de WP -->
+                                <th class="sticky-header wp-column">@wp.Name</th>
                             }
                             <th class="sticky-header action-column">
-                                <button id="updateAllButton" class="btn btn-success" onclick="updateAll()">Update All</button> <!-- Botón Update All -->
+                                <button id="updateAllButton" class="btn btn-success" onclick="updateAll()">Update All</button>
                             </th>
                         </tr>
                     </thead>
@@ -170,7 +131,7 @@
                         @foreach (var person in Model.ProjectPersonnel.Select(px => px.PersonNavigation).OrderBy(p => p.Surname))
                         {
                             <tr>
-                                <td class="name-column">@person.Name @person.Surname</td>
+                                <td class="name-column sticky-col">@person.Name @person.Surname</td>
                                 @foreach (var wp in orderedWorkPackages)
                                 {
                                     bool isAssigned = Model.WorkPackagePersonnel.Any(wpx => wpx.Wp == wp.Id && wpx.Person == person.Id);
@@ -183,7 +144,7 @@
                                     </td>
                                 }
                                 <td class="action-column">
-                                    <button onclick="removeFromProject(@person.Id)" class="btn btn-danger">Remove</button> <!-- Botón Remove -->
+                                    <button onclick="removeFromProject(@person.Id)" class="btn btn-danger">Remove</button>
                                 </td>
                             </tr>
                         }
@@ -193,7 +154,6 @@
         </div>
     </div>
 </div>
-
 
 
 
@@ -372,121 +332,97 @@
     }
 
 <style>
-    .person-result {
-        cursor: pointer;
-        padding: 5px;
-    }
+     .project-personnel-wrapper {
+         max-height: 600px;
+         overflow: auto;
+         border: 1px solid #ccc;
+         position: relative;
+         background-color: white;
+     }
 
-        .person-result:hover {
-            background-color: #eee;
-        }
+     .sticky-table {
+         border-collapse: separate;
+         border-spacing: 0;
+         width: max-content;
+         min-width: 100%;
+     }
 
-        .person-result.active {
-            background-color: #4c87c6;
-        }
+         .sticky-table th,
+         .sticky-table td {
+             min-width: 120px;
+             padding: 8px;
+             text-align: center;
+             border: 1px solid #dee2e6;
+             background-color: white;
+         }
 
-    .card-detail-label {
-        font-weight: bold;
-    }
+         .sticky-table .sticky-header {
+             position: sticky;
+             top: 0;
+             background-color: var(--blue-dark);
+             color: white;
+             z-index: 10;
+         }
 
-    .card-title {
-        font-weight: bold;
-    }
+         .sticky-table .sticky-col {
+             position: sticky;
+             left: 0;
+             background-color: #f8f9fa;
+             z-index: 9;
+         }
 
-    .card-header {
-        background-color: #005A9C; /* Azul oscuro, ajusta el código de color según tu logo */
-        color: #FFFFFF; /* Blanco */
-        text-align: center;
-        font-weight: bold;
-        /* Otros estilos que desees mantener, como el padding, etc. */
-    }
+         .sticky-table .sticky-header.sticky-col {
+             z-index: 11;
+             background-color: #003366;
+             color: white;
+         }
 
-    .wp-checkbox {
-        width: 25px; /* Tamaño del checkbox */
-        height: 25px; /* Tamaño del checkbox */
-        cursor: pointer; /* Cambia el cursor a mano al pasar sobre el checkbox */
-        margin: auto; /* Centra el checkbox en la celda */
-    }
+     .name-column {
+         min-width: 200px;
+         max-width: 250px;
+         font-weight: bold;
+     }
 
-    .table th {
-        background-color: var(--blue-dark); /* Color de fondo para los encabezados */
-        color: white; /* Color del texto para los encabezados */
-        text-align: center;
-    }
+     .wp-column {
+         min-width: 60px;
+         max-width: 80px;
+     }
 
-    .table td {
-        text-align: center;
-    }
+     .action-column {
+         min-width: 100px;
+         background-color: #f8f9fa;
+     }
 
-    .table th, .table td {
-        white-space: nowrap; /* Evita el salto de línea en las celdas */
-        vertical-align: middle; /* Alinea el contenido verticalmente */
-        text-align: center; /* Centra el contenido */
-    }
+     .wp-checkbox {
+         width: 25px;
+         height: 25px;
+         cursor: pointer;
+         margin: auto;
+         display: block;
+     }
 
-    .table .name-column {
-        width: 200px; /* Ancho fijo para la columna de nombres */
-        position: sticky;
-        left: 0;        
-        z-index: 3; /* Asegura que la columna fija esté sobre el contenido desplazable */
-        
-    }
+     .card-header {
+         background-color: #005A9C;
+         color: #FFFFFF;
+         text-align: center;
+         font-weight: bold;
+         font-size: 24px;
+     }
 
-    .table .wp-column {
-        width: 50px; /* Ancho fijo para las columnas de work packages */
-    }
+     .my-style {
+         font-size: 2.5rem;
+         font-weight: bold;
+         color: #0056b3;
+         text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+     }
 
-    .table .action-column {
-        width: 75px; /* Ancho fijo para la columna de acciones */
-    }
-
-    .detail-item:not(:last-child) {
-        border-bottom: 1px solid #dee2e6; /* Color de la línea */
-        padding-bottom: 5px; /* Espaciado debajo del texto antes de la línea */
-        margin-bottom: 5px; /* Espaciado después de la línea */
-    }
-
-    .custom-table-container {
-        padding-left: 15px;
-        padding-right: 15px;
-    }
-
-    .table-responsive {
-        max-height: 800px; /* Ajusta esto según la altura deseada */
-        overflow-y: auto;
-        overflow-x: auto; /* Habilita el scroll horizontal */
-        max-width: 1200px; /* Ancho máximo para la tabla */
-        margin: 0 auto; /* Centra la tabla horizontalmente */
-    }
-
-    .sticky-header {
-        position: sticky;
-        top: 0;        
-        z-index: 2; /* Asegura que el encabezado se mantenga sobre el contenido desplazable */        
-    }
-
-    .sticky-name-header {
-        position: sticky;
-        top: 0;
-        left: 0;
-        
-        z-index: 4; /* Asegura que la cabecera fija esté sobre el contenido desplazable */
-        
-    }
-
-    .card-header {
-        font-size: 24px; /* Aumenta el tamaño del texto */
-        font-weight: bold; /* Texto en negrita */
-        text-align: center; /* Texto centrado */
-    }
-
-    .my-style {
-        font-size: 2.5rem; /* Ajusta el tamaño de la fuente */
-        font-weight: bold;
-        color: #0056b3; /* Cambia al color que prefieras */
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.2); /* Añade una ligera sombra */
-    }
+     .detail-item:not(:last-child) {
+         border-bottom: 1px solid #dee2e6;
+         padding-bottom: 5px;
+         margin-bottom: 5px;
+     }
 </style>
+
 
 
 
