@@ -59,7 +59,7 @@
     <script>
         function approveTravel(travelId) {
             if (confirm('Are you sure you want to approve this travel?')) {
-                $.post('@Url.Action("ApproveTravel", "Travel")', { id: travelId }, function (response) {
+                $.post('@Url.Action("ApproveTravel", "Personnels")', { id: travelId }, function (response) {
                     alert(response.message);
                     location.reload();
                 });
@@ -68,7 +68,7 @@
 
         function cancelTravel(travelId) {
             if (confirm('Are you sure you want to cancel this travel?')) {
-                $.post('@Url.Action("CancelTravel", "Travel")', { id: travelId }, function (response) {
+                $.post('@Url.Action("CancelTravel", "Personnels")', { id: travelId }, function (response) {
                     alert(response.message);
                     location.reload();
                 });

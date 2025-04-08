@@ -231,21 +231,51 @@
     <div id="reportPeriodsSection"></div>
     <button type="button" class="btn btn-primary" id="addReportPeriodBtn" onclick="loadReportPeriodForm()">Add Reporting Periods</button>
     <button type="button" class="btn btn-secondary" id="cancelReportPeriodBtn" onclick="cancelReportPeriodForm()" style="display:none;">Cancel</button>
-            <!-- Botones separados para exportar horas -->
-            <button type="button" class="btn btn-success btn-smaller-text" id="exportDeclaredHoursBtn" onclick="exportDeclaredHoursToCSV()" style="display:none;">Exportar Horas Declaradas a CSV</button>
-            <button type="button" class="btn btn-success btn-smaller-text" id="exportEstimatedHoursBtn" onclick="exportEstimatedHoursToCSV()" style="display:none;">Exportar Horas Estimadas a CSV</button>
+            <div class="card mt-4">
+                <div class="card-header bg-dark text-white text-center">
+                    Export Options
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4 d-flex align-items-center">
+                            <label for="manualDate" class="mb-0 mr-2 font-weight-bold">Manual Date:</label>
+                            <input type="date" id="manualDate" class="form-control ml-2" />
+                        </div>
+                    </div>
 
-            <!-- Botón original comentado por si se necesita más adelante -->
-            <!-- <button type="button" class="btn btn-success" id="exportHoursBtn" onclick="exportHoursToCSV()" style="display:none;">Exportar horas a CSV</button> -->
-            <!-- Botón para exportar PMs a CSV -->
-            <button type="button" class="btn btn-success btn-smaller-text" id="exportPMsBtn" onclick="exportPMsToCSV()" style="display:none;">Exportar PMs a CSV</button>
-    <!-- Botón para exportar PMs por WP a CSV -->
-            <button type="button" class="btn btn-success btn-smaller-text" id="exportPMSforWPToCSV" onclick="exportPMSforWPToCSV()" style="display:none;">Exportar PMs por WP a CSV</button>
-    <!-- Botón para exportar PMs Auditoria -->
-            <button type="button" class="btn btn-success btn-smaller-text" id="exportPMSforAuditoria" onclick="exportPMSforAuditoriaToCSV()" style="display:none;">Exportar PMs Auditoria</button>
-            <div class="form-group d-inline-block">
-                <label for="manualDate">Fecha Manual:</label>
-                <input type="date" id="manualDate" class="form-control" />
+                    <div class="row text-center">
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportDeclaredHoursBtn" onclick="exportDeclaredHoursToCSV()" style="display:none;">
+                                Export Declared Hours
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportEstimatedHoursBtn" onclick="exportEstimatedHoursToCSV()" style="display:none;">
+                                Export Estimated Hours
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportPMsBtn" onclick="exportPMsToCSV()" style="display:none;">
+                                Export PMs
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportPMSforWPToCSV" onclick="exportPMSforWPToCSV()" style="display:none;">
+                                Export PMs per WP
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportPMSforAuditoria" onclick="exportPMSforAuditoriaToCSV()" style="display:none;">
+                                Export Audit PMs
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportPMSforWPToCSVBtn" onclick="exportPMSAuditByWPToCSV()" style="display:none;">
+                                Export Audit PMs per WP
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 </div>
 
@@ -279,6 +309,7 @@
                     $('#exportPMSforAuditoria').show(); // Mostrar el botón de exportar PMs Auditoria
                     $('#exportDeclaredHoursBtn').show(); // Mostrar el botón de exportar horas declaradas
                     $('#exportEstimatedHoursBtn').show(); // Mostrar el botón de exportar horas estimadas
+                    $('#exportPMSforWPToCSVBtn').show(); // Mostrar el botón de exportar PMs Auditoria por WP
 
                     // Guardar las fechas del periodo seleccionado
                     $('#exportPMSforWPToCSV').data('start-date', startDate);
@@ -510,7 +541,47 @@
                 a.remove();
             })
             .catch(error => console.error('Error:', error));
-    }   
+    }  
+    
+    function exportPMSAuditByWPToCSV() {
+        var projectId = @ViewBag.projId;
+        var startDate = $('#exportPMSforWPToCSV').data('start-date');
+        var endDate = $('#exportPMSforWPToCSV').data('end-date');
+
+        // Convertir las fechas al formato ISO 8601 (yyyy-MM-dd)
+        var startDateISO = new Date(startDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+        var endDateISO = new Date(endDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+
+        // Verificar los valores antes de enviarlos
+        console.log("Project ID:", projectId);
+        console.log("Start Date (ISO):", startDateISO);
+        console.log("End Date (ISO):", endDateISO);
+
+        fetch('@Url.Action("ExportPmsAuditoriaByWP", "Projects")', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ProjectId: projectId, StartDate: startDateISO, EndDate: endDateISO })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                var url = window.URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = `PMsAuditByWP_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
 
 </script>
 
@@ -590,6 +661,18 @@
         padding-left: 10px;
         padding-right: 10px;
         white-space: nowrap; /* Evita el salto de línea */
+    }
+
+    #manualDate {
+        min-width: 150px;
+    }
+
+    .card-header {
+        font-size: 20px;
+    }
+
+    .btn-block {
+        white-space: nowrap;
     }
     </style>
 

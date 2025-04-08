@@ -10,6 +10,7 @@ using System.Text;
 using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
 using TRS2._0.Models.ViewModels;
 using TRS2._0.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace TRS2._0.Controllers
 {
@@ -137,17 +138,20 @@ namespace TRS2._0.Controllers
         {
             if (ModelState.IsValid)
             {
+                
+                // Buscar persona en base de datos
                 var personnel = await _context.Personnel.FirstOrDefaultAsync(p => p.BscId == model.BSCID);
-
                 if (personnel == null)
                 {
                     ModelState.AddModelError(string.Empty, "This user is not yet registered in our database. Please wait 24 hours or contact iss@bsc.es.");
                     return View(model);
                 }
 
-                if (!string.IsNullOrEmpty(personnel.Password))
+                // Comprobar si ya está registrado en Identity
+                var existingUser = await _userManager.FindByNameAsync(model.BSCID);
+                if (existingUser != null)
                 {
-                    ModelState.AddModelError(string.Empty, "This user is already registered. Go to login page and click on 'I don't remember my password'.");
+                    ModelState.AddModelError(string.Empty, "This user already has an account. Please go to the login page and use 'I don't remember my password'.");
                     return View(model);
                 }
 
@@ -169,25 +173,26 @@ namespace TRS2._0.Controllers
                     var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
                     var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
 
-                    var emailContent = $@"
-                    <html>
-                    <body>
-                        <p>Greetings, {personnel.Name},</p>
-                        <p>You now have access to the TRS 3.0 web application.</p>
-                        <p>To access the site, please use the following link: <a href='https://opstrs03.bsc.es/'>TRS 3.0</a></p>
-                        <p>Your login credentials are:</p>
-                        <ul>
-                            <li><strong>Username:</strong> {model.BSCID}</li>
-                            <li><strong>Password:</strong> {password}</li>
-                        </ul>
-                        <p>This access is intended to help us debug the web application before its final deployment.</p>
-                        <p>Thank you very much for your collaboration.</p>
-                        <p>Sincerely,</p>
-                        <p>The ISS Team</p>
-                    </body>
-                    </html>";
+                    string emailContent = $@"
+                                            <html>
+                                            <body>
+                                                <p>Greetings, {personnel.Name},</p>
+                                                <p>You now have access to the TRS 3.0 web application.</p>
+                                                <p>To access the site, please use the following link: <a href='https://opstrs03.bsc.es/'>TRS 3.0</a></p>
+                                                <p>Your login credentials are:</p>
+                                                <ul>
+                                                    <li><strong>Username:</strong> {model.BSCID}</li>
+                                                    <li><strong>Password:</strong> {password}</li>
+                                                </ul>
+                                                <p>If you experience any issues while logging in or using the system, please feel free to contact us at <a href='mailto:iss@bsc.es'>iss@bsc.es</a>.</p>
+                                                <p>Thank you for your collaboration.</p>
+                                                <p>Sincerely,</p>
+                                                <p>The ISS Team</p>
+                                            </body>
+                                            </html>";
 
-                    await _emailSender.SendEmailAsync(personnel.Email, "Access to TRS 3.0 - Beta", emailContent);
+
+                    await _emailSender.SendEmailAsync(personnel.Email, "Access to TRS 3.0", emailContent);
 
                     _logger.LogInformation("User registration email sent.");
 
@@ -320,6 +325,75 @@ namespace TRS2._0.Controllers
         {
             return View();
         }
+
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> AdminResetPassword(string userId)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return Json(new { success = false, message = "User not found." });
+            }
+
+            var personnel = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == user.PersonnelId);
+            if (personnel == null)
+            {
+                return Json(new { success = false, message = "Linked personnel not found." });
+            }
+
+            string password = GeneratePassword();
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            // Reload the user to avoid concurrency issues
+            await _context.Entry(user).ReloadAsync();
+            var result = await _userManager.ResetPasswordAsync(user, token, password);
+
+            if (!result.Succeeded)
+            {
+                var errorMessages = string.Join("; ", result.Errors.Select(e => e.Description));
+                return Json(new
+                {
+                    success = false,
+                    message = $"Password reset failed: {errorMessages}",
+                    password = password
+                });
+            }
+
+            try
+            {
+                string emailContent = $@"
+            <html>
+            <body>
+                <p>Hello {personnel.Name},</p>
+                <p>Your password for TRS 3.0 has been reset by an administrator.</p>
+                <p><strong>Username:</strong> {user.UserName}</p>
+                <p><strong>New Password:</strong> {password}</p>
+                <p>Please log in using the following link: <a href='https://opstrs03.bsc.es/'>TRS 3.0</a></p>
+                <p>If you experience any issues, please contact iss@bsc.es.</p>
+            </body>
+            </html>";
+
+                await _emailSender.SendEmailAsync(personnel.Email, "Your TRS 3.0 Password Has Been Reset", emailContent);
+            }
+            catch (Exception ex)
+            {
+                // Aquí puedes registrar el error con _logger si lo tienes configurado
+                _logger.LogError(ex, "Error sending reset password email to user {UserName}", user.UserName);
+
+                return Json(new { success = false, message = $"Password reset succeeded, but failed to send email. Error: {ex.Message}", password= password });
+
+            }
+
+            return Json(new
+            {
+                success = true,
+                message = "Password reset and email sent successfully.",
+                password = password
+            });            
+        }
+
+
 
         private string GeneratePassword()
         {

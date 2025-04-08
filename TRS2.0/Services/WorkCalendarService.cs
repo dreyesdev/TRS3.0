@@ -175,6 +175,28 @@ public class WorkCalendarService
         return Math.Round(totalEffort, 2);
     }
 
+    public async Task<decimal> CalculateMonthlyEffortForPersonWithoutCurrentWP(int personId,int wpId, int year, int month)
+    {
+        // Obtener todos los esfuerzos asociados a la persona que están dentro del rango de fechas especificado
+        var efforts = await _context.Persefforts
+            .Include(pe => pe.WpxPersonNavigation)
+            .Where(pe => pe.WpxPersonNavigation.Person == personId &&
+                         pe.Month.Year == year &&
+                         pe.Month.Month == month)
+            .ToListAsync();
+
+        var effortforthiswp = efforts.Where(e => e.WpxPersonNavigation.Wp == wpId).ToList();
+
+        var sumefforts = effortforthiswp.Sum(e => e.Value);
+
+        // Sumar los valores de esfuerzo para el mes dado
+        decimal totalEffort = efforts.Sum(e => e.Value);
+
+        totalEffort = totalEffort - sumefforts;
+
+        return Math.Round(totalEffort, 2);
+    }
+
     public async Task<Dictionary<DateTime, decimal>> CalculateMonthlyEffortForPersonInProject(int personId, DateTime startDate, DateTime endDate, int projectId)
     {
         // Asegurarse de que la fecha de fin sea al menos el último momento del mes indicado
@@ -464,9 +486,9 @@ public class WorkCalendarService
                     }
                 }
             }
-
+            
             // Check for travels in the current month
-            if (travelDetails.Any())
+            if (status == 0 && travelDetails.Any())
             {
                 status = 4; // Estado para indicar que hay viajes
                 
@@ -920,6 +942,7 @@ public class WorkCalendarService
         return Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2;
     }
 
+    // Calcula las horas estimadas de una persona en un proyecto
     public async Task<decimal> CalculateEstimatedHoursForPersonInProject(int personId, int projectId, int year, int month)
     {
         // Obtener las horas totales trabajadas por la persona en el mes
@@ -949,6 +972,41 @@ public class WorkCalendarService
         }
 
         // Calcular las horas estimadas en el proyecto
+        decimal estimatedHours = totalMonthlyHours * totalEffort;
+
+        // Redondear al entero o .5 más cercano
+        return RoundToNearestHalfOrWhole(estimatedHours);
+    }
+
+    // Calcula las horas estimadas de una persona en un proyecto y en un paquete de trabajo específico
+    public async Task<decimal> CalculateEstimatedHoursForPersonInWorkPackage(int personId, int wpId, int year, int month)
+    {
+        // Obtener las horas totales trabajadas por la persona en el mes
+        var hoursPerDayWithDedication = await CalculateDailyWorkHoursWithDedication(personId, year, month);
+        var totalMonthlyHours = hoursPerDayWithDedication.Values.Sum();
+
+        if (totalMonthlyHours == 0)
+        {
+            return 0; // Si no hay horas trabajadas, devolver 0
+        }
+
+        // Obtener los esfuerzos para el Work Package específico en el mes especificado
+        var efforts = await _context.Persefforts
+            .Where(pe => pe.WpxPersonNavigation.Person == personId &&
+                                    pe.WpxPersonNavigation.Wp == wpId &&
+                                                            pe.Month.Year == year &&
+                                                                                    pe.Month.Month == month)
+            .ToListAsync();
+
+        // Calcular el esfuerzo total
+        decimal totalEffort = efforts.Sum(e => e.Value);
+
+        if (totalEffort == 0)
+        {
+            return 0; // Si no hay esfuerzo registrado, devolver 0
+        }
+
+        // Calcular las horas estimadas en el paquete de trabajo
         decimal estimatedHours = totalMonthlyHours * totalEffort;
 
         // Redondear al entero o .5 más cercano
@@ -1114,6 +1172,138 @@ public class WorkCalendarService
         }
 
         return workingDays;
+    }
+
+    public async Task AutoFillTimesheetForPersonAndMonthAsync(int personId, DateTime targetMonth)
+    {
+        var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", $"AutoFillTimesheet_{personId}_{targetMonth:yyyyMM}.txt");
+        var logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.File(logPath, rollingInterval: RollingInterval.Infinite)
+            .CreateLogger();
+
+        try
+        {
+            var monthStart = new DateTime(targetMonth.Year, targetMonth.Month, 1);
+            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
+            logger.Information($"Inicio del proceso para el empleado {personId} en el mes {monthStart:yyyy-MM}");
+
+            var wpxList = await _context.Wpxpeople
+                .Include(w => w.PersonNavigation)
+                .Include(w => w.WpNavigation)
+                    .ThenInclude(wp => wp.Proj)
+                .Where(w => w.Person == personId)
+                .ToListAsync();
+
+            var wpxWithEffort = await _context.Persefforts
+                .Where(pe => pe.Month == monthStart && wpxList.Select(w => w.Id).Contains(pe.WpxPerson))
+                .Select(pe => pe.WpxPerson)
+                .FirstOrDefaultAsync();
+
+            if (wpxWithEffort == 0)
+            {
+                logger.Warning($"Empleado {personId} no tiene effort registrado en {monthStart:yyyy-MM}");
+                return;
+            }
+
+            var wpx = wpxList.FirstOrDefault(w => w.Id == wpxWithEffort);
+            if (wpx == null)
+            {
+                logger.Warning($"Error al obtener WP con effort para el empleado {personId} en {monthStart:yyyy-MM}");
+                return;
+            }
+
+            var personName = wpx.PersonNavigation.Name ?? "SIN NOMBRE";
+            var personSurname = wpx.PersonNavigation.Surname ?? "SIN APELLIDO";
+            var projectAcronym = wpx.WpNavigation?.Proj?.Acronim ?? "SIN PROYECTO";
+
+            var monthlyEffort = await _context.Persefforts
+                .Where(pe => pe.WpxPerson == wpx.Id && pe.Month == monthStart)
+                .SumAsync(pe => pe.Value);
+
+            if (monthlyEffort <= 0)
+            {
+                logger.Warning($"[{personName} {personSurname}] [{projectAcronym}] - WP={wpx.Wp}, Mes={monthStart:yyyy-MM}: Effort es 0 o negativo");
+                return;
+            }
+
+            var maxEffort = await _context.PersMonthEfforts
+                .Where(pme => pme.PersonId == personId && pme.Month == monthStart)
+                .Select(pme => pme.Value)
+                .FirstOrDefaultAsync();
+
+            if (monthlyEffort > maxEffort)
+            {
+                logger.Warning($"[{personName} {personSurname}] [{projectAcronym}] - WP={wpx.Wp}, Mes={monthStart:yyyy-MM}: Ajuste de {monthlyEffort} a {maxEffort}");
+                monthlyEffort = maxEffort;
+            }
+
+            bool ajusteCompleto = Math.Abs(monthlyEffort - maxEffort) <= 0.001m;
+
+            var validWorkDays = Enumerable.Range(0, (monthEnd - monthStart).Days + 1)
+                .Select(offset => monthStart.AddDays(offset))
+                .Where(day => day.DayOfWeek != DayOfWeek.Saturday && day.DayOfWeek != DayOfWeek.Sunday)
+                .ToList();
+
+            validWorkDays = validWorkDays
+                .Where(day => !IsHoliday(day).Result)
+                .ToList();
+
+            var leaveDays = await _context.Leaves
+                .Where(l => l.PersonId == personId && l.Day >= monthStart && l.Day <= monthEnd && (l.Type == 1 || l.Type == 2 || l.Type == 3))
+                .Select(l => l.Day)
+                .ToListAsync();
+
+            validWorkDays = validWorkDays.Except(leaveDays).ToList();
+
+            if (!validWorkDays.Any())
+            {
+                logger.Warning($"[{personName} {personSurname}] [{projectAcronym}] - No hay días hábiles disponibles");
+                return;
+            }
+
+            var maxHoursForMonth = await CalculateMaxHoursForPersonInMonth(personId, monthStart.Year, monthStart.Month);
+
+            decimal totalMonthlyHours = ajusteCompleto ? maxHoursForMonth * maxEffort : monthlyEffort * maxHoursForMonth;
+            decimal rawDailyHours = totalMonthlyHours / validWorkDays.Count;
+            decimal adjustedDailyHours = Math.Round(rawDailyHours * 2, MidpointRounding.AwayFromZero) / 2;
+            if (adjustedDailyHours == 0) adjustedDailyHours = 0.5m;
+
+            foreach (var day in validWorkDays)
+            {
+                var timesheet = await _context.Timesheets
+                    .FirstOrDefaultAsync(ts => ts.WpxPersonId == wpx.Id && ts.Day == day);
+
+                if (timesheet == null)
+                {
+                    _context.Timesheets.Add(new Timesheet
+                    {
+                        WpxPersonId = wpx.Id,
+                        Day = day,
+                        Hours = adjustedDailyHours
+                    });
+                    logger.Information($"[{personName} {personSurname}] Día {day:yyyy-MM-dd}: nuevo registro con {adjustedDailyHours} horas");
+                }
+                else
+                {
+                    decimal previous = timesheet.Hours;
+                    timesheet.Hours = adjustedDailyHours;
+                    logger.Information($"[{personName} {personSurname}] Día {day:yyyy-MM-dd}: actualizado de {previous} a {adjustedDailyHours} horas");
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            logger.Information($"Finalizado para el empleado {personId} en {monthStart:yyyy-MM}");
+        }
+        catch (Exception ex)
+        {
+            logger.Error($"Error en AutoFillTimesheetForPersonAndMonthAsync: {ex.Message}");
+        }
+        finally
+        {
+            logger.Dispose();
+        }
     }
 
 

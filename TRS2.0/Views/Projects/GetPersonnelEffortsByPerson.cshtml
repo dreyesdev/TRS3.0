@@ -99,29 +99,36 @@
                                                 cellClass += " out-of-contract";
                                                 cellStyle = "background-color: red;";
                                                 break;
+
                                             case 2:
                                                 cellClass += " overload";
                                                 cellStyle = "background-color: yellow;";
                                                 break;
-                                            default:
-                                                
-                                                // Para estados normales o cuando hay viajes, revisa Inside/Outside Travel
-                                                if (HasOutsideTravel(monthStatus.TravelDetails, projectEffort.ProjectId))
-                                                {
-                                                    cellStyle = hasGradient ? $"background-image: {monthStatus.Gradient}, hotpink;" : "background-color: hotpink;";
-                                                    
-                                                }
-                                                if (HasInsideTravel(monthStatus.TravelDetails, projectEffort.ProjectId))
-                                                {
-                                                    cellStyle = hasGradient ? $"background-image: {monthStatus.Gradient}, darkgreen;" : "background-color: darkgreen;";
-                                                }
-                                                
-                                                else if (hasGradient)
-                                                {
-                                                    cellStyle = $"background-image: {monthStatus.Gradient};";
-                                                }
-                                                break;
                                         }
+
+                                        // ✅ SOLO APLICA VIAJES Y GRADIENTE SI Status != 1 y != 2
+                                        if (monthStatus.Status != 1 && monthStatus.Status != 2)
+                                        {
+                                            if (HasOutsideTravel(monthStatus.TravelDetails, projectEffort.ProjectId))
+                                            {
+                                                cellStyle = hasGradient
+                                                ? $"background-image: {monthStatus.Gradient}, hotpink;"
+                                                : "background-color: hotpink;";
+                                            }
+
+                                            if (HasInsideTravel(monthStatus.TravelDetails, projectEffort.ProjectId))
+                                            {
+                                                cellStyle = hasGradient
+                                                ? $"background-image: {monthStatus.Gradient}, darkgreen;"
+                                                : "background-color: darkgreen;";
+                                            }
+
+                                            if (string.IsNullOrEmpty(cellStyle) && hasGradient)
+                                            {
+                                                cellStyle = $"background-image: {monthStatus.Gradient};";
+                                            }
+                                        }
+
 
                                         <td class="@cellClass" style="@cellStyle">
                                             @if (monthStatus.Month >= wp.StartDate && monthStatus.Month <= wp.EndDate)
@@ -133,7 +140,7 @@
                                                            data-personid="@personnelEffort.PersonId"
                                                            data-wpid="@wp.WpId"
                                                            data-month="@monthStatus.Month.ToString("yyyy-MM-dd")"
-                                                           data-original-value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? (personnelEffort.Efforts[monthStatus.Month] == 0 ? "0" : personnelEffort.Efforts[monthStatus.Month].ToString("0.00")) : "0")" />
+                                                           data-original-value="@((personnelEffort.Efforts.ContainsKey(monthStatus.Month)) ? (personnelEffort.Efforts[monthStatus.Month] == 0 ? "0.00" : personnelEffort.Efforts[monthStatus.Month].ToString("0.00")) : "0")" />
                                                 }
                                                 else
                                                 {

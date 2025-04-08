@@ -46,10 +46,19 @@
             <button id="nextMonthButton" class="btn btn-primary mx-2">Next</button>
         </div>
                 
-        <div class="d-flex justify-content-center align-items-center" style="width: 10%;">
-            <!-- Botón Save All con estilo verde -->
-            <button id="saveAllButton" class="btn btn-success">Save All</button>
-        </div>
+        @if ((bool?)ViewBag.ShowAutoFillButton == true)
+        {
+            <div class="d-flex justify-content-center align-items-center gap-2" style="width: 20%;">
+                <button id="saveAllButton" class="btn btn-success">Save All</button>
+                <button id="autoFillButton" class="btn btn-warning">Auto Fill</button>
+            </div>
+        }
+        else
+        {
+            <div class="d-flex justify-content-center align-items-center" style="width: 10%;">
+                <button id="saveAllButton" class="btn btn-success">Save All</button>
+            </div>
+        }
 
 
         <!-- Contenedor para la barra de progreso -->
@@ -486,6 +495,32 @@
             table.append(row);
         });
     });
+
+    document.getElementById('autoFillButton')?.addEventListener('click', async function () {
+        const personId = @Model.Person.Id;
+        const year = @Model.CurrentYear;
+        const month = @Model.CurrentMonth;
+
+        if (!confirm(`Are you sure you want to automatically fill in the timesheet for ${month}/${year}? This action may overwrite existing data.`)) return;
+
+
+        const response = await fetch('/Timesheet/AutoFillTimesheetForPersonAndMonth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                personId: personId,
+                targetMonth: `${year}-${String(month).padStart(2, '0')}-01T00:00:00`
+            })
+        });
+
+        const result = await response.json();
+        alert(result.message);
+
+        if (result.success) {
+            location.reload(); // recarga para reflejar los cambios
+        }
+    });
+
 </script>
 
 

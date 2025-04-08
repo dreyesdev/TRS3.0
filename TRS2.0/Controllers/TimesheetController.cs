@@ -74,6 +74,22 @@ namespace TRS2._0.Controllers
             var startDate = new DateTime(currentYear, currentMonth, 1);
             var endDate = startDate.AddMonths(1).AddDays(-1);
 
+            var canAutoFill = await (from pf in _context.Persefforts
+                                     join wxp in _context.Wpxpeople on pf.WpxPerson equals wxp.Id
+                                     where pf.Value != 0 &&
+                                           pf.Month.Year == currentYear &&
+                                           pf.Month.Month == currentMonth &&
+                                           wxp.Person == validPersonId
+                                     group pf by new { wxp.Person, pf.Month } into g
+                                     where g.Count() == 1
+                                     select g.Key).AnyAsync();
+
+            bool isPastMonth = new DateTime(currentYear, currentMonth, 1) < new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+
+            ViewBag.ShowAutoFillButton = canAutoFill && isPastMonth;
+
+
+
             // Obtener las bajas de tipo 11 y 12 para el mes actual
             var leaveReductions = await _context.Leaves
                 .Where(l => l.PersonId == validPersonId &&
@@ -310,7 +326,10 @@ namespace TRS2._0.Controllers
                                         .Select(r => r.Name + " " + r.Surname)
                                         .FirstOrDefault();
 
-            var totalWorkHours = hoursPerDayWithDedication.Sum(entry => entry.Value);
+            var totalWorkHours = hoursPerDayWithDedication
+                                .Where(entry => !leavesthismonth.Any(leave => leave.Day == entry.Key) && !holidays.Contains(entry.Key))
+                                .Sum(entry => entry.Value);
+
             decimal percentageUsed = totalWorkHours > 0 ? hoursUsed / totalWorkHours * 100 : 0;
 
             var totalWorkHoursWithDedication = timesheets
@@ -324,6 +343,16 @@ namespace TRS2._0.Controllers
 
             foreach (var day in hoursPerDayWithDedication.Keys)
             {
+                // Excluir si el día es festivo, está de baja (distinta de tipo 11/12) o está de vacaciones
+                bool isHoliday = holidays.Contains(day);
+                bool isLeave = leavesthismonth.Any(leave => leave.Day == day && leave.Type != 11 && leave.Type != 12);
+
+                if (isHoliday || isLeave)
+                {
+                    hoursForOtherProjects[day] = 0;
+                    continue;
+                }
+
                 var maxHoursForDay = hoursPerDayWithDedication[day];
                 if (maxHoursForDay > 0)
                 {
@@ -1176,5 +1205,53 @@ namespace TRS2._0.Controllers
 
             return lastLogin != default ? lastLogin.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
         }
+
+        [HttpPost]
+        public async Task<IActionResult> AutoFillTimesheetForPersonAndMonth([FromBody] AutoFillRequest model)
+        {
+            if (model == null || model.PersonId <= 0)
+                return Json(new { success = false, message = "Petición inválida." });
+
+            var monthStart = new DateTime(model.TargetMonth.Year, model.TargetMonth.Month, 1);
+
+            // Verificamos si cumple condiciones para poder autocompletar
+            var cumpleCondiciones = await (from pf in _context.Persefforts
+                                           join wxp in _context.Wpxpeople on pf.WpxPerson equals wxp.Id
+                                           where pf.Value != 0 &&
+                                                 pf.Month.Year == monthStart.Year &&
+                                                 pf.Month.Month == monthStart.Month &&
+                                                 wxp.Person == model.PersonId
+                                           group pf by new { wxp.Person, pf.Month } into g
+                                           where g.Count() == 1
+                                           select g.Key).AnyAsync();
+
+            bool esMesPasado = monthStart < new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+
+            if (!cumpleCondiciones || !esMesPasado)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = $"No se puede ejecutar el proceso. Verifica que el mes sea pasado y que la persona tenga effort en un único WP en ese mes."
+                });
+            }
+
+            try
+            {
+                await _workCalendarService.AutoFillTimesheetForPersonAndMonthAsync(model.PersonId, monthStart);
+                return Json(new { success = true, message = "Timesheet completado correctamente." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
+            }
+        }
+
+        public class AutoFillRequest
+        {
+            public int PersonId { get; set; }
+            public DateTime TargetMonth { get; set; }
+        }
+
     }
 }

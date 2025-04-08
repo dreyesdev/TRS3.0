@@ -553,22 +553,30 @@ namespace TRS2._0.Controllers
 
         // Método para aprobar un viaje (cambiar el estado a 3)
         [HttpPost]
-        public async Task<IActionResult> ApproveTravel(int id)
+        public async Task<IActionResult> ApproveTravel(string id)
         {
-            // Buscamos el viaje por su ID
-            var travel = await _context.Liquidations.FindAsync(id);
-            if (travel == null)
+            try
             {
-                // Si no se encuentra, devolvemos un error
-                return Json(new { success = false, message = "Registro de viaje no encontrado." });
+                // Buscamos el viaje por su ID
+                var travel = await _context.Liquidations.FindAsync(id);
+                if (travel == null)
+                {
+                    // Si no se encuentra, devolvemos un error
+                    return Json(new { success = false, message = "Registro de viaje no encontrado." });
+                }
+
+                // Cambiamos el estado a 3 (aprobado)
+                travel.Status = "0";
+                _context.Update(travel); // Marcamos el cambio
+                await _context.SaveChangesAsync(); // Guardamos en la base de datos
+
+                return Json(new { success = true, message = "Viaje aprobado correctamente." }); // Respuesta de éxito
             }
-
-            // Cambiamos el estado a 3 (aprobado)
-            travel.Status = "3";
-            _context.Update(travel); // Marcamos el cambio
-            await _context.SaveChangesAsync(); // Guardamos en la base de datos
-
-            return Json(new { success = true, message = "Viaje aprobado correctamente." }); // Respuesta de éxito
+            catch (Exception ex)
+            {
+                // Manejar errores inesperados
+                return Json(new { success = false, message = $"Error al aprobar el viaje: {ex.Message}" });
+            }
         }
 
         [HttpPost]

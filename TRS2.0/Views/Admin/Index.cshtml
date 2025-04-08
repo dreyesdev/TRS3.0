@@ -78,8 +78,25 @@
         </div>
     </div>
 
+    <h3>Reset User Password</h3>
+    <form id="resetPasswordForm">
+        <select name="userId" id="userSelect" class="form-control mb-2">
+            @foreach (var user in Model.Users)
+            {
+                <option value="@user.Value">@user.Text</option>
+            }
+        </select>
+        <button type="submit" class="btn btn-warning">Reset Password</button>
+    </form>
 
-
+    <div id="resetResult" class="mt-2 text-info"></div>
+    <div id="passwordContainer" class="mt-2" style="display: none;">
+        <label><strong>New password:</strong></label>
+        <div class="input-group">
+            <input type="text" id="generatedPassword" class="form-control" readonly>
+            <button class="btn btn-outline-secondary" type="button" onclick="copyPassword()">📋 Copy</button>
+        </div>
+    </div>
 
 
     <!-- Primera fila: Trabajos Automatizados -->
@@ -146,7 +163,7 @@
         <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-header bg-warning text-white">
-                    <h4>Generar Valores PM</h4>
+                    <h4>Generar Valores PM Mes/Año</h4>
                 </div>
                 <div class="card-body">
                     <form asp-action="GeneratePMValues" method="post" class="row g-3">
@@ -163,6 +180,22 @@
                         </div>
                     </form>
                 </div>
+
+                <div class="card h-100">
+                    <div class="card-header bg-warning text-white">
+                        <h4>Generar Valores PM Año</h4>
+                    </div>
+                    <div class="card-body">
+                        <form asp-action="GenerateYearlyPMValues" method="post" class="row g-3">
+                            <div class="col-md-6">
+                                <label for="year" class="form-label">Año</label>
+                                <input type="number" name="year" class="form-control" placeholder="Year" required />
+                            </div>                            
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary w-100">Generar</button>
+                            </div>
+                        </form>
+                    </div>
             </div>
         </div>
     </div>
@@ -360,6 +393,31 @@
             </div>
         </div>
     </div>
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h4>Ajustar Timesheet de una Persona y Mes</h4>
+            </div>
+            <div class="card-body">
+                <form id="fill-person-timesheet-form">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label for="personSearchInput" class="form-label">Buscar Persona</label>
+                            <input type="text" id="personSearchInput" class="form-control" placeholder="Nombre o Apellidos" autocomplete="off" />
+                            <input type="hidden" id="selectedPersonId" />
+                            <div id="personSearchResults" class="list-group position-absolute" style="z-index: 9999;"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="targetMonth" class="form-label">Mes</label>
+                            <input type="month" id="targetMonth" class="form-control" required />
+                        </div>
+                        <div class="col-12">
+                            <button type="button" class="btn btn-primary w-100" onclick="runPersonMonthTimesheet()">Ejecutar Proceso</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
 
     <!-- Novena fila: Generar Informe de Ajustes de Timesheets -->
     <div class="row mb-4">
@@ -619,10 +677,107 @@
             }
         });
 
+            $("#resetPasswordForm").submit(function (e) {
+                e.preventDefault();
+                var userId = $("#userSelect").val();
+                $.post('/Account/AdminResetPassword', { userId: userId }, function (data) {
+                    if (data.success) {
+                        $("#resetResult").html(data.message).removeClass("text-danger").addClass("text-success");
+                    } else {
+                        $("#resetResult").html(data.message).removeClass("text-success").addClass("text-danger");
+
+                        if (data.password) {
+                            $("#resetResult").append("<br><strong>New password:</strong> " + data.password);
+                        }
+                    }
+                });
+            });
+
+            function copyPassword() {
+                var passwordInput = document.getElementById("generatedPassword");
+                passwordInput.select();
+                passwordInput.setSelectionRange(0, 99999); // Mobile support
+                document.execCommand("copy");
+                alert("Password copied to clipboard!");
+            }
+
+            $("#resetPasswordForm").submit(function (e) {
+                e.preventDefault();
+                var userId = $("#userSelect").val();
+                $.post('/Account/AdminResetPassword', { userId: userId }, function (data) {
+                    $("#resetResult").text(data.message);
+                    if (data.success) {
+                        $("#resetResult").removeClass("text-danger").addClass("text-success");
+                    } else {
+                        $("#resetResult").removeClass("text-success").addClass("text-danger");
+                    }
+
+                    if (data.password) {
+                        $("#passwordContainer").show();
+                        $("#generatedPassword").val(data.password); // ✅ esto pone el valor correcto
+                    } else {
+                        $("#passwordContainer").hide();
+                        $("#generatedPassword").val(''); // ✅ limpia el campo anterior
+                    }
+                });
+            });
         function showLogDetails(message) {
             document.getElementById("logDetailsContent").innerHTML = message;
         }
 
         document.addEventListener('DOMContentLoaded', loadProjects);
+
+            document.getElementById("personSearchInput").addEventListener("input", async function () {
+                const query = this.value.trim();
+                const resultsDiv = document.getElementById("personSearchResults");
+                resultsDiv.innerHTML = "";
+
+                if (query.length < 2) return;
+
+                const response = await fetch(`/Admin/SearchPersonByName?query=${encodeURIComponent(query)}`);
+                const results = await response.json();
+
+                if (results.length === 0) {
+                    resultsDiv.innerHTML = '<div class="list-group-item disabled">No encontrado</div>';
+                    return;
+                }
+
+                results.forEach(p => {
+                    const item = document.createElement("button");
+                    item.type = "button";
+                    item.className = "list-group-item list-group-item-action";
+                    item.textContent = `${p.name} ${p.surname}`;
+                    item.onclick = function () {
+                        document.getElementById("personSearchInput").value = `${p.name} ${p.surname}`;
+                        document.getElementById("selectedPersonId").value = p.id;
+                        resultsDiv.innerHTML = "";
+                    };
+                    resultsDiv.appendChild(item);
+                });
+            });
+
+            async function runPersonMonthTimesheet() {
+                const personId = document.getElementById("selectedPersonId").value;
+                const month = document.getElementById("targetMonth").value;
+
+                if (!personId || !month) {
+                    alert("Por favor selecciona una persona válida y un mes.");
+                    return;
+                }
+
+                const response = await fetch('/Admin/AutoFillTimesheetForPersonAndMonth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        personId: parseInt(personId),
+                        targetMonth: `${month}-01T00:00:00`
+                    })
+                });
+
+                const result = await response.json();
+                alert(result.message);
+            }
+
+            
     </script>
 }

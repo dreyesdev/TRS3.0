@@ -747,15 +747,38 @@ namespace TRS2._0.Controllers
                     decimal currentEffort = perseffort?.Value ?? 0m;
                     decimal newEffort = effortData.Effort;
 
-                    var totalEffortsPerMonth = await _workCalendarService.CalculateMonthlyEffortForPerson(effortData.PersonId, effortData.Month.Year, effortData.Month.Month);
-                    var maxPMPerson = await _workCalendarService.CalculateMonthlyPM(effortData.PersonId, effortData.Month.Year, effortData.Month.Month);
+                    var totalEffortsPerMonth = await _workCalendarService.CalculateMonthlyEffortForPersonWithoutCurrentWP(effortData.PersonId, wpxPerson.WpNavigation.Id, effortData.Month.Year, effortData.Month.Month); 
+                    var maxPMPerson = await _context.PersMonthEfforts
+                        .Where(pme => pme.PersonId == effortData.PersonId && pme.Month.Year == effortData.Month.Year && pme.Month.Month == effortData.Month.Month)
+                        .Select(pme => pme.Value)
+                        .FirstOrDefaultAsync();
+                    if (maxPMPerson == null || maxPMPerson == 0)
+                    {     
+                        notifications.Add($"No PM value found for {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}.");
+                        continue;
+                    }
+
+                    // Verificar si es el mes de inicio o fin del proyecto y ajustar el maxPM si es necesario
+                    DateTime projectStartDate = (DateTime)project.Start;
+                    DateTime projectEndDate = project.EndReportDate;
+                    DateTime effortMonthStart = new DateTime(effortData.Month.Year, effortData.Month.Month, 1);
+                    DateTime effortMonthEnd = new DateTime(effortData.Month.Year, effortData.Month.Month, DateTime.DaysInMonth(effortData.Month.Year, effortData.Month.Month));
+                    decimal maxPM = decimal.MaxValue; // Por defecto, no limitar el esfuerzo
+
+                    if ((effortMonthStart < projectStartDate && effortMonthEnd >= projectStartDate) ||
+                        (effortMonthStart <= projectEndDate && effortMonthEnd > projectEndDate))
+                    {
+                        maxPMPerson = await _workCalendarService.CalculateAdjustedMonthlyPM(effortData.PersonId, effortData.Month.Year, effortData.Month.Month, projectStartDate, projectEndDate);
+                        notifications.Add($"Adjusted PM value for {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy} is {maxPMPerson} due to date limitations.");
+                    }
+
                     decimal availableEffort = maxPMPerson - totalEffortsPerMonth;
 
                     // Condición para manejar la reducción de esfuerzos
                     if (newEffort < currentEffort)
                     {
                         // Permitir reducir el esfuerzo siempre y cuando no resulte en un valor negativo
-                        if (currentEffort - newEffort >= 0)
+                        if (newEffort >= 0)
                         {
                             perseffort.Value = newEffort; // Actualiza directamente al nuevo esfuerzo
                         }
@@ -764,48 +787,37 @@ namespace TRS2._0.Controllers
                             notifications.Add($"Cannot reduce effort to less than 0 for {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}.");
                         }
                     }
-                    if (newEffort > currentEffort && availableEffort <= 0) // Si intentamos aumentar el esfuerzo pero no hay disponibilidad
-                    {
-                        notifications.Add($"For {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}, there is no available capacity to increase efforts.");
-                        continue; // Salta al siguiente esfuerzo sin intentar guardar este cambio
-                    }
                     else
-                    {
-                        
-                        decimal effortToSave = Math.Min(newEffort, availableEffort + currentEffort);
-
-                        // Verificar si es el mes de inicio o fin del proyecto y ajustar el maxPM si es necesario
-                        DateTime projectStartDate = (DateTime)project.Start;
-                        DateTime projectEndDate = project.EndReportDate;
-                        DateTime effortMonthStart = new DateTime(effortData.Month.Year, effortData.Month.Month, 1);
-                        DateTime effortMonthEnd = new DateTime(effortData.Month.Year, effortData.Month.Month, DateTime.DaysInMonth(effortData.Month.Year, effortData.Month.Month));
-                        decimal maxPM = decimal.MaxValue; // Por defecto, no limitar el esfuerzo
-
-                        if ((effortMonthStart < projectStartDate && effortMonthEnd >= projectStartDate) ||
-                            (effortMonthStart <= projectEndDate && effortMonthEnd > projectEndDate))
+                    { 
+                        if (availableEffort <= 0) // Si intentamos aumentar el esfuerzo pero no hay disponibilidad
                         {
-                            maxPM = await _workCalendarService.CalculateAdjustedMonthlyPM(effortData.PersonId, effortData.Month.Year, effortData.Month.Month, projectStartDate, projectEndDate);
-                        }
-
-                        if (newEffort > availableEffort || newEffort > maxPM)
-                        {
-                            effortToSave = Math.Min(availableEffort + currentEffort, maxPM);
-                            decimal overflow = newEffort - effortToSave;
-                            notifications.Add($"For {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}, only {effortToSave - currentEffort} was saved due to availability or project date limits. {overflow} could not be saved.");
-                        }
-
-                        if (perseffort != null)
-                        {
-                            perseffort.Value = effortToSave;
+                            notifications.Add($"For {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}, there is no available capacity to increase efforts.");
+                            continue; // Salta al siguiente esfuerzo sin intentar guardar este cambio
                         }
                         else
                         {
-                            _context.Persefforts.Add(new Perseffort
+                        
+                            decimal effortToSave = Math.Min(newEffort, availableEffort);
+                                                        
+                            if (newEffort > availableEffort)
                             {
-                                WpxPerson = wpxPerson.Id,
-                                Month = effortData.Month,
-                                Value = effortToSave
-                            });
+                                decimal overflow = newEffort - availableEffort;                                                             
+                                notifications.Add($"For {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}, only {availableEffort} was saved due to availability or project limits. {overflow} could not be saved.");
+                            }
+
+                            if (perseffort != null)
+                            {
+                                perseffort.Value = effortToSave;
+                            }
+                            else
+                            {
+                                _context.Persefforts.Add(new Perseffort
+                                {
+                                    WpxPerson = wpxPerson.Id,
+                                    Month = effortData.Month,
+                                    Value = effortToSave
+                                });
+                            }
                         }
                     }
                 }
@@ -1768,25 +1780,141 @@ namespace TRS2._0.Controllers
             }
         }
 
-
-        private string RemoveAccents(string input)
+        [HttpPost]
+        public async Task<IActionResult> ExportPmsAuditoriaByWP([FromBody] ExportRequest request)
         {
-            string normalizedString = input.Normalize(NormalizationForm.FormD);
-            StringBuilder stringBuilder = new StringBuilder();
-
-            foreach (char c in normalizedString)
+            try
             {
-                if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
-                {
-                    stringBuilder.Append(c);
-                }
-            }
+                _logger.LogInformation("Inicio de ExportPmsAuditoriaByWP");
 
-            return stringBuilder.ToString();
+                if (request == null || request.ProjectId == 0 || string.IsNullOrEmpty(request.StartDate) || string.IsNullOrEmpty(request.EndDate))
+                {
+                    _logger.LogWarning("Datos de solicitud inválidos.");
+                    return BadRequest("Invalid request data.");
+                }
+
+                if (!DateTime.TryParseExact(request.StartDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var startDate) ||
+                    !DateTime.TryParseExact(request.EndDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var endDate))
+                {
+                    _logger.LogWarning("Formato de fecha inválido.");
+                    return BadRequest("Invalid date format.");
+                }
+
+                var project = await _context.Projects
+                    .Include(p => p.Wps)
+                        .ThenInclude(wp => wp.Wpxpeople)
+                            .ThenInclude(wpx => wpx.PersonNavigation)
+                    .FirstOrDefaultAsync(p => p.ProjId == request.ProjectId);
+
+                if (project == null)
+                {
+                    _logger.LogWarning($"Proyecto no encontrado: {request.ProjectId}");
+                    return NotFound("Proyecto no encontrado.");
+                }
+
+                var dateList = new List<DateTime>();
+                for (var date = startDate; date <= endDate; date = date.AddMonths(1))
+                    dateList.Add(date);
+
+                var personPmData = new Dictionary<string, Dictionary<string, Dictionary<DateTime, double>>>();
+
+                foreach (var wp in project.Wps)
+                {
+                    foreach (var wpx in wp.Wpxpeople)
+                    {
+                        var person = wpx.PersonNavigation;
+                        var personKey = $"{RemoveAccents(person.Surname)}, {RemoveAccents(person.Name)}";
+
+                        if (!personPmData.ContainsKey(personKey))
+                            personPmData[personKey] = new Dictionary<string, Dictionary<DateTime, double>>();
+
+                        if (!personPmData[personKey].ContainsKey(wp.Name))
+                            personPmData[personKey][wp.Name] = new Dictionary<DateTime, double>();
+
+                        foreach (var date in dateList)
+                        {
+                            double percentage = 0;
+                            try
+                            {
+                                var year = date.Year;
+                                var month = date.Month;
+
+                                _logger.LogInformation($"Procesando {personKey} - {wp.Name} - {date:yyyy-MM}");
+
+                                var estimatedHours = await _workCalendarService.CalculateEstimatedHoursForPersonInWorkPackage(person.Id, wp.Id, year, month);
+
+                                var affiliation = _context.AffxPersons
+                                    .Where(ap => ap.PersonId == person.Id && ap.Start <= date && ap.End >= date)
+                                    .OrderByDescending(ap => ap.Start)
+                                    .FirstOrDefault()?.AffId;
+
+                                if (affiliation != null)
+                                {
+                                    var maxHours = _context.AffGlobalHours
+                                        .FirstOrDefault(h => h.Aff == affiliation && h.Year == year)?.Hours ?? 0;
+                                    var maxHoursPerMonth = maxHours / 12m;
+                                    double maxHoursPerMonthDouble = (double)maxHoursPerMonth;
+
+                                    percentage = maxHoursPerMonthDouble > 0
+                                        ? Math.Round((double)estimatedHours / maxHoursPerMonthDouble, 2)
+                                        : 0;
+                                }
+                                else
+                                {
+                                    _logger.LogWarning($"Afiliación no encontrada para {personKey} en {date:yyyy-MM}");
+                                }
+                            }
+                            catch (Exception innerEx)
+                            {
+                                _logger.LogError(innerEx, $"Error interno al calcular porcentaje para {personKey} en {date:yyyy-MM}");
+                                percentage = 0;
+                            }
+
+                            personPmData[personKey][wp.Name][date] = percentage;
+                        }
+                    }
+                }
+
+                _logger.LogInformation("Construyendo CSV...");
+
+                var csv = new StringBuilder();
+                csv.Append("PersonName;WpName");
+                foreach (var date in dateList)
+                    csv.Append($";{date.ToString("MMM yyyy", CultureInfo.InvariantCulture)}");
+                csv.AppendLine();
+
+                var orderedData = personPmData
+                    .SelectMany(p => p.Value.Select(wp => new { PersonName = p.Key, WpName = wp.Key, Values = wp.Value }))
+                    .OrderBy(x => x.WpName)
+                    .ThenBy(x => x.PersonName.Split(',')[0]);
+
+                foreach (var entry in orderedData)
+                {
+                    csv.Append($"{entry.PersonName};{entry.WpName}");
+                    foreach (var date in dateList)
+                    {
+                        var value = entry.Values.ContainsKey(date) ? entry.Values[date] : 0;
+                        csv.Append($";{value.ToString("0.00", new CultureInfo("es-ES"))}");
+                    }
+                    csv.AppendLine();
+                }
+
+                var bytes = Encoding.UTF8.GetBytes(csv.ToString());
+                _logger.LogInformation("Exportación completada con éxito.");
+                return File(bytes, "text/csv", $"PmsAuditByWP_{request.ProjectId}_{DateTime.Now:yyyyMMddHHmmss}.csv");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error general en ExportPmsAuditoriaByWP");
+                return StatusCode(500, "Error interno del servidor.");
+            }
         }
 
-
-        
+        private string RemoveAccents(string text)
+        {
+            return string.Concat(text.Normalize(NormalizationForm.FormD)
+                .Where(ch => CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark));
+        }
 
         public class ExportRequest
         {

@@ -133,18 +133,34 @@ namespace TRS2._0.Controllers
                     int workingDays = await _workCalendarService.CalculateWorkingDays(year, month);
                     decimal pmValuePerDay = workingDays > 0 ? Math.Round((decimal)(1.0 / workingDays), 6) : 0;
 
-                    var newDailyPMValue = new DailyPMValue
-                    {
-                        Year = year,
-                        Month = month,
-                        WorkableDays = workingDays,
-                        PmPerDay = pmValuePerDay
-                    };
+                    var existingValue = await _context.DailyPMValues
+                        .FirstOrDefaultAsync(d => d.Year == year && d.Month == month);
 
-                    dailyPMValues.Add(newDailyPMValue);
+                    if (existingValue != null)
+                    {
+                        existingValue.WorkableDays = workingDays;
+                        existingValue.PmPerDay = pmValuePerDay;
+                        _context.DailyPMValues.Update(existingValue);
+                    }
+                    else
+                    {
+                        var newDailyPMValue = new DailyPMValue
+                        {
+                            Year = year,
+                            Month = month,
+                            WorkableDays = workingDays,
+                            PmPerDay = pmValuePerDay
+                        };
+
+                        dailyPMValues.Add(newDailyPMValue);
+                    }
                 }
 
-                _context.DailyPMValues.AddRange(dailyPMValues);
+                if (dailyPMValues.Any())
+                {
+                    _context.DailyPMValues.AddRange(dailyPMValues);
+                }
+
                 await _context.SaveChangesAsync();
 
                 return Json(new { success = true });
@@ -633,9 +649,66 @@ namespace TRS2._0.Controllers
             return RedirectToAction("Index");
         }
 
+        public async Task<IActionResult> SearchPersonByName(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return Json(new List<object>());
+
+            var results = await _context.Personnel
+                .Where(p => (p.Name + " " + p.Surname).Contains(query))
+                .OrderBy(p => p.Name)
+                .Take(15)
+                .Select(p => new { id = p.Id, name = p.Name, surname = p.Surname })
+                .ToListAsync();
+
+            return Json(results);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> AutoFillTimesheetForPersonAndMonth([FromBody] AutoFillRequest model)
+        {
+            if (model == null || model.PersonId <= 0)
+                return Json(new { success = false, message = "Petición inválida." });
+
+            var monthStart = new DateTime(model.TargetMonth.Year, model.TargetMonth.Month, 1);
+
+            // Validación de condiciones
+            var cumpleCondiciones = await (from pf in _context.Persefforts
+                                           join wxp in _context.Wpxpeople on pf.WpxPerson equals wxp.Id
+                                           where pf.Value != 0 &&
+                                                 pf.Month.Year == monthStart.Year &&
+                                                 pf.Month.Month == monthStart.Month &&
+                                                 wxp.Person == model.PersonId
+                                           group pf by new { wxp.Person, pf.Month } into g
+                                           where g.Count() == 1
+                                           select g.Key).AnyAsync();
+
+            if (!cumpleCondiciones)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = $"No se puede ejecutar el proceso para la persona seleccionada en {monthStart:yyyy-MM}. No cumple los requisitos (debe tener effort en un único WP en ese mes)."
+                });
+            }
+
+            try
+            {
+                await _loadDataService.AutoFillTimesheetForPersonAndMonthAsync(model.PersonId, monthStart);
+                return Json(new { success = true, message = "Proceso completado correctamente." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
+            }
+        }
 
 
-
+        public class AutoFillRequest
+        {
+            public int PersonId { get; set; }
+            public DateTime TargetMonth { get; set; }
+        }
     }
 
 
