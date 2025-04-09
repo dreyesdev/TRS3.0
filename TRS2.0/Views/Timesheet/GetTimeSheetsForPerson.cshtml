@@ -5,11 +5,13 @@
 @{
     ViewData["Title"] = "Timesheet Overview";
     var monthName = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(@Model.CurrentMonth);
-    var monthNameCapitalized = char.ToUpper(monthName[0]) + monthName.Substring(1);
+    var monthNameCapitalized = new DateTime(Model.CurrentYear, Model.CurrentMonth, 1)
+        .ToString("MMMM", System.Globalization.CultureInfo.CreateSpecificCulture("en"));
 }    
 <script src="~/lib/jquery/dist/jquery.min.js"></script>
-<div class="container-fluid" style="max-width: 2000px;  padding-right: 5; padding-left: 5; margin-right: auto; margin-left: auto;">
+<div class="container-fluid" style="max-width: 2000px;  padding-right: 5; padding-left: 5; margin-right: auto; margin-left: auto;">   
     <h2 style="margin-bottom: 0;">Timesheet for @Model.Person.Name @Model.Person.Surname - @monthNameCapitalized @Model.CurrentYear</h2>
+
     <!-- Sección de controles para cambiar de mes, con el selector de fechas en el centro -->
     <div class="d-flex justify-content-between mb-3">
         <!-- Contenedor para botones, selectores y "Save All" -->
@@ -20,18 +22,18 @@
             <!-- Selectores de Mes y Año -->
             <select id="monthSelect" class="form-control mx-2">
                 <option value="">Select the month</option>
-                <option value="1">Enero</option>
-                <option value="2">Febrero</option>
-                <option value="3">Marzo</option>
-                <option value="4">Abril</option>
-                <option value="5">Mayo</option>
-                <option value="6">Junio</option>
-                <option value="7">Julio</option>
-                <option value="8">Agosto</option>
-                <option value="9">Septiembre</option>
-                <option value="10">Octubre</option>
-                <option value="11">Noviembre</option>
-                <option value="12">Diciembre</option>
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
             </select>
             <select id="yearSelect" class="form-control mx-2">
                 <option value="">Select the year</option>
@@ -83,7 +85,7 @@
                 <thead class="thead-dark">
                     <tr>
                         <th class="sticky-column sticky-header">
-                            <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">Project - Acronim</div>
+                            <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">Project</div>
                             <div style="text-align: center;">WP - Title</div>
 
                         </th>
@@ -101,7 +103,7 @@
                             <div style="border-bottom: 1px solid white; margin-bottom: 2px; text-align: center; font-weight: bold">ACTUAL</div>
                             <div style="text-align: center; font-weight: bold;">ESTIMATED HOURS</div>
                         </th> <!-- Columna de Total -->
-                        <th>%</th> <!-- Nueva columna -->
+                        <th class="sticky-last-column">%</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -110,7 +112,7 @@
                         <tr>
                             <td class="single-line-cell sticky-column">
                                 
-                                <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">@wp.ProjectSAPCode - (@wp.ProjectName)</div>
+                                <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">@* @wp.ProjectSAPCode*@@wp.ProjectName</div>
                                 <div style="text-align: center;">@wp.WpName - @wp.WpTitle</div>
 
                             </td>
@@ -216,7 +218,7 @@
                                     @totalEstimado.ToString("0.#")
                                 </div>
                             </td>
-                            <td>@String.Format("{0:P1}", wp.Effort)</td> <!-- Nueva columna -->
+                            <td class="sticky-last-column">@String.Format("{0:P1}", wp.Effort)</td>
                         </tr>
                     }
                     <!-- Fila de Totales aquí -->
@@ -283,13 +285,15 @@
 <hr/>
 <div class="below-main-table" style="display: flex; justify-content: space-between; margin-top: 10px;">
     <div class="legend-box" style="width: 300px; margin-left:10px; padding: 10px; margin-top: 10px; margin-bottom: 15px; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,.1);">
-    <h4 style="margin-bottom: 20px; text-align: center; font-weight: bold">Leyend</h4>
+    <h4 style="margin-bottom: 20px; text-align: center; font-weight: bold">Legend</h4>
     <div class="mb-2">
         <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: darkorange; border: 1px solid black;">&nbsp;</span>
         <span style="margin-left: 8px;">Leave</span>
     </div>
+    <div class="mb-2">
         <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: lightcoral; border: 1px solid black;">&nbsp;</span>
         <span style="margin-left: 8px;">Partial Leave</span>
+        </div>
     <div class="mb-2">
         <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: lightblue; border: 1px solid black;">&nbsp;</span>
         <span style="margin-left: 8px;">Holiday</span>
@@ -313,10 +317,10 @@
             <thead>
                 <tr>
                     <th>Liquidation Id</th>
-                    <th>Projecto</th>
+                    <th>Project</th>
                     <th>Dedication</th>
-                    <th>StartDate</th>
-                    <th>EndDate</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
                 </tr>
             </thead>
             <tbody>

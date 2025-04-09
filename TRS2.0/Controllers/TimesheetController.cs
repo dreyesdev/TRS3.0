@@ -327,8 +327,8 @@ namespace TRS2._0.Controllers
                                         .FirstOrDefault();
 
             var totalWorkHours = hoursPerDayWithDedication
-                                .Where(entry => !leavesthismonth.Any(leave => leave.Day == entry.Key) && !holidays.Contains(entry.Key))
-                                .Sum(entry => entry.Value);
+                .Where(entry => !leavesthismonth.Any(leave => leave.Day == entry.Key && leave.Type != 11 && leave.Type != 12) && !holidays.Contains(entry.Key))
+                .Sum(entry => entry.Value);
 
             decimal percentageUsed = totalWorkHours > 0 ? hoursUsed / totalWorkHours * 100 : 0;
 
@@ -1031,7 +1031,7 @@ namespace TRS2._0.Controllers
                                 // Leyenda de colores
                                 legendColorTravelsCol.Item().Border(1).BorderColor("#000").Padding(5).Column(col =>
                                 {
-                                    col.Item().AlignCenter().Text("Leyend").Bold().FontSize(10);
+                                    col.Item().AlignCenter().Text("Legend").Bold().FontSize(10);
 
                                     var colors = new Dictionary<string, string>
                                                 {
