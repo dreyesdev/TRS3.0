@@ -155,7 +155,8 @@ namespace TRS2._0.Controllers
                     return View(model);
                 }
 
-                var password = GeneratePassword();
+                var password = await GenerateValidPasswordAsync();
+
 
                 // Actualizar la tabla personnel
                 personnel.Password = password;
@@ -342,7 +343,7 @@ namespace TRS2._0.Controllers
                 return Json(new { success = false, message = "Linked personnel not found." });
             }
 
-            string password = GeneratePassword();
+            var password = await GenerateValidPasswordAsync();
 
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
             // Reload the user to avoid concurrency issues
@@ -395,7 +396,7 @@ namespace TRS2._0.Controllers
 
 
 
-        private string GeneratePassword()
+        private async Task<string> GenerateValidPasswordAsync()
         {
             const int length = 12;
             const string uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -403,25 +404,36 @@ namespace TRS2._0.Controllers
             const string digits = "0123456789";
             const string specialChars = "!@#$%^&*()-_=+<>,.?/";
 
+            string allChars = uppercase + lowercase + digits + specialChars;
             Random rnd = new Random();
 
-            // Aseguramos que haya al menos un carácter de cada tipo
-            string password =
-                uppercase[rnd.Next(uppercase.Length)].ToString() +
-                lowercase[rnd.Next(lowercase.Length)] +
-                digits[rnd.Next(digits.Length)] +
-                specialChars[rnd.Next(specialChars.Length)];
-
-            // Llenamos el resto con caracteres aleatorios de todos los tipos
-            string allChars = uppercase + lowercase + digits + specialChars;
-            for (int i = 4; i < length; i++)
+            while (true)
             {
-                password += allChars[rnd.Next(allChars.Length)];
-            }
+                string password =
+                    uppercase[rnd.Next(uppercase.Length)].ToString() +
+                    lowercase[rnd.Next(lowercase.Length)] +
+                    digits[rnd.Next(digits.Length)] +
+                    specialChars[rnd.Next(specialChars.Length)];
 
-            // Mezclar aleatoriamente los caracteres de la contraseña
-            return new string(password.ToCharArray().OrderBy(x => rnd.Next()).ToArray());
+                for (int i = 4; i < length; i++)
+                {
+                    password += allChars[rnd.Next(allChars.Length)];
+                }
+
+                // Mezclar caracteres
+                password = new string(password.ToCharArray().OrderBy(x => rnd.Next()).ToArray());
+
+                // Validar usando el validador real de Identity
+                var tempUser = new ApplicationUser(); // Usuario temporal
+                if (await ValidatePasswordAsync(tempUser, password))
+                {
+                    return password;
+                }
+
+                // Si no es válido, se genera de nuevo (while loop)
+            }
         }
+
 
 
         private string HashPassword(string password)
@@ -442,5 +454,20 @@ namespace TRS2._0.Controllers
         {
             return View();
         }
+
+        private async Task<bool> ValidatePasswordAsync(ApplicationUser user, string password)
+        {
+            var validators = _userManager.PasswordValidators;
+            foreach (var validator in validators)
+            {
+                var result = await validator.ValidateAsync(_userManager, user, password);
+                if (!result.Succeeded)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
     }
 }

@@ -127,26 +127,54 @@ namespace TRS2._0.Controllers
 
             var maxhoursthismonth = await _workCalendarService.CalculateMaxHoursForPersonInMonth(validPersonId, currentYear, currentMonth);
 
-            // Obtener WPs para la persona en el rango de fecha especificado
-            var wpxPersons = await _context.Wpxpeople
+            // ANTIGUO, SOLO PERSONAS CON WP CON EFFORT//
+            //// Obtener WPs para la persona en el rango de fecha especificado
+            //var wpxPersons = await _context.Wpxpeople
+            //    .Include(wpx => wpx.PersonNavigation)
+            //    .Include(wpx => wpx.WpNavigation)
+            //        .ThenInclude(wp => wp.Proj)
+            //    .Where(wpx => wpx.Person == personId && wpx.WpNavigation.StartDate <= endDate && wpx.WpNavigation.EndDate >= startDate)
+            //    .Select(wpx => new
+            //    {
+            //        WpxPerson = wpx,
+            //        Effort = _context.Persefforts
+            //            .Where(pe => pe.WpxPerson == wpx.Id && pe.Month >= startDate && pe.Month <= endDate)
+            //            .Sum(pe => (decimal?)pe.Value)
+            //    })
+            //    .Where(wpx => wpx.Effort.HasValue && wpx.Effort.Value > 0)
+            //    .Select(wpx => wpx.WpxPerson)
+            //    .ToListAsync();
+
+            //NUEVO INCLUYENDO WP SIN EFFORT PERO CON HORAS EN TIMESHEET//
+            var allWpxPersons = await _context.Wpxpeople
                 .Include(wpx => wpx.PersonNavigation)
                 .Include(wpx => wpx.WpNavigation)
                     .ThenInclude(wp => wp.Proj)
                 .Where(wpx => wpx.Person == personId && wpx.WpNavigation.StartDate <= endDate && wpx.WpNavigation.EndDate >= startDate)
-                .Select(wpx => new
-                {
-                    WpxPerson = wpx,
-                    Effort = _context.Persefforts
-                        .Where(pe => pe.WpxPerson == wpx.Id && pe.Month >= startDate && pe.Month <= endDate)
-                        .Sum(pe => (decimal?)pe.Value)
-                })
-                .Where(wpx => wpx.Effort.HasValue && wpx.Effort.Value > 0)
-                .Select(wpx => wpx.WpxPerson)
                 .ToListAsync();
+
+            var wpxWithEffort = await _context.Persefforts
+                .Where(pe => pe.Month >= startDate && pe.Month <= endDate)
+                .Where(pe => allWpxPersons.Select(wpx => wpx.Id).Contains(pe.WpxPerson))
+                .GroupBy(pe => pe.WpxPerson)
+                .Where(g => g.Sum(pe => pe.Value) > 0)
+                .Select(g => g.Key)
+                .ToListAsync();
+
+            var wpxWithTimesheet = await _context.Timesheets
+                .Where(ts => ts.Day >= startDate && ts.Day <= endDate && ts.Hours > 0)
+                .Where(ts => allWpxPersons.Select(wpx => wpx.Id).Contains(ts.WpxPersonId))
+                .Select(ts => ts.WpxPersonId)
+                .Distinct()
+                .ToListAsync();
+
+            var wpxToShow = allWpxPersons
+                .Where(wpx => wpxWithEffort.Contains(wpx.Id) || wpxWithTimesheet.Contains(wpx.Id))
+                .ToList();
 
             // Obtener Timesheets para la persona en el rango de fecha especificado
             var timesheets = await _context.Timesheets
-                .Where(ts => wpxPersons.Select(wpx => wpx.Id).Contains(ts.WpxPersonId) && ts.Day >= startDate && ts.Day <= endDate)
+                .Where(ts => wpxToShow.Select(wpx => wpx.Id).Contains(ts.WpxPersonId) && ts.Day >= startDate && ts.Day <= endDate)
                 .ToListAsync();
 
             var hoursUsed = timesheets.Sum(ts => ts.Hours);
@@ -182,7 +210,7 @@ namespace TRS2._0.Controllers
                 );
 
             // Suponiendo que tienes una lista o puedes obtener los IDs de los proyectos
-            var projectIds = wpxPersons.Select(wpx => wpx.WpNavigation.ProjId).Distinct().ToList();
+            var projectIds = wpxToShow.Select(wpx => wpx.WpNavigation.ProjId).Distinct().ToList();
 
             // Obtener los estados de bloqueo para esos proyectos en el mes y año específicos
             var projectLocks = await _context.ProjectMonthLocks
@@ -205,7 +233,7 @@ namespace TRS2._0.Controllers
                 TotalHoursWithDedication = totalWorkHoursWithDedication,
                 Holidays = holidays,
                 MonthDays = Enumerable.Range(1, DateTime.DaysInMonth(currentYear, currentMonth)).Select(day => new DateTime(currentYear, currentMonth, day)).ToList(),
-                WorkPackages = wpxPersons.Select(wpx =>
+                WorkPackages = wpxToShow.Select(wpx =>
                 {
                     var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
                     var estimatedHours = RoundToNearestHalfOrWhole(maxhoursthismonth * effort);

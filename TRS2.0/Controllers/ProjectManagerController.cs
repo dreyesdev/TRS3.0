@@ -17,7 +17,7 @@ using System.Linq;
 using TRS2._0.Models.ViewModels.ProjectManager;
 using TRS2._0.Models.ViewModels;
 
-[Authorize(Roles = "ProjectManager")]
+[Authorize(Roles = "ProjectManager,Researcher,Admin")]
 public class ProjectManagerController : Controller
 {
     private readonly WorkCalendarService _workCalendarService;
@@ -293,12 +293,14 @@ public class ProjectManagerController : Controller
         return RedirectToAction("Index");
     }
 
+    [Authorize(Roles = "ProjectManager,Researcher,Admin")]
     public IActionResult ReportError()
     {
         return View();
     }
 
-    [HttpPost]    
+    [HttpPost]
+    [Authorize(Roles = "ProjectManager,Researcher,Admin")]
     public async Task<IActionResult> SubmitErrorReport(ReportErrorViewModel model)
     {
         if (!ModelState.IsValid)

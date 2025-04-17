@@ -22,7 +22,7 @@ namespace TRS2._0.Models.DataModels
         [Column(TypeName = "decimal(5, 2)")]
         public decimal Dedication { get; set; }
 
-        [Column(TypeName = "decimal(5, 2)")]
+        [Column(TypeName = "decimal(5, 4)")]
         public decimal PMs { get; set; }
 
         public string Status { get; set; }

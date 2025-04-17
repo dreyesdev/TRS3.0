@@ -1382,7 +1382,7 @@ namespace TRS2._0.Controllers
                     declaredHoursStopwatch.Reset();
 
                     totalHoursStopwatch.Start();
-                    var totalHoursResult = await _workCalendarService.CalculateTotalHoursForPerson(personId, reportPeriod.StartDate, reportPeriod.EndDate, projectId, workingDaysPerMonth);
+                    var totalHoursResult = await _workCalendarService.CalculateTotalHoursForPersonV2(personId, reportPeriod.StartDate, reportPeriod.EndDate);
                     totalHoursStopwatch.Stop();
                     Console.WriteLine($"Calculating total hours for person {personId} took {totalHoursStopwatch.ElapsedMilliseconds} ms");
                     totalHoursStopwatch.Reset();

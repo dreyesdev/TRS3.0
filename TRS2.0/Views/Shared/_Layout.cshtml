@@ -66,18 +66,21 @@
                                     <a class="nav-link text-dark" asp-area="" asp-controller="TimeSheet" asp-action="GetTimeSheetsForPerson">TimeSheet</a>
                                 </li>
                             }
-                            @if (User.IsInRole("Admin") || User.IsInRole("ProjectManager"))
+                            @if (User.IsInRole("Admin") || User.IsInRole("ProjectManager") || User.IsInRole("Researcher"))
                             {
                                 <li class="nav-item dropdown">
-                                            <a class="nav-link dropdown-toggle text-dark" href="#" id="pmDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <a class="nav-link dropdown-toggle text-dark" href="#" id="pmDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                         <i class="bi bi-tools"></i> Utilidades
                                     </a>
                                     <ul class="dropdown-menu" aria-labelledby="pmDropdown">
-                                        <li>
-                                            <a class="dropdown-item" asp-controller="ProjectManager" asp-action="Index">
-                                                <i class="bi bi-file-earmark-spreadsheet"></i> Cargar Timesheets
-                                            </a>
-                                        </li>
+                                        @if (User.IsInRole("Admin") || User.IsInRole("ProjectManager"))
+                                        {
+                                            <li>
+                                                <a class="dropdown-item" asp-controller="ProjectManager" asp-action="Index">
+                                                    <i class="bi bi-file-earmark-spreadsheet"></i> Cargar Timesheets
+                                                </a>
+                                            </li>
+                                        }
                                         <li>
                                             <a class="dropdown-item" asp-controller="ProjectManager" asp-action="ReportError">
                                                 <i class="bi bi-bug"></i> Reportar Error
@@ -86,6 +89,7 @@
                                     </ul>
                                 </li>
                             }
+
                         }
                     </ul>
                     <ul class="navbar-nav">

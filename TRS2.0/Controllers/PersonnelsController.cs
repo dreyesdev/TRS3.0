@@ -569,6 +569,9 @@ namespace TRS2._0.Controllers
                 travel.Status = "0";
                 _context.Update(travel); // Marcamos el cambio
                 await _context.SaveChangesAsync(); // Guardamos en la base de datos
+                // Cargar de nuevo las liquidaciones a 0
+                _loadDataService.ProcessLiquidationsAsync();
+
 
                 return Json(new { success = true, message = "Viaje aprobado correctamente." }); // Respuesta de éxito
             }

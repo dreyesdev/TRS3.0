@@ -92,17 +92,15 @@
                         @* <th>Dedication - Estimated Hours</th> *@
                         @foreach (var day in Model.MonthDays)
                         {
-                            <th>
-
-                            <div style="border-bottom: 1px solid white; margin-bottom: 2px; margin-top: 8px; text-align: center;">@day.Day.ToString("00")</div>
-                            <div style="text-align: center;">@day.ToString("ddd").ToUpper()</div>
-
+                            <th class="sticky-day-header">
+                                <div style="border-bottom: 1px solid white; margin-bottom: 2px; margin-top: 8px; text-align: center;">@day.Day.ToString("00")</div>
+                                <div style="text-align: center;">@day.ToString("ddd", CultureInfo.CreateSpecificCulture("en")).ToUpper()</div>
                             </th>
                         }
-                        <th>
+                        <th class="sticky-penultimate-column">
                             <div style="border-bottom: 1px solid white; margin-bottom: 2px; text-align: center; font-weight: bold">ACTUAL</div>
                             <div style="text-align: center; font-weight: bold;">ESTIMATED HOURS</div>
-                        </th> <!-- Columna de Total -->
+                        </th>
                         <th class="sticky-last-column">%</th>
                     </tr>
                 </thead>
@@ -189,7 +187,7 @@
 
 
 
-                            <td>
+                            <td class="sticky-penultimate-column">
                                 @{
                                     var totalActual = wp.Timesheets.Sum(ts => ts.Hours);
                                     var totalEstimado = wp.EstimatedHours;
@@ -271,8 +269,8 @@
                                 </div>
                             </td>
                         }
-                        <th style="background-color: #343a40; color: white;"></th>
-                        <th style="background-color: #343a40; color: white;"></th>
+                        <th class="sticky-penultimate-column" style="background-color: #343a40; color: white;"></th>
+                        <th class="sticky-last-column" style="background-color: #343a40; color: white;"></th>
                     </tr>
                 </tfoot>
 
@@ -717,10 +715,19 @@
         position: sticky;
         left: 0;
         background-color: white;
-        z-index: 4; /* Asegura que la primera columna esté por encima de las demás */
+        z-index: 3;
     }
 
-    
+    .sticky-header {
+        position: sticky;
+        top: 0;
+        background-color: #343a40;
+        z-index: 3;
+    }
+
+    .sticky-day-header {
+        z-index: 2; /* Menor que el de la primera columna */
+    }
 
     tfoot th {
         bottom: 0;
@@ -728,9 +735,7 @@
         z-index: 2;
     }
 
-    .sticky-header {
-        z-index: 5; /* Asegura que la cabecera de la primera columna esté por encima de las demás */
-    }
+    
 
     .legend-box {
         width: 300px;
@@ -744,6 +749,21 @@
         .legend-box .mb-2 {
             margin-bottom: 15px; /* Incrementado para mayor separación */
         }
+
+    .sticky-penultimate-column {
+        position: sticky;
+        right: 50px; /* Ajusta este valor según el ancho de la última columna */
+        background-color: white;
+        z-index: 1;
+    }
+
+    .sticky-last-column {
+        position: sticky;
+        right: 0;
+        background-color: white;
+        z-index: 1;
+    }
+    
 </style>
 
 

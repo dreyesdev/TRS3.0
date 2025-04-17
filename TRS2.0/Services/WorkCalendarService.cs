@@ -303,6 +303,7 @@ public class WorkCalendarService
             decimal hoursForMonth = 0;
             if (workingDaysPerMonth.TryGetValue(new DateTime(startDate.Year, startDate.Month, 1), out int workingDays))
             {
+                
                 // Aquí utilizas workingDays obtenidos de DailyPmValues
                 foreach (var affiliation in affiliations)
                 {
@@ -327,6 +328,27 @@ public class WorkCalendarService
         return totalHoursPerMonth;
     }
 
+    public async Task<Dictionary<DateTime, decimal>> CalculateTotalHoursForPersonV2(
+    int personId,
+    DateTime startDate,
+    DateTime endDate)
+    {
+        var totalHoursPerMonth = new Dictionary<DateTime, decimal>();
+
+        startDate = new DateTime(startDate.Year, startDate.Month, 1);
+        endDate = new DateTime(endDate.Year, endDate.Month, DateTime.DaysInMonth(endDate.Year, endDate.Month));
+
+        while (startDate <= endDate)
+        {
+            var monthKey = new DateTime(startDate.Year, startDate.Month, 1);
+            decimal hours = await CalculateMaxHoursForPersonInMonth(personId, startDate.Year, startDate.Month);
+            totalHoursPerMonth[monthKey] = hours;
+
+            startDate = startDate.AddMonths(1);
+        }
+
+        return totalHoursPerMonth;
+    }
 
     public async Task<bool> IsOutOfContract(int personId, int year, int month)
     {
