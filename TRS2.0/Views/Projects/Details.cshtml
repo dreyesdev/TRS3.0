@@ -231,11 +231,11 @@
                     </td>
                     <td class="text-center">
                         <span class="editable" id="wpStartDate_@wp.Id">@wp.StartDate.ToShortDateString()</span>
-                        <input type="date" class="edit-field form-control" id="editWpStartDate_@wp.Id" value="@wp.StartDate.ToString("dd-MM-yyyy")" style="display: none;" />
+                        <input type="date" class="edit-field form-control" id="editWpStartDate_@wp.Id" value="@wp.StartDate.ToString("yyyy-MM-dd")" style="display: none;" />
                     </td>
                     <td class="text-center">
                         <span class="editable" id="wpEndDate_@wp.Id">@wp.EndDate.ToShortDateString()</span>
-                        <input type="date" class="edit-field form-control" id="editWpEndDate_@wp.Id" value="@wp.EndDate.ToString("dd-MM-yyyy")" style="display: none;" />
+                        <input type="date" class="edit-field form-control" id="editWpEndDate_@wp.Id" value="@wp.EndDate.ToString("yyyy-MM-dd")" style="display: none;" />
                     </td>
                     <td class="text-center">
                         <span class="editable" id="wpPms_@wp.Id">@wp.Pms</span>
@@ -287,8 +287,9 @@
 
 <script>
 // Variables para las fechas de inicio y fin del proyecto
-    var projectStartDateString = '@(Model.Start.HasValue ? Model.Start.Value.ToString("dd-MM-yyyy") : "")';
-    var projectEndDateString = '@(Model.End.HasValue ? Model.End.Value.ToString("dd-MM-yyyy") : "")';
+        var projectStartDateString = '@(Model.Start.HasValue ? Model.Start.Value.ToString("yyyy-MM-dd") : "")';
+    var projectEndDateString = '@(Model.End.HasValue ? Model.End.Value.ToString("yyyy-MM-dd") : "")';
+
 
     var projectStartDate = projectStartDateString ? new Date(projectStartDateString) : null;
     var projectEndDate = projectEndDateString ? new Date(projectEndDateString) : null;

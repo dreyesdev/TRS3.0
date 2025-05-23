@@ -108,7 +108,9 @@ namespace TRS2._0.Controllers
                 if (leaveReductions.TryGetValue(day, out var reduction))
                 {
                     // Aplicar la reducción al máximo de horas diarias
-                    hoursPerDayWithDedication[day] = RoundToNearestHalfOrWhole(hoursPerDayWithDedication[day] * (1 - reduction));
+                    //hoursPerDayWithDedication[day] = RoundToNearestHalfOrWhole(hoursPerDayWithDedication[day] * (1 - reduction)); // ANTERIOR AL CAMBIO DE DECIMALES
+                    hoursPerDayWithDedication[day] = Math.Round(hoursPerDayWithDedication[day] * (1 - reduction), 2);
+
                 }
             }
 
@@ -209,7 +211,7 @@ namespace TRS2._0.Controllers
                     group => group.Sum(ts => ts.Hours)
                 );
 
-            // Suponiendo que tienes una lista o puedes obtener los IDs de los proyectos
+            // Obtener los IDs de los proyectos
             var projectIds = wpxToShow.Select(wpx => wpx.WpNavigation.ProjId).Distinct().ToList();
 
             // Obtener los estados de bloqueo para esos proyectos en el mes y año específicos
@@ -218,6 +220,48 @@ namespace TRS2._0.Controllers
                             l.Year == currentYear &&
                             l.Month == currentMonth)
                 .ToListAsync();
+
+            var estimatedHoursByWpxId = new Dictionary<int, decimal>();
+
+            foreach (var wpx in wpxToShow)
+            {
+                var hours = await _workCalendarService.CalculateEstimatedHoursForPersonInWorkPackage(validPersonId, wpx.Wp, currentYear, currentMonth);
+                estimatedHoursByWpxId[wpx.Id] = hours;
+            }
+
+            var workPackagesList = new List<WorkPackageInfoTS>();
+
+            foreach (var wpx in wpxToShow)
+            {
+                var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
+
+                decimal estimatedHours;
+                if (await _workCalendarService.HasNoContractDaysAsync(validPersonId, currentYear, currentMonth))
+                {
+                    var maxByAffiliation = await _workCalendarService.CalculateMaxHoursByAffiliationOnlyAsync(validPersonId, currentYear, currentMonth);
+                    estimatedHours = Math.Round(maxByAffiliation * effort, 2);
+                }
+                else
+                {
+                    estimatedHours = Math.Round(maxhoursthismonth * effort, 2);
+                }
+
+                var isLocked = projectLocks.Any(l => l.ProjectId == wpx.WpNavigation.ProjId && l.PersonId == personId && (l.IsLocked == true));
+
+                workPackagesList.Add(new WorkPackageInfoTS
+                {
+                    WpId = wpx.Wp,
+                    WpName = wpx.WpNavigation.Name,
+                    WpTitle = wpx.WpNavigation.Title,
+                    ProjectName = wpx.WpNavigation.Proj.Acronim,
+                    ProjectSAPCode = wpx.WpNavigation.Proj.SapCode,
+                    ProjectId = wpx.WpNavigation.Proj.ProjId,
+                    IsLocked = isLocked,
+                    Effort = effort,
+                    EstimatedHours = estimatedHours,
+                    Timesheets = timesheets.Where(ts => ts.WpxPersonId == wpx.Id).ToList()
+                });
+            }
 
             // Preparación del ViewModel
             var viewModel = new TimesheetViewModel
@@ -233,25 +277,7 @@ namespace TRS2._0.Controllers
                 TotalHoursWithDedication = totalWorkHoursWithDedication,
                 Holidays = holidays,
                 MonthDays = Enumerable.Range(1, DateTime.DaysInMonth(currentYear, currentMonth)).Select(day => new DateTime(currentYear, currentMonth, day)).ToList(),
-                WorkPackages = wpxToShow.Select(wpx =>
-                {
-                    var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
-                    var estimatedHours = RoundToNearestHalfOrWhole(maxhoursthismonth * effort);
-                    var isLocked = projectLocks.Any(l => l.ProjectId == wpx.WpNavigation.ProjId && l.PersonId == personId && (l.IsLocked == true));
-                    return new WorkPackageInfoTS
-                    {
-                        WpId = wpx.Wp,
-                        WpName = wpx.WpNavigation.Name,
-                        WpTitle = wpx.WpNavigation.Title,
-                        ProjectName = wpx.WpNavigation.Proj.Acronim,
-                        ProjectSAPCode = wpx.WpNavigation.Proj.SapCode,
-                        ProjectId = wpx.WpNavigation.Proj.ProjId,
-                        IsLocked = isLocked,
-                        Effort = effort,
-                        EstimatedHours = estimatedHours,
-                        Timesheets = timesheets.Where(ts => ts.WpxPersonId == wpx.Id).ToList()
-                    };
-                }).ToList(),
+                WorkPackages = workPackagesList,
                 HoursUsed = hoursUsed
             };
 
@@ -288,7 +314,9 @@ namespace TRS2._0.Controllers
                 if (leaveReductions.TryGetValue(day, out var reduction))
                 {
                     // Aplicar la reducción al máximo de horas diarias
-                    hoursPerDayWithDedication[day] = RoundToNearestHalfOrWhole(hoursPerDayWithDedication[day] * (1 - reduction));
+                    //hoursPerDayWithDedication[day] = RoundToNearestHalfOrWhole(hoursPerDayWithDedication[day] * (1 - reduction)); //ANTERIOR AL CAMBIO DE DECIMALES
+                    hoursPerDayWithDedication[day] = Math.Round(hoursPerDayWithDedication[day] * (1 - reduction), 2);
+
                 }
             }
 
@@ -414,7 +442,9 @@ namespace TRS2._0.Controllers
                 WorkPackages = wpxPersons.Select(wpx =>
                 {
                     var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
-                    var estimatedHours = RoundToNearestHalfOrWhole((hoursPerDayWithDedication.Values.Sum()) * effort);
+                    //var estimatedHours = RoundToNearestHalfOrWhole((hoursPerDayWithDedication.Values.Sum()) * effort); //ANTERIOR AL CAMBIO DE DECIMALES
+                    var estimatedHours = Math.Round((hoursPerDayWithDedication.Values.Sum()) * effort, 2);
+
 
                     return new WorkPackageInfoTS
                     {
@@ -628,34 +658,35 @@ namespace TRS2._0.Controllers
                                     var isFuture = day.Date > DateTime.Now.Date;
                                     var isHoliday = model.Holidays.Any(h => h.Date == day.Date);
 
-                                    var cellBackground = "#fff"; // Color por defecto
+                                    var cellBackground = "#FFFFFF"; // Por defecto, blanco
 
+                                    // PRIORIDAD: Holiday o Leave → aunque sea futuro
                                     if (isHoliday)
                                     {
-                                        cellBackground = "#FFD700";
-                                    }
-                                    else if (hasTravel && !isFuture)
-                                    {
-                                        cellBackground = "#90EE90"; // lightgreen
-                                    }
-                                    else if (isWeekend || isFuture)
-                                    {
-                                        cellBackground = "#6c757d";
+                                        cellBackground = "#008000"; // National Holidays
                                     }
                                     else if (leave != null)
                                     {
                                         switch (leave.Type)
                                         {
                                             case 1:
-                                                cellBackground = "#FFA07A"; // lightsalmon
+                                                cellBackground = "#FFA07A"; // Absence
                                                 break;
                                             case 2:
-                                                cellBackground = "#ADD8E6"; // lightblue
+                                                cellBackground = "#ADD8E6"; // Vacation
                                                 break;
                                             case 3:
-                                                cellBackground = "#800080"; // purple
+                                                cellBackground = "#DDA0DD"; // Out of Contract
                                                 break;
                                         }
+                                    }
+                                    else if (hasTravel && !isFuture)
+                                    {
+                                        cellBackground = "#FF69B4"; // Travel Days
+                                    }
+                                    else if (isWeekend || isFuture)
+                                    {
+                                        cellBackground = "#6c757d"; // Gris clásico original
                                     }
                                     // Directly add cells for each day within the same iteration that adds the work package name
                                     tabla.Cell().Background(cellBackground).Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").Bold().FontSize(8);
@@ -679,7 +710,10 @@ namespace TRS2._0.Controllers
                                     footer.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursForDay}").ExtraBold().FontColor("#FFFFFF").FontSize(8);
                                 }
 
-                                footer.Cell().Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursWorkedOnProject}").ExtraBold().FontColor("#FFFFFF").Bold().FontSize(8);
+                                footer.Cell().Padding(2).AlignMiddle().AlignCenter()
+    .Text($"{roundedtotalHoursWorkedOnProject}")
+    .FontColor("#FFFFFF").Bold().FontSize(7);
+
                             });
 
                         });
@@ -808,6 +842,7 @@ namespace TRS2._0.Controllers
         public async Task<IActionResult> ExportTimesheetToPdf2(int personId, int year, int month, int project, string manualDate = null)
         {
             QuestPDF.Settings.License = LicenseType.Professional;
+            TextStyle.Default.FontFamily("Arial");
             DateTime? selectedDate = null;
             if (!string.IsNullOrEmpty(manualDate))
             {
@@ -820,10 +855,15 @@ namespace TRS2._0.Controllers
             var lastLoginDateResponsible = await GetLastLoginDateForNextMonth(responsibleId, year, month);
             var totalhours = model.TotalHours;
             var totalhoursworkedonproject = model.WorkPackages.Sum(wp => wp.Timesheets.Sum(ts => ts.Hours));
-            var totaldaysWorkedOnProject = Math.Ceiling(totalhoursworkedonproject / model.AffiliationHours);
+            // Actualización del cálculo de días trabajados en el proyecto para incluir decimales
+            var totaldaysWorkedOnProject = Math.Round(totalhoursworkedonproject / model.AffiliationHours, 1, MidpointRounding.AwayFromZero);
+            //CAMBIOS ANTES DE DECIMAL
+            //decimal roundedtotalHours = Math.Round(totalhours * 2, MidpointRounding.AwayFromZero) / 2;
+            //decimal roundedtotalHoursWorkedOnProject = Math.Round(totalhoursworkedonproject * 2, MidpointRounding.AwayFromZero) / 2;
 
-            decimal roundedtotalHours = Math.Round(totalhours * 2, MidpointRounding.AwayFromZero) / 2;
-            decimal roundedtotalHoursWorkedOnProject = Math.Round(totalhoursworkedonproject * 2, MidpointRounding.AwayFromZero) / 2;
+            decimal roundedtotalHours = Math.Round(totalhours, 2, MidpointRounding.AwayFromZero);
+            decimal roundedtotalHoursWorkedOnProject = Math.Round(totalhoursworkedonproject, 2, MidpointRounding.AwayFromZero);
+
 
             DateTime? finalDateInvestigator = null;
             DateTime? finalDateResponsible = null;
@@ -936,7 +976,7 @@ namespace TRS2._0.Controllers
                                         {
                                             columns.RelativeColumn(); // Una columna por día
                                         }
-                                        columns.RelativeColumn(); // Additional column for "Total"
+                                        columns.ConstantColumn(35); // Additional column for "Total"
                                     });
 
                                     // Encabezado de la tabla
@@ -972,31 +1012,32 @@ namespace TRS2._0.Controllers
 
                                             if (isHoliday)
                                             {
-                                                cellBackground = "#008000"; // Verde para National Holidays
+                                                cellBackground = "#008000"; // National Holidays
                                             }
-                                            else if (hasTravel && !isFuture)
-                                            {
-                                                cellBackground = "#FF69B4"; // Rosado Saturado para Travel Days
-                                            }
-                                            else if (isWeekend || isFuture)
-                                            {
-                                                cellBackground = "#D3D3D3"; // Light Grey for better readability
-                                            }
-                                            else if (leave != null)
+                                            if (leave != null)
                                             {
                                                 switch (leave.Type)
                                                 {
                                                     case 1:
-                                                        cellBackground = "#FFA07A"; // Light salmon
+                                                        cellBackground = "#FFA07A"; // Absence
                                                         break;
                                                     case 2:
-                                                        cellBackground = "#ADD8E6"; // Light blue
+                                                        cellBackground = "#ADD8E6"; // Vacation
                                                         break;
                                                     case 3:
-                                                        cellBackground = "#DDA0DD"; // Plum, lighter than purple
+                                                        cellBackground = "#DDA0DD"; // Out of Contract
                                                         break;
                                                 }
                                             }
+                                            if (hasTravel && !isFuture && cellBackground == "#FFFFFF")
+                                            {
+                                                cellBackground = "#FF69B4"; // Travel Days
+                                            }
+                                            if ((isWeekend || isFuture) && cellBackground == "#FFFFFF")
+                                            {
+                                                cellBackground = "#6c757d"; // Gris original si no fue sobreescrito antes
+                                            }
+
                                             tabla.Cell().Background(cellBackground).Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").Bold().FontSize(8);
                                         }
 
@@ -1011,7 +1052,9 @@ namespace TRS2._0.Controllers
                                         for (int day = 1; day <= DateTime.DaysInMonth(year, month); day++)
                                         {
                                             var totalHoursForDay = model.WorkPackages.Sum(wp => wp.Timesheets.FirstOrDefault(ts => ts.Day.Day == day)?.Hours ?? 0);
-                                            decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay * 2, MidpointRounding.AwayFromZero) / 2;
+                                            //decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay * 2, MidpointRounding.AwayFromZero) / 2; //CAMBIOS ANTES DE DECIMAL
+                                            decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay, 2, MidpointRounding.AwayFromZero);
+
                                             footer.Cell().BorderVertical(1).BorderColor("#00BFFF").BorderBottom(1).Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursForDay}").ExtraBold().FontColor("#FFFFFF").FontSize(8);
                                         }
                                         footer.Cell().BorderBottom(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursWorkedOnProject}").ExtraBold().FontColor("#FFFFFF").Bold().FontSize(8);
@@ -1024,9 +1067,9 @@ namespace TRS2._0.Controllers
                                             var otherProjectHoursForDay = model.HoursForOtherProjects.ContainsKey(date) ? model.HoursForOtherProjects[date] : 0;
                                             var isHolidayOrLeave = model.Holidays.Any(h => h.Date == date) || model.LeavesthisMonth.Any(l => l.Day == date);
                                             decimal roundedOtherProjectHoursForDay = isHolidayOrLeave ? 0 : Math.Round(otherProjectHoursForDay * 2, MidpointRounding.AwayFromZero) / 2;
-                                            footer.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedOtherProjectHoursForDay:0.#}").ExtraBold().FontColor("#FFFFFF").FontSize(8);
+                                            footer.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#D3D3D3").Padding(2).AlignCenter().Text($"{roundedOtherProjectHoursForDay:0.#}").ExtraBold().FontColor("#000000").FontSize(8);
                                         }
-                                        footer.Cell().Background("#0055A4").Padding(2).AlignCenter().Text($"{model.TotalHoursForOtherProjects:0.#}").ExtraBold().FontColor("#FFFFFF").Bold().FontSize(8);
+                                        footer.Cell().Background("#D3D3D3").Padding(2).AlignCenter().Text($"{model.TotalHoursForOtherProjects:0.#}").ExtraBold().FontColor("#000000").Bold().FontSize(8);
                                     });
 
                                 });
@@ -1199,11 +1242,12 @@ namespace TRS2._0.Controllers
         }
 
         // Método auxiliar para redondear al entero o .5 más cercano
-        private decimal RoundToNearestHalfOrWhole(decimal value)
-        {
-            // Multiplicar por 2, redondear al entero más cercano y dividir por 2
-            return Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2;
-        }
+        // MÉTODO INACTIVO - SE COMENTA TRAS EL CAMBIO A DECIMALES COMPLETOS EN HORAS
+        //private decimal RoundToNearestHalfOrWhole(decimal value)
+        //{
+        //    // Multiplicar por 2, redondear al entero más cercano y dividir por 2
+        //    return Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2;
+        //}
         public async Task<string> GetLastLoginDateForPerson(int personId, int year, int month)
         {
             var lastLogin = await _context.UserLoginHistories

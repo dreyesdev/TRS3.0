@@ -329,7 +329,7 @@
                         <tr>
                             <td>@travel.LiqId</td>
                             <td>@travel.ProjectSAPCode - @travel.ProjectAcronimo</td>
-                            <td>@String.Format("{0:P0}", travel.Dedication)</td>
+                            <td>@(travel.Dedication.ToString("0") + "%")</td>
                             <td>@travel.StartDate.ToString("yyyy-MM-dd")</td>
                             <td>@travel.EndDate.ToString("yyyy-MM-dd")</td>
                         </tr>
@@ -423,9 +423,9 @@
             currentValue = parseFloat(currentValue);
 
             // Validación de que el valor sea entero o decimal con .5
-            if (!Number.isInteger(currentValue) && currentValue % 1 !== 0.5) {
-                invalidInputs.push(input);
-            } else {
+                if (isNaN(currentValue) || currentValue < 0) {
+                    invalidInputs.push(input);
+                } else {
                 if (Math.round(currentValue * 100) / 100 !== Math.round(originalValue * 100) / 100) {
                     changedTimesheets.push({
                         ProjectId: parseInt(input.getAttribute('data-projectid'), 10),
@@ -439,7 +439,7 @@
         });
 
         if (invalidInputs.length > 0) {
-            alert('Algunos valores no son válidos. Solo se permiten valores enteros o decimales con .5.');
+            alert('Some inputs are invalid. Please enter a positive number.');
             invalidInputs.forEach(input => input.classList.add('is-invalid'));
         } else {
             if (changedTimesheets.length > 0) {

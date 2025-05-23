@@ -825,6 +825,7 @@ namespace TRS2._0.Services
                     }
                     else
                     {
+                        personnel.Email = fields[1];
                         personnel.Surname = fields[2];
                         personnel.Name = fields[3];
                         personnel.Department = department;
@@ -1614,126 +1615,151 @@ namespace TRS2._0.Services
 
                     await Task.Delay(1500);
 
-                    var requestsResponse = await _httpClient.GetAsync($"https://app.woffu.com/api/v1/users/{userId}/requests");
-                    if (!requestsResponse.IsSuccessStatusCode)
+                    var allRequests = new List<JToken>();
+                    int pageIndex = 0;
+                    bool morePages = true;
+
+                    do
                     {
-                        var responseContent = await requestsResponse.Content.ReadAsStringAsync();
-                        logger.Error($"HTTP request failed. Status: {requestsResponse.StatusCode}, Content: {responseContent}");
-                        continue;
-                    }
+                        var url = $"https://app.woffu.com/api/v1/users/{userId}/requests?pageIndex={pageIndex}&pageSize=100";
+                        var requestsResponse = await _httpClient.GetAsync(url);
 
-                    var requestsContent = await requestsResponse.Content.ReadAsStringAsync();
-                    var requestsObject = JsonConvert.DeserializeObject<JObject>(requestsContent);
-
-                    if (requestsObject.ContainsKey("Views"))
-                    {
-                        var requestsArray = (JArray)requestsObject["Views"];
-
-                        var groupedDays = requestsArray
-                            .Where(r => r["RequestStatus"]?.ToString() == "Approved")
-                            .SelectMany(r =>
-                            {
-                                var startDate = DateTime.Parse(r["StartDate"].ToString());
-                                var endDate = DateTime.Parse(r["EndDate"].ToString());
-                                var hours = (decimal?)r["NumberHoursRequested"] ?? 0;
-                                var agreementEventId = r["AgreementEventId"]?.Value<int>() ?? 0;
-
-                                return Enumerable.Range(0, (endDate - startDate).Days + 1)
-                                    .Select(offset => new
-                                    {
-                                        Date = startDate.AddDays(offset),
-                                        Hours = hours,
-                                        AgreementEventId = agreementEventId
-                                    });
-                            })
-                            .GroupBy(x => x.Date)
-                            .Select(g => new
-                            {
-                                Date = g.Key,
-                                TotalHours = g.Sum(x => x.Hours),
-                                AgreementEventId = g.First().AgreementEventId
-                            });
-
-                        var processedDays = new HashSet<DateTime>();
-
-                        foreach (var dayGroup in groupedDays)
+                        if (!requestsResponse.IsSuccessStatusCode)
                         {
-                            var date = dayGroup.Date;
-                            var totalHours = dayGroup.TotalHours;
-                            var agreementEventId = dayGroup.AgreementEventId;
+                            var responseContent = await requestsResponse.Content.ReadAsStringAsync();
+                            logger.Error($"HTTP request failed (userId={userId}). Status: {requestsResponse.StatusCode}, Content: {responseContent}");
+                            morePages = false;
+                            continue;
+                        }
 
-                            var agreementEvent = await _context.AgreementEvents.FindAsync(agreementEventId);
-                            if (agreementEvent != null)
+                        var requestsContent = await requestsResponse.Content.ReadAsStringAsync();
+                        var requestsObject = JsonConvert.DeserializeObject<JObject>(requestsContent);
+
+                        if (requestsObject.ContainsKey("Views"))
+                        {
+                            var requestsArray = (JArray)requestsObject["Views"];
+                            if (requestsArray.Count == 0)
                             {
-                                decimal leaveReduction;
-
-                                if (agreementEventId == 1079914) // Baja de paternidad por horas
-                                {
-                                    leaveReduction = 0.5m; // Reducción fija al 50%
-                                    logger.Information($"Processing paternity leave (ID=1079914): PersonId={personId}, Date={date}, Reduction={leaveReduction:P}");
-                                }
-                                else if (totalHours > 0)
-                                {
-                                    leaveReduction = await _workCalendarService.CalculateLeaveReductionAsync(personId, date, totalHours);
-                                }
-                                else
-                                {
-                                    leaveReduction = 1.00m;
-                                }
-
-                                if (existingLeaves.TryGetValue(date, out var existingLeave))
-                                {
-                                    if (existingLeave.Type == 3)
-                                    {
-                                        logger.Information($"Skipping record with Type 3 for PersonId={personId}, Date={date}.");
-                                        continue;
-                                    }
-
-                                    if (existingLeave.LeaveReduction != leaveReduction || existingLeave.Hours != totalHours)
-                                    {
-                                        existingLeave.LeaveReduction = leaveReduction;
-                                        existingLeave.Hours = totalHours > 0 ? totalHours : null;
-                                        existingLeave.Type = agreementEventId == 1079914 ? 12 : (int)agreementEvent.Type;
-                                        _context.Leaves.Update(existingLeave);
-
-                                        logger.Information($"Updated leave record for PersonId={personId}, Date={date}, LeaveReduction={leaveReduction}");
-                                    }
-                                }
-                                else
-                                {
-                                    var newLeave = new Leave
-                                    {
-                                        PersonId = personId,
-                                        Day = date,
-                                        Type = agreementEventId == 1079914 ? 12 : (int)agreementEvent.Type,
-                                        Legacy = false,
-                                        LeaveReduction = leaveReduction,
-                                        Hours = totalHours > 0 ? totalHours : null
-                                    };
-                                    _context.Leaves.Add(newLeave);
-
-                                    logger.Information($"Created new leave record for PersonId={personId}, Date={date}, LeaveReduction={leaveReduction}");
-                                }
-
-                                processedDays.Add(date);
+                                morePages = false;
+                            }
+                            else
+                            {
+                                allRequests.AddRange(requestsArray);
+                                pageIndex++;
                             }
                         }
-
-                        var daysToDelete = existingLeaves
-                            .Where(e => !processedDays.Contains(e.Key) && e.Value.Legacy == false && e.Value.Type != 3)
-                            .Select(e => e.Key)
-                            .ToList();
-
-                        foreach (var day in daysToDelete)
+                        else
                         {
-                            var leaveToRemove = existingLeaves[day];
-                            _context.Leaves.Remove(leaveToRemove);
-                            logger.Information($"Deleted leave record for PersonId={personId}, Date={day}");
+                            logger.Warning($"'Views' property not found for userId={userId} on pageIndex={pageIndex}.");
+                            morePages = false;
+                        }
+
+                        await Task.Delay(500);
+                    }
+                    while (morePages);
+
+                    var requestsArrayCombined = new JArray(allRequests);
+
+                    var groupedDays = requestsArrayCombined
+                        .Where(r => r["RequestStatus"]?.ToString() == "Approved")
+                        .SelectMany(r =>
+                        {
+                            var startDate = DateTime.Parse(r["StartDate"].ToString());
+                            var endDate = DateTime.Parse(r["EndDate"].ToString());
+                            var hours = (decimal?)r["NumberHoursRequested"] ?? 0;
+                            var agreementEventId = r["AgreementEventId"]?.Value<int>() ?? 0;
+
+                            return Enumerable.Range(0, (endDate - startDate).Days + 1)
+                                .Select(offset => new
+                                {
+                                    Date = startDate.AddDays(offset),
+                                    Hours = hours,
+                                    AgreementEventId = agreementEventId
+                                });
+                        })
+                        .GroupBy(x => x.Date)
+                        .Select(g => new
+                        {
+                            Date = g.Key,
+                            TotalHours = g.Sum(x => x.Hours),
+                            AgreementEventId = g.First().AgreementEventId
+                        });
+
+                    var processedDays = new HashSet<DateTime>();
+
+                    foreach (var dayGroup in groupedDays)
+                    {
+                        var date = dayGroup.Date;
+                        var totalHours = dayGroup.TotalHours;
+                        var agreementEventId = dayGroup.AgreementEventId;
+
+                        var agreementEvent = await _context.AgreementEvents.FindAsync(agreementEventId);
+                        if (agreementEvent != null)
+                        {
+                            decimal leaveReduction;
+
+                            if (agreementEventId == 1079914)
+                            {
+                                leaveReduction = 0.5m;
+                                logger.Information($"Processing paternity leave (ID=1079914): PersonId={personId}, Date={date}, Reduction={leaveReduction:P}");
+                            }
+                            else if (totalHours > 0)
+                            {
+                                leaveReduction = await _workCalendarService.CalculateLeaveReductionAsync(personId, date, totalHours);
+                            }
+                            else
+                            {
+                                leaveReduction = 1.00m;
+                            }
+
+                            if (existingLeaves.TryGetValue(date, out var existingLeave))
+                            {
+                                if (existingLeave.Type == 3)
+                                {
+                                    logger.Information($"Skipping record with Type 3 for PersonId={personId}, Date={date}.");
+                                    continue;
+                                }
+
+                                if (existingLeave.LeaveReduction != leaveReduction || existingLeave.Hours != totalHours)
+                                {
+                                    existingLeave.LeaveReduction = leaveReduction;
+                                    existingLeave.Hours = totalHours > 0 ? totalHours : null;
+                                    existingLeave.Type = agreementEventId == 1079914 ? 12 : (int)agreementEvent.Type;
+                                    _context.Leaves.Update(existingLeave);
+
+                                    logger.Information($"Updated leave record for PersonId={personId}, Date={date}, LeaveReduction={leaveReduction}");
+                                }
+                            }
+                            else
+                            {
+                                var newLeave = new Leave
+                                {
+                                    PersonId = personId,
+                                    Day = date,
+                                    Type = agreementEventId == 1079914 ? 12 : (int)agreementEvent.Type,
+                                    Legacy = false,
+                                    LeaveReduction = leaveReduction,
+                                    Hours = totalHours > 0 ? totalHours : null
+                                };
+                                _context.Leaves.Add(newLeave);
+
+                                logger.Information($"Created new leave record for PersonId={personId}, Date={date}, LeaveReduction={leaveReduction}");
+                            }
+
+                            processedDays.Add(date);
                         }
                     }
-                    else
+
+                    var daysToDelete = existingLeaves
+                        .Where(e => !processedDays.Contains(e.Key) && e.Value.Legacy == false && e.Value.Type != 3)
+                        .Select(e => e.Key)
+                        .ToList();
+
+                    foreach (var day in daysToDelete)
                     {
-                        logger.Warning("The 'Views' property was not found in the response.");
+                        var leaveToRemove = existingLeaves[day];
+                        _context.Leaves.Remove(leaveToRemove);
+                        logger.Information($"Deleted leave record for PersonId={personId}, Date={day}");
                     }
                 }
 
@@ -1750,6 +1776,7 @@ namespace TRS2._0.Services
                 logger.Dispose();
             }
         }
+
 
         // PENDIENTE: ES NECESARIO AJUSTAR LA FECHA MÁXIMA SEGÚN SE DECIDA EN PRINCIPIO NO DEBE SER MAYOR QUE EL DÍA ACTUAL, SE ESTAN RELLENANDO TIMESHEETS A TIEMPO FUTURO//
         public async Task AutoFillTimesheetsForInvestigatorsInSingleWPWithEffortAsync()

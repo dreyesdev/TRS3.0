@@ -328,7 +328,7 @@ namespace TRS2._0.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]        
         public async Task<IActionResult> AdminResetPassword(string userId)
         {
             var user = await _userManager.FindByIdAsync(userId);
@@ -346,8 +346,10 @@ namespace TRS2._0.Controllers
             var password = await GenerateValidPasswordAsync();
 
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-            // Reload the user to avoid concurrency issues
+
+            // Refrescar el user para evitar problemas de concurrencia
             await _context.Entry(user).ReloadAsync();
+
             var result = await _userManager.ResetPasswordAsync(user, token, password);
 
             if (!result.Succeeded)
@@ -361,29 +363,37 @@ namespace TRS2._0.Controllers
                 });
             }
 
+            // ✅ Guardar la nueva contraseña en Personnel
+            personnel.Password = password;
+            _context.Update(personnel);
+            await _context.SaveChangesAsync();
+
             try
             {
                 string emailContent = $@"
-            <html>
-            <body>
-                <p>Hello {personnel.Name},</p>
-                <p>Your password for TRS 3.0 has been reset by an administrator.</p>
-                <p><strong>Username:</strong> {user.UserName}</p>
-                <p><strong>New Password:</strong> {password}</p>
-                <p>Please log in using the following link: <a href='https://opstrs03.bsc.es/'>TRS 3.0</a></p>
-                <p>If you experience any issues, please contact iss@bsc.es.</p>
-            </body>
-            </html>";
+        <html>
+        <body>
+            <p>Hello {personnel.Name},</p>
+            <p>Your password for TRS 3.0 has been reset by an administrator.</p>
+            <p><strong>Username:</strong> {user.UserName}</p>
+            <p><strong>New Password:</strong> {password}</p>
+            <p>Please log in using the following link: <a href='https://opstrs03.bsc.es/'>TRS 3.0</a></p>
+            <p>If you experience any issues, please contact <a href='mailto:iss@bsc.es'>iss@bsc.es</a>.</p>
+        </body>
+        </html>";
 
                 await _emailSender.SendEmailAsync(personnel.Email, "Your TRS 3.0 Password Has Been Reset", emailContent);
             }
             catch (Exception ex)
             {
-                // Aquí puedes registrar el error con _logger si lo tienes configurado
                 _logger.LogError(ex, "Error sending reset password email to user {UserName}", user.UserName);
 
-                return Json(new { success = false, message = $"Password reset succeeded, but failed to send email. Error: {ex.Message}", password= password });
-
+                return Json(new
+                {
+                    success = false,
+                    message = $"Password reset succeeded, but failed to send email. Error: {ex.Message}",
+                    password = password
+                });
             }
 
             return Json(new
@@ -391,8 +401,9 @@ namespace TRS2._0.Controllers
                 success = true,
                 message = "Password reset and email sent successfully.",
                 password = password
-            });            
+            });
         }
+
 
 
 

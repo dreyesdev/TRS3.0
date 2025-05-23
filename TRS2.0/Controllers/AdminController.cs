@@ -709,7 +709,24 @@ namespace TRS2._0.Controllers
             public int PersonId { get; set; }
             public DateTime TargetMonth { get; set; }
         }
+
+        [HttpGet]
+        public async Task<IActionResult> SearchUserByName(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return Json(new List<object>());
+
+            var users = await _userManager.Users
+                .Where(u => u.UserName.Contains(query))
+                .Select(u => new { u.Id, u.UserName })
+                .Take(10)
+                .ToListAsync();
+
+            return Json(users);
+        }
+
     }
+
 
 
 }

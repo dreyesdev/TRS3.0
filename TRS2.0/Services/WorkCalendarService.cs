@@ -10,13 +10,14 @@ using TRS2._0.Models.ViewModels;
 using static TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel;
 using System.Diagnostics;
 using Serilog;
+using System.Text;
 namespace TRS2._0.Services;
 
 public class WorkCalendarService
 {
         private readonly TRSDBContext _context;
 
-        public WorkCalendarService(TRSDBContext context)
+        public WorkCalendarService(TRSDBContext context, ILogger<WorkCalendarService> @object)
         {
             _context = context;
         }
@@ -269,6 +270,86 @@ public class WorkCalendarService
 
         return hoursPerMonth;
     }
+
+
+    // -----------------------------------------------------------------------------------
+    // [CHANGE] GetWorkedDaysPerMonthForPersonInProject
+    // Actualizado el 30/04/2025
+    // - Ahora el cálculo de días trabajados se basa en:
+    //    - Horas reales declaradas en Timesheets del proyecto.
+    //    - Afiliación activa en el mes con mayor número de horas por día.
+    //    - División y redondeo con Math.Round(..., MidpointRounding.AwayFromZero).
+    // - Si no hay afiliación válida, marca como "SIN AFILIACIÓN".
+    // Esta lógica replica exactamente el método de ExportTimesheetToPdf2 en TimesheetController.
+    // -----------------------------------------------------------------------------------
+
+    public async Task<Dictionary<DateTime, decimal>> GetWorkedDaysPerMonthForPersonInProject(int personId, DateTime startDate, DateTime endDate, int projectId)
+    {
+        var declaredHoursPerMonth = await GetDeclaredHoursPerMonthForPersonInProyect(personId, startDate, endDate, projectId);
+
+        var affiliations = await _context.AffxPersons
+            .Where(a => a.PersonId == personId &&
+                        a.Start <= endDate && a.End >= startDate)
+            .ToListAsync();
+
+        var affHoursList = await _context.AffHours.ToListAsync();
+
+        Dictionary<DateTime, decimal> workedDaysPerMonth = new Dictionary<DateTime, decimal>();
+
+        foreach (var entry in declaredHoursPerMonth)
+        {
+            DateTime month = entry.Key;
+            decimal totalDeclaredHours = entry.Value;
+
+            var monthAffiliations = affiliations
+                .Where(a => a.Start <= month.AddMonths(1).AddDays(-1) && a.End >= month)
+                .ToList();
+
+            if (!monthAffiliations.Any())
+            {
+                workedDaysPerMonth[month] = -1; // SIN AFILIACIÓN
+                continue;
+            }
+
+            // Aquí: obtener correctamente la hora diaria vigente en este mes
+            List<decimal> activeAffiliationHours = new List<decimal>();
+
+            foreach (var affiliation in monthAffiliations)
+            {
+                var validAffHours = affHoursList
+                    .Where(ah => ah.AffId == affiliation.AffId &&
+                                 ah.StartDate <= month.AddMonths(1).AddDays(-1) &&
+                                 ah.EndDate >= month)
+                    .ToList();
+
+                foreach (var v in validAffHours)
+                {
+                    if (v.Hours > 0)
+                    {
+                        activeAffiliationHours.Add(v.Hours);
+                    }
+                }
+            }
+
+            if (!activeAffiliationHours.Any())
+            {
+                workedDaysPerMonth[month] = -1; // No hay afiliaciones válidas para este mes
+                continue;
+            }
+
+            // Usar la afiliación de MENOS horas (como en Timesheet real)
+            decimal selectedAffiliationHours = activeAffiliationHours.Min();
+
+            decimal workedDays = Math.Round(totalDeclaredHours / selectedAffiliationHours, 1, MidpointRounding.AwayFromZero);
+            workedDaysPerMonth[month] = workedDays;
+        }
+
+        return workedDaysPerMonth;
+    }
+
+
+
+
 
     public async Task<Dictionary<DateTime, decimal>> CalculateTotalHoursForPerson(int personId, DateTime startDate, DateTime endDate, int projectId, Dictionary<DateTime, int> workingDaysPerMonth)
     {
@@ -1289,7 +1370,9 @@ public class WorkCalendarService
 
             decimal totalMonthlyHours = ajusteCompleto ? maxHoursForMonth * maxEffort : monthlyEffort * maxHoursForMonth;
             decimal rawDailyHours = totalMonthlyHours / validWorkDays.Count;
-            decimal adjustedDailyHours = Math.Round(rawDailyHours * 2, MidpointRounding.AwayFromZero) / 2;
+            //decimal adjustedDailyHours = Math.Round(rawDailyHours * 2, MidpointRounding.AwayFromZero) / 2; // ANTERIOR AL CAMBIO DECIMAL
+            decimal adjustedDailyHours = Math.Round(rawDailyHours, 2, MidpointRounding.AwayFromZero);
+
             if (adjustedDailyHours == 0) adjustedDailyHours = 0.5m;
 
             foreach (var day in validWorkDays)
@@ -1326,6 +1409,393 @@ public class WorkCalendarService
         {
             logger.Dispose();
         }
+    }
+
+    public async Task<bool> HasNoContractDaysAsync(int personId, int year, int month)
+    {
+        var startDate = new DateTime(year, month, 1);
+        var endDate = startDate.AddMonths(1).AddDays(-1);
+
+        var hasNoContract = await _context.Leaves.AnyAsync(l =>
+            l.PersonId == personId &&
+            l.Day >= startDate &&
+            l.Day <= endDate &&
+            l.Type == 3 // tipo "no contrato"
+        );
+
+        return hasNoContract;
+    }
+
+
+    public async Task<decimal> CalculateMaxHoursByAffiliationOnlyAsync(int personId, int year, int month)
+    {
+        var startDate = new DateTime(year, month, 1);
+        var endDate = startDate.AddMonths(1).AddDays(-1);
+
+        // Buscar afiliación válida para ese mes
+        var affx = await _context.AffxPersons
+            .Where(ap => ap.PersonId == personId &&
+                         ap.Start <= endDate &&
+                         ap.End >= startDate)
+            .OrderByDescending(ap => ap.Start) // Por si hay varias, tomar la más reciente
+            .FirstOrDefaultAsync();
+
+        if (affx == null)
+            return 0;
+
+        int affId = affx.AffId;
+
+        // Buscar las horas asociadas a esa afiliación
+        var affHours = await _context.AffHours
+            .Where(ah => ah.AffId == affId &&
+                         ah.StartDate <= endDate &&
+                         ah.EndDate >= startDate)
+            .OrderByDescending(ah => ah.StartDate)
+            .FirstOrDefaultAsync();
+
+        if (affHours == null)
+            return 0;
+
+        // Calcular días laborables
+        int workingDays = await CalculateWorkingDays(year, month);
+
+        return Math.Round(affHours.Hours * workingDays, 2);
+    }
+
+
+
+    // Esta función ajusta automáticamente los efforts mensuales de una persona para corregir overloads respetando viajes y bloqueos
+    // Esta función ajusta automáticamente los efforts mensuales de una persona para corregir overloads respetando viajes y bloqueos
+    public async Task<(bool Success, string Message)> AdjustMonthlyOverloadAsync(int personId, int year, int month)
+    {
+        var log = new StringBuilder();
+        var result = (Success: false, Message: "");
+
+        // Buscar el PM máximo permitido para esa persona y mes
+        var pmEntry = await _context.PersMonthEfforts
+                        .FirstOrDefaultAsync(p => p.PersonId == personId && p.Month.Year == year && p.Month.Month == month);
+
+        // Si no hay PM registrado, no se puede continuar
+        if (pmEntry == null)
+            return (false, "No PM value found for the specified month.");
+
+        var pmValue = pmEntry.Value;
+
+        // Definir las fechas de inicio y fin del mes
+        DateTime monthStart = new DateTime(year, month, 1);
+        DateTime monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
+        // Obtener todos los efforts de la persona ese mes
+        var efforts = await _context.Persefforts
+            .Include(pe => pe.WpxPersonNavigation)
+            .ThenInclude(wpx => wpx.WpNavigation)
+            .ThenInclude(wp => wp.Proj)
+            .Where(pe => pe.WpxPersonNavigation.Person == personId &&
+                         pe.Month.Year == year && pe.Month.Month == month)
+            .ToListAsync();
+
+        // Si no hay efforts, no hay nada que ajustar
+        if (!efforts.Any())
+            return (false, "No efforts found for this person and month.");
+
+        // Guardar los valores originales de los efforts antes de resetearlos
+        var originalEffortValues = efforts.ToDictionary(e => e.Code, e => e.Value);
+
+        // Agrupar efforts por proyecto y WP para analizarlos por separado
+        var grouped = efforts
+            .GroupBy(e => new { ProjId = e.WpxPersonNavigation.WpNavigation.ProjId, WpId = e.WpxPersonNavigation.Wp })
+            .Select(g => new
+            {
+                ProjId = g.Key.ProjId,
+                WpId = g.Key.WpId,
+                TotalEffort = g.Sum(x => x.Value),
+                Persefforts = g.ToList()
+            }).ToList();
+
+        // Calcular el total de effort actualmente alocado
+        var totalAllocated = grouped.Sum(g => g.TotalEffort);
+        if (totalAllocated <= pmValue)
+            return (true, "No overload found.");
+
+        var overload = totalAllocated - pmValue; // Calcula cuánto sobra
+
+        // Buscar los proyectos bloqueados para esa persona y mes que no se pueden modificar
+        var lockedProjects = await _context.ProjectMonthLocks
+            .Where(l => l.PersonId == personId && l.Year == year && l.Month == month && l.IsLocked)
+            .Select(l => l.ProjectId)
+            .ToListAsync();
+
+        // Identificar efforts bloqueados
+        var lockedEfforts = grouped.Where(g => lockedProjects.Contains(g.ProjId)).ToList();
+
+        // Calcular effort total bloqueado y disponible
+        var lockedEffortTotal = lockedEfforts.Sum(g => g.TotalEffort);
+        var availableEffort = pmValue - lockedEffortTotal;
+
+        // Si lo bloqueado ya supera el PM, no se puede resolver
+        if (availableEffort < 0)
+            return (false, "Locked efforts exceed available PM. Overload cannot be resolved.");
+
+        // Filtrar los efforts que sí se pueden modificar
+        var modifiableEfforts = grouped.Except(lockedEfforts).ToList();
+
+        // Obtener los viajes aceptados en ese mes para esa persona
+        var travels = await _context.Liquidations
+            .Where(t => t.PersId == personId && t.Start <= monthEnd && t.End >= monthStart)
+            .Select(t => t.Id)
+            .ToListAsync();
+
+        // Obtener los IDs
+        var travelProjIds = await _context.liqdayxproject
+        .Where(l => travels.Contains(l.LiqId) && l.Day >= monthStart && l.Day <= monthEnd)
+        .Select(l => l.ProjId)
+        .Distinct()
+        .ToListAsync(); // Obtiene los Proyectos afectados por viajes /
+
+        // Agrupar esos WPs por proyecto
+        var withTravelGroupedByProject = modifiableEfforts
+        .Where(g => travelProjIds.Contains(g.ProjId))
+        .GroupBy(g => g.ProjId)
+        .ToList(); // Agrupa por proyecto los WPs con viajes
+
+        var minEffortByProject = new Dictionary<int, decimal>(); // Diccionario de esfuerzo mínimo requerido por proyecto
+
+        // Calcular el mínimo effort requerido por proyecto para justificar los viajes
+        foreach (var projectGroup in withTravelGroupedByProject)
+        {
+            int projId = projectGroup.Key;
+            var travelEffort = await _context.liqdayxproject
+                .Where(l => l.PersId == personId &&
+                            l.ProjId == projId &&
+                            l.Day >= monthStart && l.Day <= monthEnd)
+                .SumAsync(l => l.PMs);
+
+            minEffortByProject[projId] = travelEffort; // Guarda el mínimo por proyecto
+        }
+
+        // Sumar todos los efforts mínimos por viajes
+        var minTotalTravelEffort = minEffortByProject.Values.Sum(); // Suma total de esfuerzo mínimo requerido por viajes
+        if (availableEffort < minTotalTravelEffort) // Si no hay suficiente disponible, salir
+            return (false, "Available PM is not enough to justify travel-related efforts.");
+
+        // Calcular el esfuerzo total a reducir y el ratio de reducción general
+        decimal totalEffortToReduce = modifiableEfforts.Sum(m => m.TotalEffort); // Total que se podría ajustar
+        decimal targetEffort = availableEffort; // Esfuerzo que realmente podemos usar
+        decimal reductionRatio = Math.Min(1.0m, targetEffort / totalEffortToReduce); // Ratio general de reducción
+
+        // Enfoque iterativo: ajustamos individualmente los proyectos con viaje que no pueden aceptar el ratio global,
+        // y una vez viable, aplicamos el ratio a todos los que sí pueden aceptarlo
+        var remainingTravelEfforts = withTravelGroupedByProject.ToList(); // Lista inicial de proyectos con viaje por tratar
+                                                                          
+        var treatedProjects = new HashSet<int>();// Conjunto para registrar los IDs de proyectos ya ajustados por viaje (personalizado o global)
+
+        while (true)
+        {
+            // Identificar proyectos que no cumplen con el mínimo usando el ratio global aplicado effort por effort
+            var nonCompliantProjects = remainingTravelEfforts
+                .Where(projectGroup =>
+                {
+                    int projId = projectGroup.Key;
+                    var projectedTotal = projectGroup.SelectMany(wp => wp.Persefforts)
+                        .Sum(e => Math.Round(originalEffortValues[e.Code] * reductionRatio, 2));
+                    return projectedTotal < minEffortByProject[projId];
+                })
+                .ToList();
+
+            if (!nonCompliantProjects.Any())
+                break;
+
+            // Para cada proyecto no compatible, aplicar ratio mínimo necesario individualmente
+            foreach (var projectGroup in nonCompliantProjects)
+            {
+                int projId = projectGroup.Key;
+                decimal minEffort = minEffortByProject[projId];
+                var allEfforts = projectGroup.SelectMany(wp => wp.Persefforts).ToList();
+
+                var totalOriginal = allEfforts.Sum(e => originalEffortValues[e.Code]);
+
+                if (totalOriginal == 0)
+                {
+                    Console.WriteLine($"❌ Proyecto {projId} tiene esfuerzo original 0 pero requiere mínimo {minEffort}");
+                    return (false, $"Project {projId} has zero original effort but requires travel effort.");
+                }
+
+                decimal projRatio = minEffort / totalOriginal;
+
+                Console.WriteLine($"=== Ajustando Proyecto {projId} ===");
+                Console.WriteLine($"- Ratio global original: {reductionRatio}");
+                Console.WriteLine($"- No acepta el ratio global. Se aplica ratio personalizado: {projRatio}");
+                Console.WriteLine($"- Esfuerzo requerido para viaje: {minEffort}");
+                Console.WriteLine($"- Total effort original del proyecto: {totalOriginal}");
+
+                decimal totalAdjusted = 0;
+                var orderedEfforts = allEfforts.OrderBy(e => originalEffortValues[e.Code]).ToList();
+
+                foreach (var effort in orderedEfforts)
+                {
+                    var original = originalEffortValues[effort.Code];
+                    var newEffort = Math.Round(original * projRatio, 2);
+                    effort.Value = newEffort;
+                    totalAdjusted += newEffort;
+                    Console.WriteLine($"   • Effort {effort.Code}: original={original} → ajustado={newEffort}");
+                }
+
+                // Delta final
+                var delta = Math.Round(minEffort, 2) - totalAdjusted;
+                if (delta != 0 && orderedEfforts.Any())
+                {
+                    var maxEffort = allEfforts
+                                    .OrderByDescending(e => originalEffortValues[e.Code])
+                                    .FirstOrDefault();
+                    if (maxEffort != null)
+                        maxEffort.Value += delta;
+                    Console.WriteLine($"   → Se aplicó delta de ajuste final: {delta} al último effort {orderedEfforts.Last().Code}");
+                }
+
+                var finalSum = orderedEfforts.Sum(e => e.Value);
+                Console.WriteLine($"- Total final asignado al proyecto: {finalSum}");
+
+                if (finalSum < minEffort)
+                    Console.WriteLine($"❌ El total final no cumple con el mínimo ({finalSum} < {minEffort})");
+                else
+                    Console.WriteLine($"✅ Mínimo cumplido correctamente ({finalSum} ≥ {minEffort})");
+
+                availableEffort -= minEffort;
+                // Marcar este proyecto como tratado
+                treatedProjects.Add(projId);
+
+            }
+
+
+            remainingTravelEfforts = remainingTravelEfforts.Except(nonCompliantProjects).ToList();
+            totalEffortToReduce = modifiableEfforts.SelectMany(m => m.Persefforts).Sum(e => originalEffortValues[e.Code]) - (pmValue - availableEffort);
+            reductionRatio = Math.Min(1.0m, availableEffort / totalEffortToReduce);
+        }
+                
+        // Ajustamos el resto de proyectos con viaje usando el ratio global validado
+        foreach (var projectGroup in remainingTravelEfforts)
+        {
+            int projId = projectGroup.Key;
+            var minEffort = minEffortByProject.ContainsKey(projId) ? minEffortByProject[projId] : 0;
+            var allEfforts = projectGroup.SelectMany(wp => wp.Persefforts).ToList();
+            var totalOriginal = allEfforts.Sum(e => originalEffortValues[e.Code]);
+            // ⚠️ IMPORTANTE: Calculamos idealTotal sumando los efforts ya redondeados individualmente.
+            // Esto evita errores acumulados por redondeos tardíos como Math.Round(suma * ratio, 2),
+            // que pueden producir diferencias de ±0.01 incluso si los valores individuales son correctos.
+            // Este enfoque asegura consistencia con la forma en que realmente se aplican los efforts.
+            var idealTotal = allEfforts.Sum(e => Math.Round(originalEffortValues[e.Code] * reductionRatio, 2));
+
+
+
+            Console.WriteLine($"=== Ajustando con ratio global Proyecto {projId} ===");
+            Console.WriteLine($"- Total esfuerzo original: {totalOriginal}");
+            Console.WriteLine($"- Ratio global aplicado: {reductionRatio}");
+            Console.WriteLine($"- Ideal total esperado tras ajuste: {idealTotal}");
+            if (minEffort > 0)
+                Console.WriteLine($"- Mínimo requerido por viaje: {minEffort}");
+
+            decimal totalAdjusted = 0;
+
+            var orderedEfforts = allEfforts.OrderBy(e => originalEffortValues[e.Code]).ToList();
+            foreach (var effort in orderedEfforts)
+            {
+                var original = originalEffortValues[effort.Code];
+                var newEffort = Math.Round(original * reductionRatio, 2);
+                effort.Value = newEffort;
+                totalAdjusted += newEffort;
+                Console.WriteLine($"   • Effort {effort.Code}: original={original} → ajustado={newEffort}");
+            }
+
+            var delta = idealTotal - totalAdjusted;
+            if (delta != 0 && orderedEfforts.Any())
+            {
+                var maxEffort = allEfforts
+                                .OrderByDescending(e => originalEffortValues[e.Code])
+                                .FirstOrDefault();
+                if (maxEffort != null)
+                    maxEffort.Value += delta;
+                Console.WriteLine($"   → Se aplicó delta de ajuste final: {delta} al último effort {orderedEfforts.Last().Code}");
+            }
+
+            var finalSum = orderedEfforts.Sum(e => e.Value);
+            Console.WriteLine($"- Total final ajustado del proyecto: {finalSum}");
+
+            if (minEffort > 0 && finalSum < minEffort)
+                Console.WriteLine($"❌ NO SE CUMPLE el mínimo requerido ({finalSum} < {minEffort})");
+            else if (minEffort > 0)
+                Console.WriteLine($"✅ Mínimo cumplido correctamente ({finalSum} ≥ {minEffort})");
+
+            // 🔄 Restar del esfuerzo disponible el total ajustado de este proyecto
+            availableEffort -= finalSum;
+
+            // Marcar este proyecto como tratado
+            treatedProjects.Add(projId);
+        }
+
+        Console.WriteLine("=== Proyectos tratados ===");
+        foreach (var id in treatedProjects)
+            Console.WriteLine($"Tratado: ProjId {id}");
+
+        // Ahora tratamos los efforts sin viajes ni ajustes anteriores de forma global (ordenados de menor a mayor effort)
+        var withoutTravel = modifiableEfforts
+            .Where(g => !treatedProjects.Contains(g.ProjId)) // Excluimos también proyectos ya tratados
+            .ToList();
+        Console.WriteLine("=== Proyectos en withoutTravel ===");
+        foreach (var wp in withoutTravel)
+            Console.WriteLine($"ProjId {wp.ProjId} - WpId {wp.WpId}");
+
+        decimal remainingEffort = availableEffort; // Ya fue calculado correctamente antes
+        
+
+        var totalWithoutTravel = withoutTravel.Sum(w => w.TotalEffort);
+
+        if (totalWithoutTravel > 0 && remainingEffort > 0)
+        {
+            var ratio = Math.Min(1.0m, remainingEffort / totalWithoutTravel);
+            var allEfforts = withoutTravel.SelectMany(wp => wp.Persefforts).ToList();
+
+            decimal totalAdjusted = 0;
+            foreach (var effort in allEfforts)
+            {
+                var newEffort = Math.Round(originalEffortValues[effort.Code] * ratio, 2);
+                effort.Value = newEffort;
+                totalAdjusted += newEffort;
+            }
+
+            var delta = Math.Round(remainingEffort, 2) - totalAdjusted; // Compensamos la diferencia final exacta
+            if (delta != 0 && allEfforts.Any())
+            {
+                var maxEffort = allEfforts
+                    .OrderByDescending(e => originalEffortValues[e.Code])
+                    .FirstOrDefault();
+                if (maxEffort != null)
+                    maxEffort.Value += delta;
+            }
+
+        }
+
+        // Validación final: comprobar si el esfuerzo total corregido no excede el PM permitido
+        var adjustedEfforts = modifiableEfforts.SelectMany(g => g.Persefforts).ToList();
+        var totalEffortFinal = lockedEfforts.Sum(g => g.TotalEffort) + adjustedEfforts.Sum(e => e.Value);
+        var excess = Math.Round(totalEffortFinal - pmValue, 2);
+
+        if (excess > 0) // Tolerancia mínima
+        {
+            var maxEffort = adjustedEfforts.OrderByDescending(e => e.Value).FirstOrDefault();
+            if (maxEffort != null)
+            {
+                maxEffort.Value = Math.Max(0, Math.Round(maxEffort.Value - excess, 2));
+                totalEffortFinal = lockedEfforts.Sum(g => g.TotalEffort) + adjustedEfforts.Sum(e => e.Value);
+            }
+        }
+
+        if (Math.Round(totalEffortFinal, 2) > Math.Round(pmValue, 2))
+            return (false, $"Adjusted total effort ({totalEffortFinal}) exceeds available PM ({pmValue}).");
+
+        Console.WriteLine("=== Resultado final de todos los efforts ===");        
+        // Guardar todos los cambios en la base de datos
+        await _context.SaveChangesAsync();
+        return (true, "Overload corrected successfully.");
     }
 
 

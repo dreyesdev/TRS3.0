@@ -274,6 +274,11 @@
                                 Export Audit PMs per WP
                             </button>
                         </div>
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportWorkedDaysBtn" onclick="exportWorkedDaysToCSV()" style="display:none;">
+                                Export Worked Days
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -310,6 +315,8 @@
                     $('#exportDeclaredHoursBtn').show(); // Mostrar el botón de exportar horas declaradas
                     $('#exportEstimatedHoursBtn').show(); // Mostrar el botón de exportar horas estimadas
                     $('#exportPMSforWPToCSVBtn').show(); // Mostrar el botón de exportar PMs Auditoria por WP
+                    $('#exportWorkedDaysBtn').show(); //Mostrar el botón de exportar días trabajados
+
 
                     // Guardar las fechas del periodo seleccionado
                     $('#exportPMSforWPToCSV').data('start-date', startDate);
@@ -580,6 +587,44 @@
                 a.remove();
             })
             .catch(error => console.error('Error:', error));
+    }
+
+        function exportWorkedDaysToCSV() {
+        var projectId = @ViewBag.projId;
+        var startDate = $('#exportPMSforWPToCSV').data('start-date');
+        var endDate = $('#exportPMSforWPToCSV').data('end-date');
+
+        // Convertir las fechas al formato ISO 8601 (yyyy-MM-dd)
+        var startDateISO = new Date(startDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+        var endDateISO = new Date(endDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+
+        fetch('@Url.Action("ExportWorkedDaysToCSV", "Projects")', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ProjectId: projectId,
+                StartDate: startDateISO,
+                EndDate: endDateISO
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            var url = window.URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = `WorkedDays_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        })
+        .catch(error => console.error('Error exporting Worked Days:', error));
     }
 
 
