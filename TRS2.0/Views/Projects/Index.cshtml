@@ -1,7 +1,8 @@
 ﻿@model List<TRS2._0.Models.DataModels.Project>
 
-<h1 class="text-center my-style">Projects <span id="selectedYearTitle"></span></h1>
-
+<h1 class="text-center my-style">
+    Projects <span id="selectedYearTitle">(@ViewBag.DefaultSelectedYear)</span>
+</h1>
 
 <div class="filter-container d-flex justify-content-center align-items-center mb-4" style="gap: 20px;">
     <div>
@@ -10,7 +11,8 @@
             <option value="">All</option>
             @foreach (var year in ViewBag.UniqueYears)
             {
-                <option value="@year">@year</option>
+                var isSelected = (int)year == (int)ViewBag.DefaultSelectedYear ? "selected" : "";
+                @Html.Raw($"<option value=\"{year}\" {isSelected}>{year}</option>")
             }
         </select>
     </div>
@@ -43,9 +45,16 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var item in Model.Where(p => p.Type == type && p.St1 == "ABIERTO" && p.St2 == "CONCEDIDO" && p.Visible == 1).OrderBy(p => p.Acronim))
+                    @foreach (var item in Model
+                        .Where(p => p.Type == type &&
+                                    p.St1 == "ABIERTO" &&
+                                    (p.St2 == "CONCEDIDO" || string.IsNullOrEmpty(p.St2)) &&
+                                    p.Visible == 1)
+                        .OrderBy(p => p.Acronim))
                     {
-                        <tr data-name="@item.Acronim" data-year="@item.Start.Value.Year">
+                        <tr data-name="@item.Acronim"
+                            data-start="@item.Start.Value.Year"
+                            data-end="@item.EndReportDate.Year">
                             <td>
                                 <a asp-action="Details" asp-route-id="@item.ProjId">@item.Acronim</a>
                             </td>
@@ -59,68 +68,53 @@
 </div>
 
 <script>
-    document.getElementById('yearDropdown').addEventListener('change', function () {
-        var selectedYear = this.value;
-        var currentUrl = window.location.href;
-
-        // Actualiza el título con el año seleccionado
-        document.getElementById('selectedYearTitle').textContent = selectedYear ? `(${selectedYear})` : '';
-
-        // Reemplaza o agrega el parámetro "selectedYear" en la URL
-        var updatedUrl = updateQueryStringParameter(currentUrl, 'selectedYear', selectedYear);
-
-        // Redirige a la URL actualizada
-        window.location.href = updatedUrl;
-    });
-
-    function updateQueryStringParameter(uri, key, value) {
-        var re = new RegExp("([?&])" + key + "=.*?(&|$)", "i");
-        var separator = uri.indexOf('?') !== -1 ? "&" : "?";
-        if (uri.match(re)) {
-            return uri.replace(re, '$1' + key + "=" + value + '$2');
-        }
-        else {
-            return uri + separator + key + "=" + value;
-        }
-    }
-
-    // JavaScript para filtrar proyectos por nombre y tipo
     document.addEventListener('DOMContentLoaded', function () {
         const searchByNameInput = document.getElementById('searchByName');
         const filterByTypeSelect = document.getElementById('filterByType');
         const yearDropdown = document.getElementById('yearDropdown');
 
-        function filterProjects() {
-            const searchQuery = searchByNameInput.value.toLowerCase();
-            const selectedType = filterByTypeSelect.value;
-            const selectedYear = yearDropdown.value;
+            function filterProjects() {
+        const searchQuery = searchByNameInput.value.toLowerCase();
+        const selectedType = filterByTypeSelect.value;
+        const selectedYear = yearDropdown.value;
 
-            document.querySelectorAll('.project-column').forEach(column => {
-                const type = column.getAttribute('data-type');
-                let matchesType = true;
-                let matchesYear = true;
+        document.querySelectorAll('.project-column').forEach(column => {
+            const type = column.getAttribute('data-type');
+            let matchesType = !selectedType || selectedType === type;
 
-                if (selectedType && selectedType !== type) {
-                    matchesType = false;
-                }
+            const rows = column.querySelectorAll('tbody tr');
+            let hasVisibleRows = false;
 
-                const rows = column.querySelectorAll('tbody tr');
-                let matchesSearch = false;
-                rows.forEach(row => {
-                    const name = row.getAttribute('data-name').toLowerCase();
-                    const year = row.getAttribute('data-year');
-                    const isVisible = name.includes(searchQuery) && (selectedYear === "" || year === selectedYear);
-                    row.style.display = isVisible ? '' : 'none';
-                    if (isVisible) matchesSearch = true;
-                });
+            rows.forEach(row => {
+                const name = row.getAttribute('data-name').toLowerCase();
+                const start = parseInt(row.getAttribute('data-start'));
+                const end = parseInt(row.getAttribute('data-end'));
 
-                column.style.display = (matchesType && matchesSearch) ? '' : 'none';
+                const matchesSearch = name.includes(searchQuery);
+                const matchesYear = !selectedYear || (start <= selectedYear && end >= selectedYear);
+
+                const isVisible = matchesSearch && matchesYear;
+
+                row.style.display = isVisible ? '' : 'none';
+                if (isVisible) hasVisibleRows = true;
             });
-        }
+
+            column.style.display = matchesType && hasVisibleRows ? '' : 'none';
+        });
+
+        document.getElementById('selectedYearTitle').textContent = selectedYear ? `(${selectedYear})` : '(All)';
+    }
+
 
         searchByNameInput.addEventListener('input', filterProjects);
         filterByTypeSelect.addEventListener('change', filterProjects);
         yearDropdown.addEventListener('change', filterProjects);
+
+        // Aplicar filtro inicial
+        filterProjects();
+
+            // Reiniciar el valor visual del dropdown para que búsquedas actúen sobre todos
+    yearDropdown.value = "";
     });
 </script>
 
@@ -131,18 +125,16 @@
 
     .projects-container {
         margin: 0 15px;
+        gap: 20px;
     }
 
     .project-column {
+        flex: 1 1 45%;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,.1);
+        padding: 20px;
         margin-bottom: 20px;
-    }
-
-    table {
-        margin-bottom: 0;
-    }
-
-    .filter-container > div {
-        margin-bottom: 10px;
     }
 
     .filter-container > div {
@@ -152,27 +144,13 @@
     }
 
     .form-select, .form-control {
-        width: auto; /* Ajusta el ancho según el contenido */
-    }
-
-    .projects-container {
-        gap: 20px; /* Espacio entre los proyectos */
-    }
-
-    .project-column {
-        flex: 1 1 45%; /* Ajusta esto según prefieras el ancho de las columnas */
-        background-color: #f8f9fa;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,.1);
-        padding: 20px;
+        width: auto;
     }
 
     .my-style {
-        font-size: 2.5rem; /* Ajusta el tamaño de la fuente según necesites */
+        font-size: 2.5rem;
         font-weight: bold;
-        color: #0056b3; /* Este es un azul sugerido, cámbialo según tu paleta de colores */
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.2); /* Añade una sombra para mayor profundidad */
+        color: #0056b3;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
     }
-
 </style>
-

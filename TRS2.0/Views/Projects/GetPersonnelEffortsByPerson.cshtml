@@ -10,7 +10,9 @@
     <h2>Personnel Effort Plan for @personName
         <div style="display: block; margin-top: 5px;">
             <button id="saveAllButton" class="btn btn-primary btn-sm">Save All</button>
+            <button id="exportPersonCsvButton" class="btn btn-secondary btn-sm" style="margin-left: 8px;">Export into CSV</button>
         </div>
+
     </h2>
     <div class="table-responsive">
         <div class="scrollable-table-container">
@@ -262,127 +264,153 @@
         });
     });
 
+        document.getElementById('exportPersonCsvButton').addEventListener('click', function () {
+        var csvContent = '';
+        var header = ['Project', 'Person', 'WP'];
+
+        // Construye cabecera con meses
+        const monthHeaders = Array.from(document.querySelectorAll('.table thead tr:nth-child(1) th')).slice(3);
+        header.push(...monthHeaders.map(th => th.innerText.trim()));
+        csvContent += header.join(';') + '\r\n';
+
+        // Filas
+        document.querySelectorAll('.table tbody tr').forEach(row => {
+            const cells = row.querySelectorAll('td');
+            let rowData = [];
+
+            for (let i = 0; i < cells.length; i++) {
+                let value = '';
+                const input = cells[i].querySelector('input');
+                if (input) {
+                    value = input.value.trim();
+                } else {
+                    value = cells[i].innerText.trim();
+                }
+
+                // Cambiar punto decimal por coma si es numérico
+                if (!isNaN(value) && value.includes('.')) {
+                    value = value.replace('.', ',');
+                }
+
+                rowData.push(value);
+            }
+
+            csvContent += rowData.join(';') + '\r\n';
+        });
+
+        const encodedUri = 'data:text/csv;charset=utf-8;base64,' + btoa(unescape(encodeURIComponent(csvContent)));
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+            const rawName = '@personName';
+    const sanitizedName = rawName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, '_');
+    link.setAttribute('download', `Personnel_Effort_Plan_${sanitizedName}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
 
 </script>
     
 
 <style>
     .input-effort {
-        width: 100%; /* Asegura que el input ocupe toda la celda */
-        min-width: 60px; /* Ajusta el mínimo ancho para mostrar tres caracteres */
-        text-align: center; /* Centra el texto */
+        width: 100%;
+        min-width: 60px;
+        text-align: center;
     }
 
     .effort-cell {
-        min-width: 60px; /* Igual al mínimo ancho del input */
-        padding: 0; /* Elimina el relleno para permitir que el input llene la celda */
-        text-align: center; /* Centra el texto */
+        min-width: 60px;
+        padding: 0;
+        text-align: center;
     }
 
     .person-name-column {
         font-weight: bold;
-        width: 250px; /* Ajusta este valor según tus necesidades */
-        white-space: nowrap; /* Evita que el texto se envuelva a la siguiente línea */
-        overflow: hidden; /* Oculta el texto que exceda el ancho de la celda */
-        text-overflow: ellipsis; /* Añade puntos suspensivos si el texto es demasiado largo */
+        width: 250px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .scrollable-table-container {
-        overflow-y: auto;        
-        max-height: 800px; /* Aumenta este valor para mostrar más filas */
+        overflow-y: auto;
+        max-height: 800px;
     }
 
-    .table thead th {
+    /* Encabezado fila 1: Project, Person, WP... */
+    .table thead tr:nth-child(1) th {
         position: sticky;
         top: 0;
-        z-index: 10;
-        background-color: var(--blue-dark); /* Asegura que el fondo no sea transparente */
-    }
-        
-
-    /* Ajustar si es necesario para las celdas adyacentes */
-    .table th:nth-child(2), .table td:nth-child(2), .table th:nth-child(3), .table td:nth-child(3) {
-        position: sticky;
-        background-color: white; /* Fondo blanco para las celdas del cuerpo */
-        z-index: 10; /* Ajusta según necesidad para mantener la consistencia del z-index */
-    }
-
-    /* Estilo para la cabecera de la primera y segunda columna */
-    .table th:first-child, .table th:nth-child(2) {
-        position: sticky;
-        left: 0; /* Para la primera columna */
-        z-index: 11; /* Asegurarse de que está por encima del resto */
-        background-color: var(--blue-dark); /* Color de fondo oscuro */
+        z-index: 12;
+        background-color: var(--blue-dark);
+        color: white;
         text-align: center;
         vertical-align: middle;
     }
 
-    .table th:nth-child(2) {
-        left: 200px; /* Ajusta este valor al ancho de tu primera columna */
+    /* Encabezado fila 2: leyendas de PMs, Total, etc. */
+    .table thead tr:nth-child(2) th {
+        position: sticky;
+        top: 50px; /* Altura de la primera fila, ajústalo si cambia */
         z-index: 11;
-    }
-
-    /* Estilos para las celdas de cuerpo en la primera y segunda columna */
-    .table td:first-child, .table td:nth-child(2) {
-        position: sticky;
-        left: 0; /* Para la primera columna */
-        background-color: white; /* Fondo blanco para las celdas del cuerpo */
-        z-index: 10;
+        background-color: var(--blue-dark);
+        color: white;
         text-align: center;
         vertical-align: middle;
     }
 
-    .table td:nth-child(2) {
-        left: 200px; /* Ajusta este valor al ancho de tu primera columna */
-        z-index: 10;
-    }
-
-    /* Ajustes para el ancho de las columnas fijas */
-    .table th:first-child, .table td:first-child {
-        min-width: 200px; /* o el ancho que necesites */
+    /* Columnas fijas - Primera columna */
+    .table th:first-child,
+    .table td:first-child {
+        position: sticky;
+        left: 0;
+        min-width: 200px;
         max-width: 200px;
-    }
-
-    .table th:nth-child(2), .table td:nth-child(2) {
-        min-width: 250px; /* o el ancho que necesites */
-        max-width: 250px;
-    }
-
-    /* Ajustar bordes para celdas adyacentes */
-    .table td:nth-child(3), .table th:nth-child(3) {
-        border-left: 2px solid #dee2e6; /* Asegúrate de que el color del borde coincida con el estilo de tu tabla */
-    }
-
-    /* Estilo para la cabecera de la tercera columna */
-    .table th:nth-child(3) {
-        position: sticky;
-        left: 450px; /* Ajusta este valor a la suma del ancho de tus dos primeras columnas */
-        z-index: 11; /* Asegúrate de que esté por encima del resto */
-        background-color: var(--blue-dark); /* Color de fondo oscuro */
+        background-color: white;
+        z-index: 10;
         text-align: center;
         vertical-align: middle;
     }
 
-    /* Estilos para las celdas de cuerpo en la tercera columna */
+    /* Segunda columna */
+    .table th:nth-child(2),
+    .table td:nth-child(2) {
+        position: sticky;
+        left: 200px;
+        min-width: 250px;
+        max-width: 250px;
+        background-color: white;
+        z-index: 10;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    /* Tercera columna */
+    .table th:nth-child(3),
     .table td:nth-child(3) {
         position: sticky;
-        left: 450px; /* Ajusta este valor a la suma del ancho de tus dos primeras columnas */
-        background-color: white; /* Fondo blanco para las celdas del cuerpo */
+        left: 450px;
+        min-width: 100px;
+        max-width: 100px;
+        background-color: white;
         z-index: 10;
         text-align: center;
-
         vertical-align: middle;
+        border-left: 2px solid #dee2e6;
     }
 
-    /* Ajustes para el ancho de las columnas fijas */
-    .table th:nth-child(3), .table td:nth-child(3) {
-        min-width: 100px; /* o el ancho que necesites */
-        max-width: 100px;
+    /* Intersecciones: encabezado fila 2 + columnas fijas */
+    .table thead tr:nth-child(2) th:nth-child(1),
+    .table thead tr:nth-child(2) th:nth-child(2),
+    .table thead tr:nth-child(2) th:nth-child(3) {
+        z-index: 13;
     }
 
-    /* Ajustar bordes para celdas adyacentes */
-    .table td:nth-child(4), .table th:nth-child(4) {
-        border-left: 2px solid #dee2e6; /* Asegúrate de que el color del borde coincida con el estilo de tu tabla */
+    /* Asegura que las celdas posteriores a WP tengan un borde visual */
+    .table td:nth-child(4),
+    .table th:nth-child(4) {
+        border-left: 2px solid #dee2e6;
     }
 
     h2 {
@@ -390,7 +418,12 @@
         font-weight: bold;
     }
 
-
+    /* Intersecciones: encabezado fila 1 + columnas fijas */
+    .table thead tr:nth-child(1) th:nth-child(1),
+    .table thead tr:nth-child(1) th:nth-child(2),
+    .table thead tr:nth-child(1) th:nth-child(3) {
+        z-index: 14;
+    }
 </style>
 
 @functions {

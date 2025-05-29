@@ -36,38 +36,50 @@ namespace TRS2._0.Controllers
 
         // GET: Projects
 
-        
+
         [Route("Proyectos/InitialRedirect")]
         [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public IActionResult InitialRedirect()
         {
-            int currentYear = DateTime.Now.Year;
-            return RedirectToAction("Index", new { selectedYear = currentYear });
+            // Simplemente redirige a Index sin parámetros
+            return RedirectToAction("Index");
         }
 
         [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
-        public IActionResult Index(int? selectedYear)
+        public IActionResult Index()
         {
-            // Obtén la lista de años únicos de los proyectos
+            // Obtener todos los años únicos de inicio y fin
             ViewBag.UniqueYears = _context.Projects
+                .Where(p => p.St1 == "ABIERTO" &&
+                            (p.St2 == "CONCEDIDO" || string.IsNullOrEmpty(p.St2)) &&
+                            p.Visible == 1 &&
+                            p.Start.HasValue &&
+                            p.End.HasValue)
                 .Select(p => p.Start.Value.Year)
-                .Concat(_context.Projects.Select(p => p.End.Value.Year))
+                .Concat(_context.Projects
+                    .Where(p => p.St1 == "ABIERTO" &&
+                                (p.St2 == "CONCEDIDO" || string.IsNullOrEmpty(p.St2)) &&
+                                p.Visible == 1 &&
+                                p.Start.HasValue &&
+                                p.End.HasValue)
+                    .Select(p => p.End.Value.Year))
                 .Distinct()
-                .OrderBy(year => year)
+                .OrderBy(y => y)
                 .ToList();
 
-            IQueryable<Project> projectsQuery = _context.Projects.AsQueryable();
+            // Obtener todos los proyectos válidos
+            var projects = _context.Projects
+                .Where(p => p.St1 == "ABIERTO" &&
+                            (p.St2 == "CONCEDIDO" || string.IsNullOrEmpty(p.St2)) &&
+                            p.Visible == 1)
+                .ToList();
 
-            // Filtra los proyectos en función del año seleccionado, si se ha proporcionado un año
-            if (selectedYear.HasValue)
-            {
-                projectsQuery = projectsQuery.Where(p => p.Start.Value.Year <= selectedYear && p.EndReportDate.Year >= selectedYear);
-            }
-
-            var projects = projectsQuery.ToList();
+            // Año actual como selección inicial en la vista
+            ViewBag.DefaultSelectedYear = DateTime.Now.Year;
 
             return View(projects);
         }
+
 
 
         // GET: Projects/Details/5
@@ -1981,7 +1993,7 @@ namespace TRS2._0.Controllers
                         }
                         else
                         {
-                            result.Append($";{workedDays.ToString("0.0", CultureInfo.InvariantCulture)}");
+                            result.Append($";{workedDays.ToString("0.0", new CultureInfo("es-ES"))}");
                         }
                     }
                     else
@@ -2000,9 +2012,7 @@ namespace TRS2._0.Controllers
 
             return File(bytes, "text/csv", $"WorkedDays_{projectId}_{DateTime.Now:yyyyMMdd}.csv");
         }
-
-
-
+                
         private string RemoveAccents(string text)
         {
             return string.Concat(text.Normalize(NormalizationForm.FormD)
@@ -2035,6 +2045,8 @@ namespace TRS2._0.Controllers
             public string StartDate { get; set; }
             public string EndDate { get; set; }
         }
+              
+
 
     }
 

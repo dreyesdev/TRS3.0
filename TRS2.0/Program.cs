@@ -58,7 +58,7 @@ builder.Services.Configure<IdentityOptions>(options =>
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.ExpireTimeSpan = TimeSpan.FromMinutes(60); // Expira la sesión tras 60 minutos de inactividad
-    options.SlidingExpiration = false; // No renueva la sesión automáticamente
+    options.SlidingExpiration = true; // No renueva la sesión automáticamente
     options.Cookie.HttpOnly = true; // Protege la cookie contra accesos de JavaScript
     options.Cookie.IsEssential = true; // Se mantiene en todas las políticas de privacidad
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Requiere HTTPS

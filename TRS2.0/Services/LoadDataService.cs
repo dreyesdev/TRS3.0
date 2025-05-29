@@ -2616,6 +2616,34 @@ namespace TRS2._0.Services
             logger.Information("Proceso de ajuste global de esfuerzo finalizado");
         }
 
+
+        public async Task AdjustOverloadsFromDateAsync(DateTime startDate)
+        {
+            var persons = await _context.Personnel
+                .Where(p => _context.Dedications.Any(c => c.Start <= startDate && c.End >= startDate))
+                .ToListAsync(); // Personas con contrato activo
+
+            foreach (var person in persons)
+            {
+                var monthsToCheck = await _context.PersMonthEfforts
+                    .Where(pme => pme.PersonId == person.Id && pme.Month >= startDate)
+                    .OrderBy(pme => pme.Month)
+                    .ToListAsync(); // Solo meses desde la fecha definida
+
+                foreach (var pme in monthsToCheck)
+                {
+                    if (await _workCalendarService.IsOverloadedAsync(person.Id, pme.Month.Year, pme.Month.Month))
+                    {
+                        var result = await _workCalendarService.AdjustMonthlyOverloadAsync(person.Id, pme.Month.Year, pme.Month.Month);
+
+                        var status = result.Success ? "✅ OK" : $"❌ ERROR: {result.Message}";
+                        _fileLogger.Information($"→ Persona {person.Id}, Mes {pme.Month:yyyy-MM}: {status}");
+                    }
+                }
+            }
+        }
+
+
         public async Task RunScheduledJobs()
         {
             var dataLoadPath = Path.Combine(Directory.GetCurrentDirectory(), "Dataload");
@@ -2645,6 +2673,7 @@ namespace TRS2._0.Services
                                 ("Procesamiento Avanzado de Liquidaciones", () => ProcessAdvancedLiquidationsAsync()),
                                 ("Actualización de Tabla de Ausencias", () => UpdateLeaveTableAsync()),
                                 ("Carga de Esfuerzo Mensual", () => UpdateMonthlyPMs())
+                                //("Corrección de Overloads", () => AdjustOverloadsFromDateAsync(new DateTime(2024, 10, 1)))//
                             };
 
             foreach (var (processName, process) in processes)
@@ -2785,6 +2814,11 @@ namespace TRS2._0.Services
 
                     case "AdjustGlobalEffort":
                         await AdjustGlobalEffortAsync();
+                        break;
+
+                    case "AdjustEffortOverloads":
+                        var cutoffDate = new DateTime(2024, 10, 1); // ⚠️ Fecha pendiente de acordar con Finanzas
+                        await AdjustOverloadsFromDateAsync(cutoffDate);
                         break;
 
                     default:

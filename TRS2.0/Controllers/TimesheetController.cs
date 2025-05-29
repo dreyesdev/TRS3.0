@@ -15,6 +15,8 @@ using System.Security.Claims;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.AspNetCore.Authorization;
 using System.Linq;
+using Microsoft.AspNetCore.Identity;
+using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
 
 
 
@@ -28,12 +30,14 @@ namespace TRS2._0.Controllers
         private readonly ILogger<TimesheetController> _logger;
         private readonly TRSDBContext _context;
         private readonly WorkCalendarService _workCalendarService;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public TimesheetController(ILogger<TimesheetController> logger, TRSDBContext context, WorkCalendarService workCalendarService)
+        public TimesheetController(ILogger<TimesheetController> logger, TRSDBContext context, WorkCalendarService workCalendarService, UserManager<ApplicationUser> userManager)
         {
             _logger = logger;
             _context = context;
             _workCalendarService = workCalendarService;
+            _userManager = userManager;
         }
 
         [Authorize(Roles = "Admin, ProjectManager")]
@@ -47,25 +51,31 @@ namespace TRS2._0.Controllers
         [Authorize(Roles = "Admin, ProjectManager, User, Researcher")]
         public async Task<IActionResult> GetTimeSheetsForPerson(int? personId, int? year, int? month)
         {
-            // Si no se proporciona un personId, obtiene el personId del usuario logueado
+            // Obtener usuario autenticado y roles
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var user = await _context.Users.Include(u => u.Personnel).FirstOrDefaultAsync(u => u.Id == userId);
+            var userRoles = await _userManager.GetRolesAsync(user);
+            bool isAdminOrPM = userRoles.Contains("Admin") || userRoles.Contains("ProjectManager");
+
             if (!personId.HasValue)
             {
-                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-                var user = await _context.Users
-                                         .Include(u => u.Personnel)
-                                         .SingleOrDefaultAsync(u => u.Id == userId);
-
-                if (user == null || user.Personnel == null)
-                {
-                    _logger.LogError($"No se encontró el usuario o no está asociado a un personal con el ID {userId}");
-                    return NotFound();
-                }
-
-                personId = user.PersonnelId;
+                personId = user?.PersonnelId;
             }
 
-            // Validar que personId no sea nulo y obtener su valor
+            if (!personId.HasValue)
+            {
+                _logger.LogError($"No se pudo determinar el personId del usuario {userId}");
+                return NotFound();
+            }
+
             int validPersonId = personId.Value;
+
+            // Validar si tiene permiso para acceder a esa ficha
+            if (!isAdminOrPM && user?.PersonnelId != validPersonId)
+            {
+                _logger.LogWarning($"User {userId} tried to view timesheets of personId {validPersonId} without permission.");
+                return Forbid();
+            }
 
             // Determina el año y mes actual si no se proporcionan
             var currentYear = year ?? DateTime.Now.Year;
@@ -100,7 +110,7 @@ namespace TRS2._0.Controllers
                 .ToDictionaryAsync(l => l.Day, l => l.LeaveReduction);
 
             // Obtener las horas diarias iniciales con dedicación
-            var hoursPerDayWithDedication = await _workCalendarService.CalculateDailyWorkHoursWithDedication(validPersonId, currentYear, currentMonth);
+            var hoursPerDayWithDedication = await _workCalendarService.CalculateDailyWorkHoursWithDedicationNotRounded(validPersonId, currentYear, currentMonth);
 
             // Ajustar las horas por día considerando las bajas de tipo 11 y 12 (Parciales)
             foreach (var day in hoursPerDayWithDedication.Keys.ToList())
@@ -306,7 +316,7 @@ namespace TRS2._0.Controllers
                 .ToDictionaryAsync(l => l.Day, l => l.LeaveReduction);
 
             // Calcular horas diarias iniciales con la dedicación
-            var hoursPerDayWithDedication = await _workCalendarService.CalculateDailyWorkHoursWithDedication(personId, currentYear, currentMonth);
+            var hoursPerDayWithDedication = await _workCalendarService.CalculateDailyWorkHoursWithDedicationNotRounded(personId, currentYear, currentMonth);
 
             // Ajustar las horas por día considerando las bajas de tipo 11 y 12
             foreach (var day in hoursPerDayWithDedication.Keys.ToList())
@@ -689,12 +699,12 @@ namespace TRS2._0.Controllers
                                         cellBackground = "#6c757d"; // Gris clásico original
                                     }
                                     // Directly add cells for each day within the same iteration that adds the work package name
-                                    tabla.Cell().Background(cellBackground).Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").Bold().FontSize(8);
+                                    tabla.Cell().Background(cellBackground).Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.#") ?? "0").Bold().FontSize(8);
                                 }
 
                                 // Calculate the total hours for this WP and add a cell for it
                                 var totalHours = wp.Timesheets.Sum(ts => ts.Hours);
-                                tabla.Cell().Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(totalHours.ToString("0.##")).Bold().FontSize(8);
+                                tabla.Cell().Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(totalHours.ToString("0.#")).Bold().FontSize(8);
 
                             }
 
@@ -861,8 +871,8 @@ namespace TRS2._0.Controllers
             //decimal roundedtotalHours = Math.Round(totalhours * 2, MidpointRounding.AwayFromZero) / 2;
             //decimal roundedtotalHoursWorkedOnProject = Math.Round(totalhoursworkedonproject * 2, MidpointRounding.AwayFromZero) / 2;
 
-            decimal roundedtotalHours = Math.Round(totalhours, 2, MidpointRounding.AwayFromZero);
-            decimal roundedtotalHoursWorkedOnProject = Math.Round(totalhoursworkedonproject, 2, MidpointRounding.AwayFromZero);
+            decimal roundedtotalHours = Math.Round(totalhours, 1, MidpointRounding.AwayFromZero);
+            decimal roundedtotalHoursWorkedOnProject = Math.Round(totalhoursworkedonproject, 1, MidpointRounding.AwayFromZero);
 
 
             DateTime? finalDateInvestigator = null;
@@ -1038,11 +1048,11 @@ namespace TRS2._0.Controllers
                                                 cellBackground = "#6c757d"; // Gris original si no fue sobreescrito antes
                                             }
 
-                                            tabla.Cell().Background(cellBackground).Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.##") ?? "0").Bold().FontSize(8);
+                                            tabla.Cell().Background(cellBackground).Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.#") ?? "0").Bold().FontSize(8);
                                         }
 
                                         var totalHours = wp.Timesheets.Sum(ts => ts.Hours);
-                                        tabla.Cell().Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(totalHours.ToString("0.##")).Bold().FontSize(8);
+                                        tabla.Cell().Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(totalHours.ToString("0.#")).Bold().FontSize(8);
                                     }
 
                                     tabla.Footer(footer =>
@@ -1053,7 +1063,7 @@ namespace TRS2._0.Controllers
                                         {
                                             var totalHoursForDay = model.WorkPackages.Sum(wp => wp.Timesheets.FirstOrDefault(ts => ts.Day.Day == day)?.Hours ?? 0);
                                             //decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay * 2, MidpointRounding.AwayFromZero) / 2; //CAMBIOS ANTES DE DECIMAL
-                                            decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay, 2, MidpointRounding.AwayFromZero);
+                                            decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay, 1, MidpointRounding.AwayFromZero);
 
                                             footer.Cell().BorderVertical(1).BorderColor("#00BFFF").BorderBottom(1).Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursForDay}").ExtraBold().FontColor("#FFFFFF").FontSize(8);
                                         }
