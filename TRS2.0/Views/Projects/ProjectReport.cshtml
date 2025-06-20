@@ -362,7 +362,7 @@
     }   
 
     function exportHoursToCSV() {
-        var csvContent = "data:text/csv;charset=utf-8,";
+        var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
         var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
 
         rows.forEach(function (row) {
@@ -390,7 +390,7 @@
     }
 
     function exportDeclaredHoursToCSV() {
-        var csvContent = "data:text/csv;charset=utf-8,";
+        var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
         var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
 
         rows.forEach(function (row) {
@@ -417,7 +417,7 @@
     }
 
     function exportEstimatedHoursToCSV() {
-        var csvContent = "data:text/csv;charset=utf-8,";
+        var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
         var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
 
         rows.forEach(function (row) {
@@ -445,7 +445,7 @@
 
 
     function exportPMsToCSV() {
-        var csvContent = "data:text/csv;charset=utf-8,";
+        var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
         var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
 
         rows.forEach(function (row) {

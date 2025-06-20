@@ -2672,8 +2672,8 @@ namespace TRS2._0.Services
                                 ("Procesamiento de Liquidaciones", () => ProcessLiquidationsAsync()),
                                 ("Procesamiento Avanzado de Liquidaciones", () => ProcessAdvancedLiquidationsAsync()),
                                 ("Actualización de Tabla de Ausencias", () => UpdateLeaveTableAsync()),
-                                ("Carga de Esfuerzo Mensual", () => UpdateMonthlyPMs())
-                                //("Corrección de Overloads", () => AdjustOverloadsFromDateAsync(new DateTime(2024, 10, 1)))//
+                                ("Carga de Esfuerzo Mensual", () => UpdateMonthlyPMs()),
+                                ("Corrección de Overloads", () => AdjustOverloadsFromDateAsync(new DateTime(2025, 1, 1)))
                             };
 
             foreach (var (processName, process) in processes)
@@ -2817,7 +2817,7 @@ namespace TRS2._0.Services
                         break;
 
                     case "AdjustEffortOverloads":
-                        var cutoffDate = new DateTime(2024, 10, 1); // ⚠️ Fecha pendiente de acordar con Finanzas
+                        var cutoffDate = new DateTime(2025, 1, 1); // ⚠️ Fecha pendiente de acordar con Finanzas
                         await AdjustOverloadsFromDateAsync(cutoffDate);
                         break;
 

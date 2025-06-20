@@ -16,6 +16,9 @@ using System.Globalization;
 using System.Linq;
 using TRS2._0.Models.ViewModels.ProjectManager;
 using TRS2._0.Models.ViewModels;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authorization;
+using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
 
 [Authorize(Roles = "ProjectManager,Researcher,Admin")]
 public class ProjectManagerController : Controller
@@ -24,24 +27,45 @@ public class ProjectManagerController : Controller
     private readonly ILogger<ProjectManagerController> _logger;
     private readonly TRSDBContext _context;
     private readonly IConfiguration _configuration;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public ProjectManagerController(WorkCalendarService workCalendarService, ILogger<ProjectManagerController> logger, TRSDBContext context, IConfiguration configuration)
+    public ProjectManagerController(WorkCalendarService workCalendarService, ILogger<ProjectManagerController> logger, TRSDBContext context, IConfiguration configuration, UserManager<ApplicationUser> userManager)
     {
         _workCalendarService = workCalendarService;
         _logger = logger;
         _context = context;
         _configuration = configuration;
+        _userManager = userManager;
     }
 
     public async Task<IActionResult> Index()
     {
+        var errores = await _context.TimesheetErrorLogs
+    .Select(e => new TimesheetErrorLog
+    {
+        Id = e.Id,
+        FileName = e.FileName,
+        PersonName = e.PersonName,
+        ProjectName = e.ProjectName,
+        WorkPackageName = e.WorkPackageName,
+        Month = e.Month,
+        ErrorMessage = e.ErrorMessage,
+        Timestamp = e.Timestamp,
+        IsResolved = e.IsResolved,
+        AuthorId = e.AuthorId ?? "" // 👈 aquí neutralizas el NULL
+    })
+    .OrderByDescending(e => e.Timestamp)
+    .ToListAsync();
+
+
         var viewModel = new ProjectManagerViewModel
         {
-            Errors = await _context.TimesheetErrorLogs.OrderByDescending(e => e.Timestamp).ToListAsync()
+            Errors = errores
         };
 
         return View(viewModel);
     }
+
 
 
     [HttpPost]
@@ -52,223 +76,161 @@ public class ProjectManagerController : Controller
         if (files == null || files.Count == 0)
         {
             ViewBag.Message = "No se seleccionaron archivos.";
-            return View("Index", viewModel); // Se pasa el modelo vacío para evitar NullReferenceException
+            return View("Index", viewModel);
         }
 
-        string uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "Uploads");
-        if (!Directory.Exists(uploadPath))
-        {
-            Directory.CreateDirectory(uploadPath);
-        }
+        // Crear carpeta temporal única por sesión de usuario
+        var userId = _userManager.GetUserId(User);
+        var timestamp = DateTime.Now.ToString("yyyyMMddHHmmssfff");
+        var sessionFolder = Path.Combine(Directory.GetCurrentDirectory(), "Uploads", $"{userId}_{timestamp}");
 
+        Directory.CreateDirectory(sessionFolder);
+
+        // Guardar los archivos subidos en la carpeta de sesión
         foreach (var file in files)
         {
-            var filePath = Path.Combine(uploadPath, file.FileName);
+            var filePath = Path.Combine(sessionFolder, file.FileName);
             using (var stream = new FileStream(filePath, FileMode.Create))
             {
                 await file.CopyToAsync(stream);
             }
         }
 
-        // Ejecutamos el proceso combinado
-        viewModel = await ProcessFolderForPMs(uploadPath);
+        // Procesar solo los archivos subidos en esta sesión
+        viewModel = await ProcessFolderForPMs(sessionFolder);
+
+        // Limpiar carpeta tras el procesamiento (éxito o error, no conservamos)
+        try
+        {
+            Directory.Delete(sessionFolder, recursive: true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning($"No se pudo borrar la carpeta temporal '{sessionFolder}': {ex.Message}");
+        }
 
         ViewBag.Message = "Archivos procesados y esfuerzos ajustados correctamente.";
         return View("Index", viewModel);
     }
 
 
+
     private async Task<ProjectManagerViewModel> ProcessFolderForPMs(string folderPath)
     {
         var viewModel = new ProjectManagerViewModel
         {
-            Errors = await _context.TimesheetErrorLogs.OrderByDescending(e => e.Timestamp).ToListAsync() // Ahora solo leemos desde la BD
+            Errors = await _context.TimesheetErrorLogs.OrderByDescending(e => e.Timestamp).ToListAsync()
         };
+
+        var currentUserId = _userManager.GetUserId(User);
 
         try
         {
-            // Configurar el contexto de la licencia de EPPlus
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-            var files = Directory.GetFiles(folderPath, "*.xlsx", SearchOption.AllDirectories);
+
+            string[] files;
+            if (System.IO.File.Exists(folderPath) && Path.GetExtension(folderPath).Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                files = new[] { folderPath }; // solo un archivo específico
+            }
+            else if (System.IO.Directory.Exists(folderPath))
+            {
+                files = Directory.GetFiles(folderPath, "*.xlsx", SearchOption.AllDirectories);
+            }
+            else
+            {
+                throw new FileNotFoundException("No se encontró la ruta especificada ni como archivo ni como carpeta válida.");
+            }
 
             foreach (var file in files)
             {
-                using (var package = new ExcelPackage(new FileInfo(file)))
+                using var package = new ExcelPackage(new FileInfo(file));
+                var worksheet = package.Workbook.Worksheets[0];
+
+                var monthAbbreviation = worksheet.Cells["B11"].Text.ToLower();
+                var year = int.Parse(worksheet.Cells["B12"].Text);
+                var month = DateTime.ParseExact(monthAbbreviation, "MMM", CultureInfo.InvariantCulture).Month;
+                var daysInMonth = DateTime.DaysInMonth(year, month);
+                var personName = worksheet.Cells["B9"].Text.Trim();
+
+                var personnel = await _context.Personnel
+                    .FirstOrDefaultAsync(p => (p.Name + " " + p.Surname).ToLower() == personName.ToLower());
+
+                if (personnel == null)
                 {
-                    var worksheet = package.Workbook.Worksheets[0];
+                    await LogErrorIfNotExists(file, personName, "N/A", "N/A", $"{month}/{year}", "Persona no encontrada en la base de datos.", currentUserId);
+                    continue;
+                }
 
-                    var monthAbbreviation = worksheet.Cells["B11"].Text.ToLower();
-                    var year = int.Parse(worksheet.Cells["B12"].Text);
-                    var month = DateTime.ParseExact(monthAbbreviation, "MMM", CultureInfo.InvariantCulture).Month;
-                    var daysInMonth = DateTime.DaysInMonth(year, month);
+                var personId = personnel.Id;
 
-                    var personName = worksheet.Cells["B9"].Text.Trim();
+                for (int row = 23; row <= worksheet.Dimension.End.Row; row++)
+                {
+                    var line = worksheet.Cells[row, 1].Text;
+                    if (line.StartsWith("Total Hours worked on project", StringComparison.OrdinalIgnoreCase)) break;
 
-                    var personnel = await _context.Personnel
-                        .FirstOrDefaultAsync(p => (p.Name + " " + p.Surname).ToLower() == personName.ToLower());
-
-                    if (personnel == null)
+                    var lineParts = line.Split(' ');
+                    if (lineParts.Length == 0)
                     {
-                        var error = new TimesheetErrorLog
-                        {
-                            FileName = Path.GetFileName(file),
-                            PersonName = personName,
-                            WorkPackageName = "N/A",
-                            ProjectName = "N/A",
-                            Month = $"{month}/{year}",
-                            ErrorMessage = "Persona no encontrada en la base de datos."
-                        };
-
-                        _context.TimesheetErrorLogs.Add(error);
-                        await _context.SaveChangesAsync();
+                        await LogErrorIfNotExists(file, personName, "", "", $"{month}/{year}", "Línea vacía o mal formateada.", currentUserId);
                         continue;
                     }
 
-                    var personId = personnel.Id;
+                    string NormalizeStatic(string input) => string.Join(" ", input?.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>());
 
-                    for (int row = 23; row <= worksheet.Dimension.End.Row; row++)
+                    var sapCode = NormalizeStatic(lineParts[0]);
+
+                    var projects = await _context.Projects.ToListAsync();
+                    var project = projects.FirstOrDefault(p => NormalizeStatic(p.SapCode) == sapCode);
+
+                    if (project == null)
                     {
-                        var line = worksheet.Cells[row, 1].Text;
-
-                        // Condición de corte si llegamos al final de los paquetes de trabajo
-                        if (line.StartsWith("Total Hours worked on project", StringComparison.OrdinalIgnoreCase))
-                        {
-                            break;
-                        }
-
-                        var queryResult = _context.Projects
-                            .Join(_context.Wps,
-                                  p => p.ProjId,
-                                  wp => wp.ProjId,
-                                  (p, wp) => new
-                                  {
-                                      FullString = (p.SapCode + " " + p.Acronim + " - " + wp.Name + " " + wp.Title).ToLower(),
-                                      Project = p,
-                                      WorkPackage = wp
-                                  })
-                            .FirstOrDefault(result => result.FullString == line.ToLower());
-
-                        if (queryResult == null)
-                        {
-                            var possiblePackage = line.Split('-').LastOrDefault()?.Trim();
-
-                            if (!string.IsNullOrEmpty(possiblePackage))
-                            {
-                                var packageQuery = _context.Projects
-                                    .Join(_context.Wps,
-                                          p => p.ProjId,
-                                          wp => wp.ProjId,
-                                          (p, wp) => new
-                                          {
-                                              PackageName = wp.Name.ToLower(),
-                                              Project = p,
-                                              WorkPackage = wp
-                                          })
-                                    .FirstOrDefault(result => result.PackageName == possiblePackage.ToLower());
-
-                                if (packageQuery != null)
-                                {
-                                    queryResult = new
-                                    {
-                                        FullString = "",
-                                        Project = packageQuery.Project,
-                                        WorkPackage = packageQuery.WorkPackage
-                                    };
-                                }
-                            }
-                        }
-
-                        if (queryResult == null)
-                        {
-                            var error = new TimesheetErrorLog
-                            {
-                                FileName = Path.GetFileName(file),
-                                PersonName = personName,
-                                WorkPackageName = line,
-                                ProjectName = "Desconocido",
-                                Month = $"{month}/{year}",
-                                ErrorMessage = "Paquete de trabajo no encontrado."
-                            };
-
-                            _context.TimesheetErrorLogs.Add(error);
-                            await _context.SaveChangesAsync();
-                            continue;
-                        }
-
-                        var project = queryResult.Project;
-                        var workPackage = queryResult.WorkPackage;
-
-                        var wpxPerson = await _context.Wpxpeople.FirstOrDefaultAsync(wpx => wpx.Person == personId && wpx.Wp == workPackage.Id);
-                        if (wpxPerson == null)
-                        {
-                            var error = new TimesheetErrorLog
-                            {
-                                FileName = Path.GetFileName(file),
-                                PersonName = personName,
-                                WorkPackageName = workPackage.Name,
-                                ProjectName = project.Acronim,
-                                Month = $"{month}/{year}",
-                                ErrorMessage = "El paquete de trabajo no está vinculado a la persona."
-                            };
-
-                            _context.TimesheetErrorLogs.Add(error);
-                            await _context.SaveChangesAsync();
-                            continue;
-                        }
-
-                        decimal totalHours = 0;
-
-                        for (int col = 3; col < 3 + daysInMonth; col++)
-                        {
-                            var hoursText = worksheet.Cells[row, col].Text;
-                            if (string.IsNullOrWhiteSpace(hoursText)) continue;
-
-                            var cultureInfo = new CultureInfo("es-ES");
-                            if (!decimal.TryParse(hoursText, NumberStyles.AllowDecimalPoint | NumberStyles.AllowThousands, cultureInfo, out decimal hours))
-                            {
-                                var error = new TimesheetErrorLog
-                                {
-                                    FileName = Path.GetFileName(file),
-                                    PersonName = personName,
-                                    WorkPackageName = workPackage.Name,
-                                    ProjectName = project.Acronim,
-                                    Month = $"{month}/{year}",
-                                    ErrorMessage = $"Valor no válido en columna {col}: {hoursText}"
-                                };
-
-                                _context.TimesheetErrorLogs.Add(error);
-                                await _context.SaveChangesAsync();                               
-
-                                hours = 0;
-                            }
-
-                            var day = col - 2;
-                            var date = new DateTime(year, month, day);
-
-                            var existingTimesheet = await _context.Timesheets
-                                .FirstOrDefaultAsync(ts => ts.WpxPersonId == wpxPerson.Id && ts.Day == date);
-
-                            if (existingTimesheet != null)
-                            {
-                                existingTimesheet.Hours = hours;
-                            }
-                            else
-                            {
-                                var timesheet = new Timesheet
-                                {
-                                    WpxPersonId = wpxPerson.Id,
-                                    Day = date,
-                                    Hours = hours
-                                };
-                                _context.Timesheets.Add(timesheet);
-                            }
-
-                            totalHours += hours;
-                        }
-
-                        await _context.SaveChangesAsync();
-                        await _workCalendarService.AdjustEffortAsync(workPackage.Id, personId, new DateTime(year, month, 1));
+                        await LogErrorIfNotExists(file, personName, line, "Desconocido", $"{month}/{year}", "Proyecto no encontrado (SAP Code).", currentUserId);
+                        continue;
                     }
+
+                    var wps = await _context.Wps.Where(wp => wp.ProjId == project.ProjId).ToListAsync();
+
+                    var wpMatch = wps.FirstOrDefault(wp => NormalizeStatic(line.ToLower()).Contains(NormalizeStatic(wp.Name.ToLower())));
+
+                    if (wpMatch == null)
+                    {
+                        await LogErrorIfNotExists(file, personName, line, project.Acronim, $"{month}/{year}", "WP no encontrado en el proyecto.", currentUserId);
+                        continue;
+                    }
+
+                    var wpxPerson = await _context.Wpxpeople.FirstOrDefaultAsync(wpx => wpx.Person == personId && wpx.Wp == wpMatch.Id);
+
+                    if (wpxPerson == null)
+                    {
+                        await LogErrorIfNotExists(file, personName, wpMatch.Name, project.Acronim, $"{month}/{year}", "El paquete de trabajo no está vinculado a la persona.", currentUserId);
+                        continue;
+                    }
+
+                    for (int col = 3; col < 3 + daysInMonth; col++)
+                    {
+                        var hoursText = worksheet.Cells[row, col].Text;
+                        if (string.IsNullOrWhiteSpace(hoursText)) continue;
+
+                        var cultureInfo = new CultureInfo("es-ES");
+                        if (!decimal.TryParse(hoursText, NumberStyles.AllowDecimalPoint | NumberStyles.AllowThousands, cultureInfo, out decimal hours))
+                        {
+                            await LogErrorIfNotExists(file, personName, wpMatch.Name, project.Acronim, $"{month}/{year}", $"Valor no válido en columna {col}: {hoursText}", currentUserId);
+                            hours = 0;
+                        }
+
+                        var day = col - 2;
+                        var date = new DateTime(year, month, day);
+
+                        var existingTimesheet = await _context.Timesheets.FirstOrDefaultAsync(ts => ts.WpxPersonId == wpxPerson.Id && ts.Day == date);
+                        if (existingTimesheet != null)
+                            existingTimesheet.Hours = hours;
+                        else
+                            _context.Timesheets.Add(new Timesheet { WpxPersonId = wpxPerson.Id, Day = date, Hours = hours });
+                    }
+
+                    await _context.SaveChangesAsync();
+                    await _workCalendarService.AdjustEffortAsync(wpMatch.Id, personId, new DateTime(year, month, 1));
                 }
             }
         }
@@ -279,6 +241,9 @@ public class ProjectManagerController : Controller
 
         return viewModel;
     }
+
+
+
 
     [HttpPost]
     public async Task<IActionResult> MarkErrorAsResolved(int id)
@@ -383,6 +348,35 @@ public class ProjectManagerController : Controller
         }
 
         return RedirectToAction("ReportError");
+    }
+
+    private async Task LogErrorIfNotExists(string filePath, string personName, string workPackageName, string projectName, string month, string errorMessage, string authorId)
+    {
+        string fileName = Path.GetFileName(filePath);
+
+        bool exists = await _context.TimesheetErrorLogs.AnyAsync(e =>
+            e.FileName == fileName &&
+            e.PersonName == personName &&
+            e.WorkPackageName == workPackageName &&
+            e.ProjectName == projectName &&
+            e.Month == month &&
+            e.ErrorMessage == errorMessage
+        );
+
+        if (!exists)
+        {
+            _context.TimesheetErrorLogs.Add(new TimesheetErrorLog
+            {
+                FileName = fileName,
+                PersonName = personName,
+                WorkPackageName = workPackageName,
+                ProjectName = projectName,
+                Month = month,
+                ErrorMessage = errorMessage,
+                AuthorId = authorId
+            });
+            await _context.SaveChangesAsync();
+        }
     }
 
 

@@ -1346,9 +1346,11 @@ public class WorkCalendarService
                 .ToListAsync();
 
             var wpxWithEffort = await _context.Persefforts
-                .Where(pe => pe.Month == monthStart && wpxList.Select(w => w.Id).Contains(pe.WpxPerson))
-                .Select(pe => pe.WpxPerson)
-                .FirstOrDefaultAsync();
+                    .Where(pe => pe.Month == monthStart && wpxList.Select(w => w.Id).Contains(pe.WpxPerson) && pe.Value > 0)
+                    .OrderByDescending(pe => pe.Value)
+                    .Select(pe => pe.WpxPerson)
+                    .FirstOrDefaultAsync();
+
 
             if (wpxWithEffort == 0)
             {
@@ -1960,6 +1962,303 @@ public class WorkCalendarService
             .FirstOrDefaultAsync();
 
         return maxPM.HasValue && effort > maxPM.Value;
+    }
+
+    public async Task<decimal> CalculateGlobalHoursForMonth(int personId, int year, int month)
+    {
+        var daysWithDedication = await CalculateDailyWorkHoursWithDedication(personId, year, month);
+        var leaves = await _context.Leaves
+            .Where(l => l.PersonId == personId &&
+                        l.Day.Year == year &&
+                        l.Day.Month == month)
+            .ToListAsync();
+
+        var holidays = await _context.NationalHolidays
+            .Where(h => h.Date.Year == year && h.Date.Month == month)
+            .Select(h => h.Date)
+            .ToListAsync();
+
+        decimal totalHours = 0;
+
+        foreach (var entry in daysWithDedication)
+        {
+            var day = entry.Key;
+            var baseHours = entry.Value;
+
+            if (holidays.Contains(day))
+                continue;
+
+            var leave = leaves.FirstOrDefault(l => l.Day.Date == day.Date);
+
+            if (leave != null)
+            {
+                if (leave.Type == 11 || leave.Type == 12) // bajas parciales
+                {
+                    // Se asume que Leave.Reduction es un valor decimal (0.25, 0.5, etc.)
+                    decimal reduction = leave.LeaveReduction;
+                    decimal adjusted = Math.Round(baseHours * (1 - reduction), 2);
+                    totalHours += adjusted;
+                }
+                else
+                {
+                    // bajas completas o vacaciones → se omite el día
+                    continue;
+                }
+            }
+            else
+            {
+                totalHours += baseHours;
+            }
+        }
+
+        return Math.Round(totalHours, 2);
+    }
+
+    public async Task<decimal> CalculateGlobalHoursFast(int personId, int year, int month,
+    List<Leave> preloadedLeaves,
+    List<NationalHoliday> preloadedHolidays)
+    {
+        var daysWithDedication = await CalculateDailyWorkHoursWithDedication(personId, year, month);
+
+        var leaves = preloadedLeaves
+            .Where(l => l.PersonId == personId && l.Day.Year == year && l.Day.Month == month)
+            .ToList();
+
+        var holidays = preloadedHolidays
+            .Where(h => h.Date.Year == year && h.Date.Month == month)
+            .Select(h => h.Date)
+            .ToHashSet();
+
+        decimal totalHours = 0;
+
+        foreach (var entry in daysWithDedication)
+        {
+            var day = entry.Key;
+            var baseHours = entry.Value;
+
+            if (holidays.Contains(day))
+                continue;
+
+            var leave = leaves.FirstOrDefault(l => l.Day.Date == day.Date);
+
+            if (leave != null)
+            {
+                if (leave.Type == 11 || leave.Type == 12)
+                {
+                    decimal adjusted = Math.Round(baseHours * (1 - leave.LeaveReduction), 2);
+                    totalHours += adjusted;
+                }
+                else
+                {
+                    continue; // baja completa o vacaciones
+                }
+            }
+            else
+            {
+                totalHours += baseHours;
+            }
+        }
+
+        return Math.Round(totalHours, 2);
+    }
+
+    public async Task<Dictionary<(int personId, int year, int month), Dictionary<DateTime, decimal>>> PreloadDailyWorkHoursWithDedicationAsync(List<int> personIds, int year)
+    {
+        var result = new Dictionary<(int personId, int year, int month), Dictionary<DateTime, decimal>>();
+
+        // Precarga dedications y affiliations solo una vez para todos
+        var dedications = await _context.Dedications
+            .Where(d => personIds.Contains(d.PersId) &&
+                        d.Start <= new DateTime(year, 12, 31) &&
+                        d.End >= new DateTime(year, 1, 1))
+            .ToListAsync();
+
+        var affxpersons = await _context.AffxPersons
+            .Include(ap => ap.Affiliation)
+            .Where(ap => personIds.Contains(ap.PersonId) &&
+                         ap.Start <= new DateTime(year, 12, 31) &&
+                         ap.End >= new DateTime(year, 1, 1))
+            .ToListAsync();
+
+        var affIds = affxpersons.Select(ap => ap.AffId).Distinct().ToList();
+
+        var affHours = await _context.AffHours
+            .Where(ah => affIds.Contains(ah.AffId) &&
+                         ah.StartDate <= new DateTime(year, 12, 31) &&
+                         ah.EndDate >= new DateTime(year, 1, 1))
+            .ToListAsync();
+
+        // Precarga festivos del año
+        var holidays = await _context.NationalHolidays
+            .Where(h => h.Date.Year == year)
+            .Select(h => h.Date)
+            .ToListAsync();
+
+        foreach (var personId in personIds)
+        {
+            var personAffiliations = affxpersons.Where(ap => ap.PersonId == personId).ToList();
+            var personDedications = dedications.Where(d => d.PersId == personId).ToList();
+
+            for (int month = 1; month <= 12; month++)
+            {
+                var startOfMonth = new DateTime(year, month, 1);
+                var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
+
+                var days = new Dictionary<DateTime, decimal>();
+
+                for (DateTime day = startOfMonth; day <= endOfMonth; day = day.AddDays(1))
+                {
+                    if (day.DayOfWeek == DayOfWeek.Saturday || day.DayOfWeek == DayOfWeek.Sunday || holidays.Contains(day))
+                        continue;
+
+                    var affiliationHours = personAffiliations
+                        .Where(ap => ap.Start <= day && ap.End >= day)
+                        .SelectMany(ap => affHours
+                            .Where(ah => ah.AffId == ap.AffId && ah.StartDate <= day && ah.EndDate >= day))
+                        .FirstOrDefault()?.Hours ?? 0;
+
+                    var dedication = personDedications
+                        .Where(d => d.Start <= day && d.End >= day)
+                        .OrderByDescending(d => d.Type)
+                        .FirstOrDefault();
+
+                    decimal reduction = dedication?.Reduc ?? 0;
+                    decimal adjustedHours = affiliationHours * (1 - reduction);
+
+                    days[day] = Math.Round(adjustedHours, 1, MidpointRounding.AwayFromZero);
+                }
+
+                result[(personId, year, month)] = days;
+            }
+        }
+
+        return result;
+    }
+
+
+    public decimal CalculateGlobalHoursFromCache(
+    int personId,
+    int year,
+    int month,
+    Dictionary<(int personId, int year, int month), Dictionary<DateTime, decimal>> cache,
+    List<Leave> preloadedLeaves,
+    List<NationalHoliday> preloadedHolidays)
+    {
+        if (!cache.TryGetValue((personId, year, month), out var daysWithDedication))
+            return 0;
+
+        var leaves = preloadedLeaves
+            .Where(l => l.PersonId == personId && l.Day.Year == year && l.Day.Month == month)
+            .ToList();
+
+        var holidays = preloadedHolidays
+            .Where(h => h.Date.Year == year && h.Date.Month == month)
+            .Select(h => h.Date)
+            .ToHashSet();
+
+        decimal totalHours = 0;
+
+        foreach (var entry in daysWithDedication)
+        {
+            var day = entry.Key;
+            var baseHours = entry.Value;
+
+            if (holidays.Contains(day))
+                continue;
+
+            var leave = leaves.FirstOrDefault(l => l.Day.Date == day.Date);
+
+            if (leave != null)
+            {
+                if (leave.Type == 11 || leave.Type == 12)
+                {
+                    decimal adjusted = Math.Round(baseHours * (1 - leave.LeaveReduction), 2);
+                    totalHours += adjusted;
+                }
+                else
+                {
+                    continue; // baja completa o vacaciones
+                }
+            }
+            else
+            {
+                totalHours += baseHours;
+            }
+        }
+
+        return Math.Round(totalHours, 2);
+    }
+
+    public async Task<decimal> CalculateTotalWorkHoursForPersonAsync(int personId, int year, int month)
+    {
+        var startDate = new DateTime(year, month, 1);
+        var endDate = startDate.AddMonths(1).AddDays(-1);
+
+        // 1. Obtener horas por día según dedicación (sin redondear)
+        var hoursPerDay = await CalculateDailyWorkHoursWithDedicationNotRounded(personId, year, month);
+
+        // 2. Obtener reducciones por baja parcial (tipo 11 o 12)
+        var leaveReductions = await _context.Leaves
+            .Where(l => l.PersonId == personId &&
+                        l.Day >= startDate &&
+                        l.Day <= endDate &&
+                        (l.Type == 11 || l.Type == 12) &&
+                        l.LeaveReduction > 0 && l.LeaveReduction <= 1)
+            .ToDictionaryAsync(l => l.Day, l => l.LeaveReduction);
+
+        // Aplicar reducciones por baja parcial
+        foreach (var day in hoursPerDay.Keys.ToList())
+        {
+            if (leaveReductions.TryGetValue(day, out var reduction))
+            {
+                hoursPerDay[day] = Math.Round(hoursPerDay[day] * (1 - reduction), 2);
+            }
+        }
+
+        // 3. Obtener días de baja completa y festivos
+        var fullLeaves = await GetLeavesForPerson(personId, year, month);
+        var holidays = await GetHolidaysForMonth(year, month);
+
+        // 4. Filtrar días no válidos
+        var validDays = hoursPerDay
+            .Where(entry => !fullLeaves.Any(l => l.Day == entry.Key) && !holidays.Contains(entry.Key))
+            .ToList();
+
+        // 5. Sumar total
+        var totalWorkHours = validDays.Sum(entry => entry.Value);
+
+        return Math.Round(totalWorkHours, 2);
+    }
+
+    public async Task<Dictionary<(int PersonId, DateTime MonthStart), decimal>> GetDeclaredHoursPerYearByPersonAsync(int year)
+    {
+        var monthStart = new DateTime(year, 1, 1);
+        var monthEnd = new DateTime(year, 12, 31);
+
+        var result = await _context.Timesheets
+            .Where(ts => ts.Day >= monthStart && ts.Day <= monthEnd)
+            .Join(_context.Wpxpeople,
+                ts => ts.WpxPersonId,
+                wpx => wpx.Id,
+                (ts, wpx) => new
+                {
+                    ts.Hours,
+                    wpx.Person,
+                    ts.Day
+                })
+            .GroupBy(x => new { x.Person, Month = new DateTime(x.Day.Year, x.Day.Month, 1) })
+            .Select(g => new
+            {
+                g.Key.Person,
+                g.Key.Month,
+                TotalHours = g.Sum(x => x.Hours)
+            })
+            .ToDictionaryAsync(
+                x => (x.Person, x.Month),
+                x => Math.Round(x.TotalHours, 2)
+            );
+
+        return result;
     }
 
 

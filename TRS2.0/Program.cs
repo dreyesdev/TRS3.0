@@ -179,7 +179,7 @@ public static class SeedData
 {
     public static async Task Initialize(TRSDBContext context, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
     {
-        string[] roles = new string[] { "Admin", "ProjectManager", "Researcher", "User" };
+        string[] roles = new string[] { "Admin", "ProjectManager", "Researcher", "User", "Leader" };
 
         foreach (string role in roles)
         {
@@ -206,5 +206,22 @@ public static class SeedData
                 await userManager.AddToRoleAsync(adminUser, "Admin");
             }
         }
+
+        // ?? NUEVO BLOQUE: asignar rol Leader automáticamente
+        var leaderIds = await context.Leaders.Select(l => l.LeaderId).ToListAsync();
+
+        foreach (var leaderId in leaderIds)
+        {
+            var person = await context.Personnel.FirstOrDefaultAsync(p => p.Id == leaderId);
+            if (person == null || string.IsNullOrEmpty(person.Email))
+                continue;
+
+            var user = await userManager.FindByEmailAsync(person.Email);
+            if (user != null && !await userManager.IsInRoleAsync(user, "Leader"))
+            {
+                await userManager.AddToRoleAsync(user, "Leader");
+            }
+        }
     }
+
 }

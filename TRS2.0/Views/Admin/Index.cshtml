@@ -79,15 +79,20 @@
     </div>
 
     <h3>Reset User Password</h3>
-    <form id="resetPasswordForm">
-        <select name="userId" id="userSelect" class="form-control mb-2">
-            @foreach (var user in Model.Users)
+
+    <div class="mb-2 d-flex flex-column flex-md-row gap-2 align-items-md-center">
+        <input type="text" class="form-control" id="userSearchBox" placeholder="Buscar usuario por nombre..." oninput="filterUserSelect()" />
+        <select name="userId" id="userSelect" class="form-control">
+            @foreach (var user in Model.Users.OrderBy(u => u.Text))
             {
                 <option value="@user.Value">@user.Text</option>
             }
         </select>
-        <button type="submit" class="btn btn-warning">Reset Password</button>
-    </form>
+    </div>
+
+    <button type="submit" form="resetPasswordForm" class="btn btn-warning">Reset Password</button>
+
+    <form id="resetPasswordForm"></form>
 
     <div id="resetResult" class="mt-2 text-info"></div>
     <div id="passwordContainer" class="mt-2" style="display: none;">
@@ -97,6 +102,7 @@
             <button class="btn btn-outline-secondary" type="button" onclick="copyPassword()">📋 Copy</button>
         </div>
     </div>
+
 
 
     <!-- Primera fila: Trabajos Automatizados -->
@@ -308,6 +314,14 @@
                 </div>
             </div>
         </div>
+
+        <form id="fixRolesForm" method="post" asp-action="FixUsersWithoutRole">
+            <button type="submit" class="btn btn-warning">
+                🛠 Arreglar usuarios sin rol
+            </button>
+        </form>
+
+        <div id="fixRolesResult" style="margin-top: 10px;"></div>
 
 
     <!-- Séptima fila: Ajuste de Esfuerzo -->
@@ -782,5 +796,35 @@
                 `;
                 container.style.display = "block";
             }
+
+                        function filterUserSelect() {
+                const input = document.getElementById('userSearchBox').value.toLowerCase();
+                const select = document.getElementById('userSelect');
+                const options = select.options;
+
+                for (let i = 0; i < options.length; i++) {
+                    const text = options[i].text.toLowerCase();
+                    options[i].style.display = text.includes(input) ? 'block' : 'none';
+                }
+
+                // Selecciona el primer visible por comodidad
+                const visibleOption = Array.from(options).find(o => o.style.display !== 'none');
+                if (visibleOption) {
+                    select.value = visibleOption.value;
+                }
+            }
+
+                document.getElementById('fixRolesForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+                fetch('@Url.Action("FixUsersWithoutRole", "Admin")', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const resultDiv = document.getElementById('fixRolesResult');
+                    resultDiv.innerText = data.message;
+                    resultDiv.className = data.success ? "alert alert-success" : "alert alert-danger";
+                });
+            });
     </script>
 }

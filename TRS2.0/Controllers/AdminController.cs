@@ -725,6 +725,99 @@ namespace TRS2._0.Controllers
             return Json(users);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> AjustarOverloadManual()
+        {
+            var persons = await _context.Personnel
+                .OrderBy(p => p.Name)
+                .Select(p => new SelectListItem
+                {
+                    Value = p.Id.ToString(),
+                    Text = p.Name + " " + p.Surname
+                })
+                .ToListAsync();
+
+            ViewBag.Persons = persons;
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> AjustarOverloadManual(int personId, int year, int month)
+        {
+            var persons = await _context.Personnel
+                .OrderBy(p => p.Name)
+                .Select(p => new SelectListItem
+                {
+                    Value = p.Id.ToString(),
+                    Text = p.Name + " " + p.Surname
+                })
+                .ToListAsync();
+
+            ViewBag.Persons = persons;
+
+            var isOverloaded = await _workCalendarService.IsOverloadedAsync(personId, year, month);
+
+            if (!isOverloaded)
+            {
+                ViewBag.Message = $"✅ La persona seleccionada no está overload en {month:00}/{year}.";
+                return View();
+            }
+
+            var result = await _workCalendarService.AdjustMonthlyOverloadAsync(personId, year, month);
+
+            ViewBag.Message = result.Success
+                ? $"✅ Ajuste completado correctamente para la persona en {month:00}/{year}."
+                : $"❌ Ajuste fallido. Motivo: {result.Message}";
+
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> LanzarAjusteDesdeFecha(DateTime fechaInicio)
+        {
+            try
+            {
+                await _loadDataService.AdjustOverloadsFromDateAsync(fechaInicio);
+                TempData["GlobalAjusteMensaje"] = $"✅ Proceso de ajuste lanzado desde {fechaInicio:yyyy-MM-dd}.";
+            }
+            catch (Exception ex)
+            {
+                TempData["GlobalAjusteMensaje"] = $"❌ Error al lanzar el ajuste: {ex.Message}";
+            }
+
+            return RedirectToAction("AjustarOverloadManual");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> FixUsersWithoutRole()
+        {
+            var users = await _userManager.Users.ToListAsync();
+            int fixedCount = 0;
+            int alreadyOk = 0;
+
+            foreach (var user in users)
+            {
+                var roles = await _userManager.GetRolesAsync(user);
+                if (!roles.Any())
+                {
+                    var result = await _userManager.AddToRoleAsync(user, "Researcher");
+                    if (result.Succeeded)
+                        fixedCount++;
+                }
+                else
+                {
+                    alreadyOk++;
+                }
+            }
+
+            return Json(new
+            {
+                success = true,
+                message = $"✅ Rol 'Researcher' asignado a {fixedCount} usuario(s) sin rol. Otros {alreadyOk} ya estaban correctamente configurados."
+            });
+        }
+
+
     }
 
 

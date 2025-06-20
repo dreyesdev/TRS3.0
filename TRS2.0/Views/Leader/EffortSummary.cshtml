@@ -1,0 +1,156 @@
+﻿@using System.Globalization
+@model TRS2._0.Models.ViewModels.LeaderEffortViewModel
+@{
+    ViewData["Title"] = "Leader Effort Summary";
+    var months = Enumerable.Range(1, 12).ToList();
+}
+
+<div class="container-fluid px-4">
+    <h2 class="text-center mb-4">Effort Summary - @Model.Year</h2>
+</div>
+
+
+<div class="d-flex justify-content-between align-items-center mb-3 px-4">
+    <form method="get" asp-action="EffortSummary" class="d-inline-flex">
+        <select name="year" onchange="this.form.submit()" class="form-select me-2">
+            @for (int y = DateTime.Now.Year - 5; y <= DateTime.Now.Year + 1; y++)
+            {
+                <option value="@y" selected="@(y == Model.Year)">@y</option>
+            }
+        </select>
+    </form>
+    <a class="btn btn-outline-primary mb-2" href="@Url.Action("ExportEffortSummaryToCsv", "Leader", new { year = Model.Year })">
+        <i class="bi bi-download"></i> Export to CSV
+    </a>
+    <div class="d-flex align-items-center w-75 gap-2">
+        <button id="toggleAllBtn" class="btn btn-outline-secondary" type="button">
+            <i class="bi bi-arrows-collapse"></i> Expandir/Contraer todo
+        </button>
+
+        <input type="text" id="personSearch" class="form-control w-75" placeholder="Buscar persona por nombre o apellidos..." />
+    </div>
+
+</div>
+
+
+<div class="container-fluid px-4">
+    @foreach (var person in Model.People)
+    {
+        var personId = person.PersonId;
+        var collapseId = $"collapsePerson_{personId}";
+
+        <div class="card mb-2 person-card" data-person-name="@($"{person.FullName}".ToLower())">
+            <div class="card-header custom-blue text-white"
+                 style="cursor:pointer"
+                 onclick="toggleCollapse('@collapseId')">
+                @person.FullName
+            </div>
+            <div id="@collapseId" class="collapse">
+                <div class="card-body">
+                    @foreach (var project in person.Efforts.OrderBy(e => e.Project))
+                    {
+                        var projectCollapseId = $"collapseProject_{personId}_{project.Project.Replace(" ", "_")}";
+
+                        <div class="mb-2">
+                            <div class="bg-light p-2 border"
+                                 style="cursor:pointer"
+                                 onclick="toggleCollapse('@projectCollapseId')">
+                                <strong>@project.Project</strong>
+                            </div>
+
+                            <div id="@projectCollapseId" class="collapse">
+                                <table class="table table-bordered table-sm mt-2">
+                                    <thead class="table-secondary">
+                                        <tr>
+                                            <th>WP</th>
+                                            @for (int m = 1; m <= 12; m++)
+                                            {
+                                                <th>@CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(m)</th>
+                                            }
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var wp in project.SubEfforts)
+                                        {
+                                            <tr>
+                                                <td>@wp.WP</td>
+                                                @for (int m = 1; m <= 12; m++)
+                                                {
+                                                    <td>@(wp.MonthlyEffort.ContainsKey(m) ? wp.MonthlyEffort[m].ToString("F2") : "0.00")</td>
+                                                }
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+
+
+@section Scripts {
+    <script>
+        function toggleDetails(rowId) {
+            const rows = document.querySelectorAll(`[data-parent="${rowId}"]`);
+            rows.forEach(r => {
+                r.style.display = r.style.display === "none" ? "table-row" : "none";
+            });
+        }
+        document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(trigger => {
+            trigger.addEventListener('click', function () {
+                const target = document.querySelector(this.getAttribute('data-bs-target'));
+                if (target.classList.contains('show')) {
+                    bootstrap.Collapse.getInstance(target)?.hide();
+                } else {
+                    new bootstrap.Collapse(target, { toggle: true });
+                }
+            });
+        });
+        function toggleCollapse(id) {
+            const el = document.getElementById(id);
+            const bsCollapse = bootstrap.Collapse.getInstance(el) || new bootstrap.Collapse(el, { toggle: false });
+            bsCollapse.toggle();
+        }
+        document.getElementById('personSearch').addEventListener('input', function () {
+            const searchValue = this.value.toLowerCase();
+            const cards = document.querySelectorAll('.person-card');
+
+            cards.forEach(card => {
+                const name = card.getAttribute('data-person-name');
+                if (name.includes(searchValue)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+            document.getElementById('toggleAllBtn').addEventListener('click', function () {
+            const collapses = document.querySelectorAll('.collapse');
+            const allExpanded = [...collapses].every(c => c.classList.contains('show'));
+
+            collapses.forEach(el => {
+                const instance = bootstrap.Collapse.getInstance(el) || new bootstrap.Collapse(el, { toggle: false });
+                if (allExpanded) {
+                    instance.hide();
+                } else {
+                    instance.show();
+                }
+            });
+        });
+    </script>
+    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <style>
+        .custom-blue {
+            background-color: #004085; /* ejemplo: el azul real del título */
+            color: white;
+        }
+
+    </style>
+}
+

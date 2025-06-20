@@ -1,0 +1,105 @@
+﻿@{
+    ViewData["Title"] = "Ajustar Overload Manual";
+    var persons = ViewBag.Persons as List<SelectListItem>;
+}
+
+<h2 class="text-center mb-4">Ajustar Overload Manualmente</h2>
+
+@if (!string.IsNullOrEmpty(ViewBag.Message))
+{
+    <div class="alert alert-info">@Html.Raw(ViewBag.Message)</div>
+}
+
+<form asp-action="AjustarOverloadManual" method="post" class="row g-3">
+    <div class="col-md-6 position-relative">
+        <label for="personSearchInput" class="form-label">Buscar Persona</label>
+        <input type="text" id="personSearchInput" class="form-control" placeholder="Nombre o Apellido" autocomplete="off" required />
+        <input type="hidden" id="personId" name="personId" />
+        <div id="personSearchResults" class="list-group position-absolute w-100" style="z-index: 9999;"></div>
+    </div>
+
+    <div class="col-md-3">
+        <label for="year" class="form-label">Año</label>
+        <input type="number" name="year" id="year" class="form-control" value="@DateTime.Now.Year" required />
+    </div>
+
+    <div class="col-md-3">
+        <label for="month" class="form-label">Mes</label>
+        <select name="month" id="month" class="form-select" required>
+            <option value="">-- Mes --</option>
+            @for (int m = 1; m <= 12; m++)
+            {
+                <option value="@m">@m.ToString("D2")</option>
+            }
+        </select>
+    </div>
+
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary w-100">Ajustar Overload</button>
+    </div>
+</form>
+
+<hr class="my-4" />
+
+<h4>🔁 Ajustar automáticamente todos los overloads desde una fecha</h4>
+
+<form asp-action="LanzarAjusteDesdeFecha" method="post" class="row g-3 align-items-end">
+    <div class="col-md-6">
+        <label for="fechaInicio" class="form-label">Fecha de inicio</label>
+        <input type="date" id="fechaInicio" name="fechaInicio" class="form-control" value="2025-01-01" required />
+    </div>
+    <div class="col-md-6">
+        <button type="submit" class="btn btn-danger w-100">Lanzar ajuste global desde esta fecha</button>
+        <div id="globalSpinner" class="text-center mt-3" style="display: none;">
+            <div class="spinner-border text-danger" role="status">
+                <span class="visually-hidden">Procesando ajuste global...</span>
+            </div>
+            <div>Procesando ajuste global, por favor espera...</div>
+        </div>
+    </div>
+</form>
+
+@if (TempData["GlobalAjusteMensaje"] != null)
+{
+    <div class="alert alert-warning">@TempData["GlobalAjusteMensaje"]</div>
+}
+
+@section Scripts {
+    <script>
+        document.getElementById("personSearchInput").addEventListener("input", async function () {
+            const query = this.value.trim();
+            const resultsDiv = document.getElementById("personSearchResults");
+            resultsDiv.innerHTML = "";
+
+            if (query.length < 2) return;
+
+            const response = await fetch(`/Admin/SearchPersonByName?query=${encodeURIComponent(query)}`);
+            const results = await response.json();
+
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<div class="list-group-item disabled">No encontrado</div>';
+                return;
+            }
+
+            results.forEach(p => {
+                const item = document.createElement("button");
+                item.type = "button";
+                item.className = "list-group-item list-group-item-action";
+                item.textContent = `${p.name} ${p.surname}`;
+                item.onclick = function () {
+                    document.getElementById("personSearchInput").value = `${p.name} ${p.surname}`;
+                    document.getElementById("personId").value = p.id;
+                    resultsDiv.innerHTML = "";
+                };
+                resultsDiv.appendChild(item);
+            });
+        });
+
+        // Mostrar spinner al enviar el formulario global
+        document.querySelector('form[action$="LanzarAjusteDesdeFecha"]').addEventListener('submit', function () {
+            document.getElementById('globalSpinner').style.display = 'block';
+        });
+    </script>
+}
+
+

@@ -1,0 +1,210 @@
+﻿@using Microsoft.AspNetCore.Identity
+@using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+
+@{
+    var currentProject = ViewBag.CurrentProject as string;
+    var currentPerson = ViewBag.CurrentPerson as string;
+    var projId = ViewBag.ProjId;
+    var personId = ViewBag.PersonId;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - TRS 3.0</title>
+
+    <!-- ✅ Estilos heredados necesarios -->
+    <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="/css/fullcalendar.min.css" />
+    <link rel="stylesheet" href="/css/dataTables.bootstrap4.min.css" />
+    <link rel="stylesheet" href="/css/jquery.dataTables.css" />
+    <link rel="stylesheet" href="/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.css" />
+    <link rel="stylesheet" href="~/css/layout-styles.css" asp-append-version="true" />
+
+    <style>
+        body {
+            display: flex;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: #1d3557;
+            color: white;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 0;
+        }
+
+            .sidebar a,
+            .sidebar button {
+                color: #f1faee;
+                padding: 10px 20px;
+                display: block;
+                text-decoration: none;
+                border: none;
+                background: none;
+                text-align: left;
+                width: 100%;
+            }
+
+                .sidebar a:hover,
+                .sidebar .active,
+                .sidebar button:hover {
+                    background-color: #457b9d;
+                }
+
+            .sidebar .logo {
+                font-size: 1.4rem;
+                padding: 0 20px 20px;
+                font-weight: bold;
+                color: #f1faee;
+            }
+
+            .sidebar h6 {
+                padding: 0 20px;
+                margin-top: 15px;
+                color: #a8dadc;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+            }
+
+        .submenu {
+            padding-left: 1.5rem;
+            font-size: 0.95rem;
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 20px;
+            color: #a8dadc;
+            font-size: 0.85rem;
+            border-top: 1px solid #ccc;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+            .user-profile img {
+                border-radius: 50%;
+                height: 40px;
+                width: 40px;
+                object-fit: cover;
+            }
+
+        .content-wrapper {
+            flex-grow: 1;
+            padding: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ✅ Sidebar -->
+    <div class="sidebar">
+        <div class="logo">TRS 3.0</div>
+
+        @if (User.Identity.IsAuthenticated)
+        {
+            <h6>Main</h6>
+            <a asp-controller="Home" asp-action="Index"><i class="bi bi-house-door"></i> Home</a>
+
+            @if (User.IsInRole("Admin") || User.IsInRole("ProjectManager"))
+            {
+                <a asp-controller="Projects" asp-action="InitialRedirect"><i class="bi bi-diagram-3"></i> Projects</a>
+            }
+
+            @if (!string.IsNullOrEmpty(currentProject))
+            {
+                <h6>@currentProject</h6>
+                <div class="submenu">
+                    <a asp-controller="Projects" asp-action="Details" asp-route-projId="@projId">Details & Wps</a>
+                    <a asp-controller="Projects" asp-action="EffortPlan" asp-route-projId="@projId">Effort Plan</a>
+                    <a asp-controller="Projects" asp-action="PersonnelSelection" asp-route-projId="@projId">Personnel Selection</a>
+                    <a asp-controller="Projects" asp-action="PersonnelEffortPlan" asp-route-projId="@projId">Personnel Effort Plan</a>
+                    <a asp-controller="Projects" asp-action="ProjectReport" asp-route-projId="@projId">Project Report</a>
+                </div>
+            }
+
+            @if (User.IsInRole("Admin") || User.IsInRole("ProjectManager"))
+            {
+                <a asp-controller="Personnels" asp-action="Index"><i class="bi bi-people"></i> Personnel</a>
+            }
+
+            @if (!string.IsNullOrEmpty(currentPerson))
+            {
+                <h6>@currentPerson</h6>
+                <div class="submenu">
+                    <a asp-controller="Personnels" asp-action="Calendar" asp-route-id="@personId">Calendar</a>
+                    <a asp-controller="Personnels" asp-action="Dedication" asp-route-id="@personId">Dedication</a>
+                    <a asp-controller="Personnels" asp-action="ExternalRate" asp-route-id="@personId">External Rate</a>
+                    <a asp-controller="Personnels" asp-action="Travels" asp-route-id="@personId">Travels</a>
+                    <a asp-controller="Personnels" asp-action="PendingTravels" asp-route-id="@personId">Pending Travels</a>
+                    <a asp-controller="Personnels" asp-action="LoginLog" asp-route-id="@personId">Login Log</a>
+                </div>
+            }
+
+            <h6>Utilities</h6>
+            @if (User.IsInRole("Admin") || User.IsInRole("ProjectManager"))
+            {
+                <a asp-controller="ProjectManager" asp-action="Index"><i class="bi bi-upload"></i> Load Timesheets</a>
+            }
+            <a asp-controller="ProjectManager" asp-action="ReportError"><i class="bi bi-bug"></i> Report Error</a>
+
+            @if (User.IsInRole("Admin") || User.IsInRole("ProjectManager") || User.IsInRole("User") || User.IsInRole("Researcher"))
+            {
+                <a asp-controller="TimeSheet" asp-action="GetTimeSheetsForPerson"><i class="bi bi-clock"></i> Timesheet</a>
+            }
+
+            @if (User.IsInRole("Admin"))
+            {
+                <h6>Admin</h6>
+                <a asp-controller="Admin" asp-action="Index"><i class="bi bi-shield-lock"></i> Admin Panel</a>
+                <a asp-controller="Tools" asp-action="GlobalHours"><i class="bi bi-clock-history"></i> Global Hours</a>
+            }
+
+            <h6>Account</h6>
+            <a asp-controller="Account" asp-action="ChangePassword"><i class="bi bi-key"></i> Change Password</a>
+            <form asp-controller="Account" asp-action="Logout" method="post">
+                <button type="submit"><i class="bi bi-box-arrow-right"></i> Logout</button>
+            </form>
+
+            <!-- ✅ Pie con usuario -->
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <img src="~/Images/profile-placeholder.jpg" alt="Profile" />
+                    <span>@User.Identity.Name</span>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- ✅ Contenido -->
+    <div class="content-wrapper container-fluid">
+        @RenderBody()
+    </div>
+
+    <!-- ✅ Scripts necesarios -->
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="/js/jquery.dataTables.min.js"></script>
+    <script src="/js/datatables.min.js"></script>
+    <script src="/js/dataTables.bootstrap4.min.js"></script>
+    <script src="/js/bootstrap.min.js"></script>
+    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src='~/js/index.global.min.js'></script>
+    <script src='~/js/locales-all.global.min.js'></script>
+
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

@@ -48,19 +48,18 @@
             <button id="nextMonthButton" class="btn btn-primary mx-2">Next</button>
         </div>
 
-        @if ((bool?)ViewBag.ShowAutoFillButton == true)
+        @if ((bool?)ViewBag.AllowEdit == true)
         {
             <div class="d-flex justify-content-center align-items-center gap-2" style="width: 20%;">
                 <button id="saveAllButton" class="btn btn-success">Save All</button>
-                <button id="autoFillButton" class="btn btn-warning">Auto Fill</button>
+
+                @if ((bool?)ViewBag.ShowAutoFillButton == true)
+                {
+                    <button id="autoFillButton" class="btn btn-warning">Auto Fill</button>
+                }
             </div>
         }
-        else
-        {
-            <div class="d-flex justify-content-center align-items-center" style="width: 10%;">
-                <button id="saveAllButton" class="btn btn-success">Save All</button>
-            </div>
-        }
+
 
 
         <!-- Contenedor para la barra de progreso -->
@@ -180,7 +179,7 @@
 
                                 string inputStyle = highlightYellow ? "background-color: yellow;" : "";
                                 <td class="hour-input-cell" style="@cellStyle">
-                                    @if (editable)
+                                    @if (editable && (bool?)ViewBag.AllowEdit == true)
                                     {                                        
                                         <input type="text" class="form-control input-hours"
                                                style="@inputStyle"

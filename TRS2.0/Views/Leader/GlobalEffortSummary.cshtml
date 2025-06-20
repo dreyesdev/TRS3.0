@@ -1,0 +1,124 @@
+﻿@model TRS2._0.Models.ViewModels.LeaderGlobalEffortViewModel
+
+@{
+    ViewData["Title"] = "Global Effort Summary";
+}
+
+<div class="container-fluid px-4">
+    <h2 class="text-center mb-4">Global Effort Summary - @Model.Year</h2>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3 px-4">
+    <form method="get" asp-action="GlobalEffortSummary" class="d-inline-flex">
+        <select name="year" onchange="this.form.submit()" class="form-select me-2">
+            @for (int y = DateTime.Now.Year - 5; y <= DateTime.Now.Year + 1; y++)
+            {
+                <option value="@y" selected="@(y == Model.Year)">@y</option>
+            }
+        </select>
+    </form>
+    <a class="btn btn-outline-primary" href="@Url.Action("ExportGlobalEffortToCsv", "Leader", new { year = Model.Year })">
+        <i class="bi bi-download"></i> Export to CSV
+    </a>
+    <div class="d-flex align-items-center w-75 gap-2">
+        <button id="toggleAllBtn" class="btn btn-outline-secondary" type="button">
+            <i class="bi bi-arrows-collapse"></i> Expandir/Contraer todo
+        </button>
+
+        <input type="text" id="personSearch" class="form-control w-75" placeholder="Buscar persona por nombre o apellidos..." />
+    </div>
+</div>
+
+<div class="container-fluid px-4">
+    @foreach (var person in Model.People)
+    {
+        var collapseId = $"collapse_{person.PersonId}";
+        <div class="card mb-2 person-card" data-person-name="@person.FullName.ToLower()">
+            <div class="card-header custom-blue text-white" style="cursor:pointer" onclick="toggleCollapse('@collapseId')">
+                @person.FullName
+            </div>
+            <div id="@collapseId" class="collapse">
+                <div class="card-body table-responsive">
+                    <table class="table table-bordered table-sm text-center">
+                        <thead class="table-secondary">
+                            <tr>
+                                <th>Mes</th>
+                                <th>Effort</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (int m = 1; m <= 12; m++)
+                            {
+                                var data = person.MonthlyEffort[m];
+                                string background = "";
+                                string color = "";
+
+                                if (data.Assigned > data.Max)
+                                {
+                                    background = "#fffacd"; // amarillo claro
+                                    color = "#b8860b"; // amarillo oscuro
+                                }
+                                else if (data.Assigned == data.Max)
+                                {
+                                    background = "#e6ffe6"; // verde claro
+                                    color = "darkgreen"; // verde oscuro
+                                }
+                                else
+                                {
+                                    background = "#e6f3ff"; // azul muy claro
+                                    color = "#00008b"; // azul oscuro
+                                }
+
+                                <tr>
+                                    <td>@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)</td>
+                                    <td style="background-color:@background; color:@color; font-weight:bold">
+                                        @data.Assigned.ToString("0.##") | @data.Max.ToString("0.##")
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        function toggleCollapse(id) {
+            const el = document.getElementById(id);
+            const bsCollapse = bootstrap.Collapse.getInstance(el) || new bootstrap.Collapse(el, { toggle: false });
+            bsCollapse.toggle();
+        }
+
+        document.getElementById('personSearch').addEventListener('input', function () {
+            const searchValue = this.value.toLowerCase();
+            const cards = document.querySelectorAll('.person-card');
+            cards.forEach(card => {
+                const name = card.getAttribute('data-person-name');
+                card.style.display = name.includes(searchValue) ? '' : 'none';
+            });
+        });
+            document.getElementById('toggleAllBtn').addEventListener('click', function () {
+            const collapses = document.querySelectorAll('.collapse');
+            const allExpanded = [...collapses].every(c => c.classList.contains('show'));
+
+            collapses.forEach(el => {
+                const instance = bootstrap.Collapse.getInstance(el) || new bootstrap.Collapse(el, { toggle: false });
+                if (allExpanded) {
+                    instance.hide();
+                } else {
+                    instance.show();
+                }
+            });
+        });
+    </script>
+
+    <style>
+        .custom-blue {
+            background-color: #004085;
+            color: white;
+        }
+    </style>
+}

@@ -19,6 +19,9 @@
     <!-- Site Custom Styles -->
     <link rel="stylesheet" href="/css/site.css" asp-append-version="true" />
 
+    <link rel="stylesheet" href="@Url.Content("~/lib/bootstrap-icons/bootstrap-icons.css")" />
+
+
     <!-- 🔹 Agregar referencia a _Layout.cshtml.css -->
     <link rel="stylesheet" href="~/css/layout-styles.css" asp-append-version="true">
 </head>
@@ -56,8 +59,22 @@
                             }
                             @if (User.IsInRole("Admin"))
                             {
-                                <li class="nav-item">
-                                    <a class="nav-link text-dark" asp-area="" asp-controller="Admin" asp-action="Index">Admin</a>
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle text-dark" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="bi bi-shield-lock"></i> Admin
+                                    </a>
+                                    <ul class="dropdown-menu" aria-labelledby="adminDropdown">
+                                        <li>
+                                            <a class="dropdown-item" asp-controller="Admin" asp-action="Index">
+                                                <i class="bi bi-house-door"></i> Principal
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" asp-controller="Admin" asp-action="AjustarOverloadManual">
+                                                <i class="bi bi-exclamation-triangle"></i> Ajuste Overloads
+                                            </a>
+                                        </li>
+                                    </ul>
                                 </li>
                             }
                             @if (User.IsInRole("Admin") || User.IsInRole("ProjectManager") || User.IsInRole("User") || User.IsInRole("Researcher"))
@@ -89,6 +106,49 @@
                                     </ul>
                                 </li>
                             }
+                            @if (User.IsInRole("Admin") || User.IsInRole("ProjectManager"))
+                            {
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle text-dark" href="#" id="toolsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="bi bi-wrench-adjustable"></i> Tools
+                                    </a>
+                                    <ul class="dropdown-menu" aria-labelledby="toolsDropdown">
+                                        <li>
+                                            <a class="dropdown-item" asp-controller="Tools" asp-action="GlobalHours">
+                                                <i class="bi bi-clock-history"></i> Global Hours
+                                            </a>
+                                        </li>
+                                        
+                                    </ul>
+                                </li>
+                            }
+
+                            @if (User.IsInRole("Admin") || User.IsInRole("Leader"))
+                            {
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle text-dark" href="#" id="leaderDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="bi bi-people"></i> Leader
+                                    </a>
+                                    <ul class="dropdown-menu" aria-labelledby="leaderDropdown">
+                                        <li>
+                                            <a class="dropdown-item" asp-controller="Leader" asp-action="EffortSummary">
+                                                <i class="bi bi-bar-chart"></i> Effort Summary
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" asp-controller="Leader" asp-action="TimesheetOverview">
+                                                <i class="bi bi-clock"></i> Timesheet Overview
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" asp-controller="Leader" asp-action="GlobalEffortSummary">
+                                                <i class="bi bi-graph-up-arrow"></i> Global Effort Summary
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </li>
+                            }
+
 
                         }
                     </ul>
@@ -218,7 +278,7 @@
 
     <footer class="footer">
         <div class="container">
-            &copy; 2024 - TRS 3.0 - <a asp-area="" asp-controller="Home" asp-action="Privacy">Contacto</a>
+            &copy; 2025 - TRS 3.0 
         </div>
     </footer>
 

@@ -4,14 +4,14 @@
     ViewData["Title"] = "Register";
 }
 
-<!-- Vista de Registro Mejorada -->
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css">    
+    <title>Create Account</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <style>
         body {
             background: linear-gradient(to right, darkblue, #2575fc);
@@ -48,18 +48,31 @@
 </head>
 <body>
     <div class="register-container">
-        <h3 class="text-center">Crear Cuenta</h3>
-        <p class="text-center text-muted">Regístrate con tus datos</p>
-        <form method="post" action="/Account/Register">
-            <div class="mb-3">
-                <label class="form-label">BSCID</label>
-                <input type="text" class="form-control" name="BSCID" required>
-            </div>            
-            <button type="submit" class="btn btn-primary w-100 mt-3">Registrarse</button>
+        <h3 class="mb-3">Create your account</h3>
+        <p class="text-muted">Use your BSC ID (not your email address)</p>
+
+        <form method="post" asp-action="Register" asp-controller="Account">
+            <div class="mb-3 text-start">
+                <label class="form-label" for="BSCID">BSC ID</label>
+                <input asp-for="BSCID" class="form-control" placeholder="e.g., jsmith" />
+                <span asp-validation-for="BSCID" class="text-danger"></span>
+                <div class="form-text">This is the same ID you use to access the <strong>Intranet</strong>.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 mt-3">Register</button>
+
+            <div class="text-danger mt-3">
+                @Html.ValidationSummary(true)
+            </div>
         </form>
-        <p class="text-center mt-3">¿Ya tienes cuenta? <a href="/Account/Login">Inicia Sesión</a></p>
+
+        <p class="mt-4">
+            Already have an account?
+            <a asp-action="Login" asp-controller="Account">Log in</a>
+        </p>
     </div>
 </body>
 </html>
+
 
 

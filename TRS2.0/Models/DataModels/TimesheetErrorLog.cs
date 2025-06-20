@@ -1,4 +1,6 @@
-﻿namespace TRS2._0.Models.DataModels
+﻿using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
+
+namespace TRS2._0.Models.DataModels
 {
     public class TimesheetErrorLog
     {
@@ -11,5 +13,7 @@
         public string ErrorMessage { get; set; }
         public DateTime Timestamp { get; set; } = DateTime.Now; // Registra la fecha del error
         public bool IsResolved { get; set; } = false; // Indica si el error fue corregido
+        public string? AuthorId { get; set; }
+        public ApplicationUser Author { get; set; } 
     }
 }

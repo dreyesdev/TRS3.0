@@ -178,19 +178,34 @@ namespace TRS2._0.Controllers
                                             <html>
                                             <body>
                                                 <p>Greetings, {personnel.Name},</p>
+
                                                 <p>You now have access to the TRS 3.0 web application.</p>
-                                                <p>To access the site, please use the following link: <a href='https://opstrs03.bsc.es/'>TRS 3.0</a></p>
+
+                                                <p>To access the site, please use the following link: 
+                                                    <a href='https://opstrs03.bsc.es/'>TRS 3.0</a>
+                                                </p>
+
                                                 <p>Your login credentials are:</p>
                                                 <ul>
-                                                    <li><strong>Username:</strong> {model.BSCID}</li>
-                                                    <li><strong>Password:</strong> {password}</li>
+                                                    <li><strong>Username:</strong> <code style='font-family: monospace;'>{model.BSCID}</code></li>
+                                                    <li><strong>Password:</strong> <code style='font-family: monospace;'>{password}</code></li>
                                                 </ul>
-                                                <p>If you experience any issues while logging in or using the system, please feel free to contact us at <a href='mailto:iss@bsc.es'>iss@bsc.es</a>.</p>
+
+                                                <p><strong style='color: darkred;'>Important:</strong> please copy and paste the password directly to avoid typos.</p>
+
+                                                <p>If you experience issues logging in, try using a private/incognito window in your browser.</p>
+
+                                                <p>If the problem persists, please contact us at 
+                                                    <a href='mailto:iss@bsc.es'>iss@bsc.es</a>.
+                                                </p>
+
                                                 <p>Thank you for your collaboration.</p>
+
                                                 <p>Sincerely,</p>
                                                 <p>The ISS Team</p>
                                             </body>
                                             </html>";
+
 
 
                     await _emailSender.SendEmailAsync(personnel.Email, "Access to TRS 3.0", emailContent);
@@ -199,9 +214,17 @@ namespace TRS2._0.Controllers
 
                     // Asignar rol al usuario
                     var roleService = new RoleService(_roleManager, _userManager);
-                    await roleService.AssignRoleToUser(user.Id, "User"); // Asigna el rol "User" por defecto
+                    var roleResult = await roleService.AssignRoleToUser(user.Id, "Researcher");
 
-                    return RedirectToAction("Index", "Home");
+                    if (!roleResult.Succeeded)
+                    {
+                        var errors = string.Join(", ", roleResult.Errors.Select(e => e.Description));
+                        _logger.LogError($"Error assigning role to user {user.UserName}: {errors}");
+                    }
+
+
+                    return RedirectToAction(nameof(RegisterConfirmation));
+
                 }
 
                 foreach (var error in result.Errors)
@@ -238,7 +261,8 @@ namespace TRS2._0.Controllers
                     $"Please reset your password by clicking <a href='{callbackUrl}'>here</a>");
 
                 _logger.LogInformation($"Password reset email sent to {model.Email}.");
-                return RedirectToAction(nameof(Login)); // Se elimina ForgotPasswordConfirmation
+                return RedirectToAction(nameof(ForgotPasswordConfirmation));
+
             }
 
             _logger.LogWarning("Invalid forgot password attempt.");
@@ -269,7 +293,7 @@ namespace TRS2._0.Controllers
             var result = await _userManager.ResetPasswordAsync(user, model.Code, model.Password);
             if (result.Succeeded)
             {
-                return RedirectToAction(nameof(Login)); // Se elimina ResetPasswordConfirmation
+                return RedirectToAction(nameof(ResetPasswordConfirmation)); // Se elimina ResetPasswordConfirmation
             }
 
             foreach (var error in result.Errors)
@@ -479,6 +503,13 @@ namespace TRS2._0.Controllers
             }
             return true;
         }
+
+        [HttpGet]
+        public IActionResult RegisterConfirmation()
+        {
+            return View();
+        }
+
 
     }
 }

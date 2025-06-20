@@ -1,0 +1,207 @@
+﻿@model TRS2._0.Models.ViewModels.ToolsViewModel
+
+@{
+    ViewData["Title"] = "Global Hours";
+    var year = Model.Year;
+    var entries = Model.GlobalHours.Entries;
+}
+
+<div class="container-fluid mt-3">
+    <h2 class="text-center fw-bold">
+        Global Hours — @Model.Year
+        <div class="d-flex justify-content-center align-items-center gap-3 mt-2">
+            <a class="btn btn-primary" asp-action="GlobalHours" asp-route-year="@(Model.Year - 1)">
+                ← @(@Model.Year - 1)
+            </a>
+            <span class="btn btn-outline-dark disabled">@Model.Year</span>
+            <a class="btn btn-primary" asp-action="GlobalHours" asp-route-year="@(Model.Year + 1)">
+                @(@Model.Year + 1) →
+            </a>
+            <input type="text" id="searchByPerson" class="form-control bg-white text-dark"
+                   placeholder="Search by surname..." style="max-width: 250px;" />
+            <button class="btn btn-success" onclick="downloadCSV()">
+                <i class="bi bi-download"></i> Export CSV
+            </button>
+        </div>
+    </h2>
+
+
+<div class="table-responsive scrollable-table-container mt-4">
+    <table class="table table-bordered table-hover table-sm global-hours-table">
+        <thead class="thead-dark">
+            <tr>
+                <th>Person</th>
+                <th>Department</th>
+                <th>Group</th>
+                @foreach (var month in Model.GlobalHours.Entries.First().MonthlyHours.Keys)
+                {
+                    <th>@month</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Model.GlobalHours.Entries)
+            {
+                    <tr data-name="@row.PersonName.ToLower()" data-surname="@row.PersonName.Split(',')[0].Trim().ToLower()">
+                    <td class="fw-bold">@row.PersonName</td>
+                    <td>@row.Department</td>
+                        <td title="@row.Group">@row.Group</td>
+                    @foreach (var val in row.MonthlyHours.Values)
+                    {
+                        <td>@val.ToString("0.00")</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+</div>
+
+
+@section Scripts {
+    <script>
+        // Filtro en tiempo real por apellido o nombre
+        document.getElementById('searchByPerson').addEventListener('input', function () {
+            const search = this.value.toLowerCase();
+            document.querySelectorAll('.global-hours-table tbody tr').forEach(row => {
+                const surname = row.getAttribute('data-surname');
+                const fullname = row.getAttribute('data-name');
+                const visible = surname.includes(search) || fullname.includes(search);
+                row.style.display = visible ? '' : 'none';
+            });
+        });
+
+        // Exportación CSV con coma decimal y punto y coma separador
+        function downloadCSV() {
+            let csvBody = "";
+
+            const headerRow = ["Person", "Department", "Group"];
+            document.querySelectorAll(".global-hours-table thead th")
+                .forEach((th, index) => {
+                    if (index >= 3) {
+                        headerRow.push(th.innerText.trim());
+                    }
+                });
+            csvBody += headerRow.join(";") + "\r\n";
+
+            document.querySelectorAll(".global-hours-table tbody tr")
+                .forEach(row => {
+                    const cols = row.querySelectorAll("td");
+                    const rowData = [];
+
+                    cols.forEach((td, index) => {
+                        let value = td.innerText.trim();
+                        if (!isNaN(value) && value.includes(".")) {
+                            value = value.replace(".", ",");
+                        }
+                        value = value.replace(/(\r\n|\n|\r)/gm, "");
+                        rowData.push(value);
+                    });
+
+                    csvBody += rowData.join(";") + "\r\n";
+                });
+
+            const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\uFEFF' + csvBody);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "Global_Hours.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+}
+
+<style>
+    .global-hours-table th,
+    .global-hours-table td {
+        box-sizing: border-box;
+        border-right: 1px solid #dee2e6;
+    }
+
+
+    /* Contenedor con scroll */
+    .scrollable-table-container {
+        overflow: auto;
+        max-height: 1000px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+    }
+
+    /* Cabecera fija */
+    .global-hours-table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #003366;
+        color: white;
+        z-index: 20;
+        text-align: center;
+        vertical-align: middle;
+        height: 50px;
+    }
+
+    /* Celdas estándar */
+    .global-hours-table td,
+    .global-hours-table th {
+        min-width: 100px;
+        text-align: center;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+        /* Columna 1: Person */
+        .global-hours-table th:first-child,
+        .global-hours-table td:first-child {
+            position: sticky;
+            left: 0;
+            background-color: #f8f9fa;
+            z-index: 15;
+            width: 220px;
+            min-width: 220px;
+            max-width: 220px;
+        }
+
+        /* Columna 2: Department */
+        .global-hours-table th:nth-child(2),
+        .global-hours-table td:nth-child(2) {
+            position: sticky;
+            left: 220px;
+            background-color: #f8f9fa;
+            z-index: 15;
+            width: 180px;
+            min-width: 180px;
+            max-width: 180px;
+        }
+
+        /* Columna 3: Group */
+        .global-hours-table th:nth-child(3),
+        .global-hours-table td:nth-child(3) {
+            position: sticky;
+            left: 400px; /* 220 + 180 */
+            background-color: #f8f9fa;
+            z-index: 15;
+            width: 300px;
+            min-width: 300px;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+
+    /* Unifica color de cabecera en las tres primeras columnas */
+    .global-hours-table thead th:first-child,
+    .global-hours-table thead th:nth-child(2),
+    .global-hours-table thead th:nth-child(3) {
+        background-color: #003366; /* mismo azul que el resto de la cabecera */
+        color: white;
+        z-index: 25;
+    }
+
+    /* Alternancia de filas */
+    .global-hours-table tbody tr:nth-child(even) {
+        background-color: #f2f2f2;
+    }
+
+
+</style>

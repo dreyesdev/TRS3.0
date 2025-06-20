@@ -48,7 +48,7 @@ namespace TRS2._0.Controllers
             return View(await tRSDBContext.ToListAsync());
         }
 
-        [Authorize(Roles = "Admin, ProjectManager, User, Researcher")]
+        [Authorize(Roles = "Admin, ProjectManager, Leader, Researcher")]
         public async Task<IActionResult> GetTimeSheetsForPerson(int? personId, int? year, int? month)
         {
             // Obtener usuario autenticado y roles
@@ -56,6 +56,7 @@ namespace TRS2._0.Controllers
             var user = await _context.Users.Include(u => u.Personnel).FirstOrDefaultAsync(u => u.Id == userId);
             var userRoles = await _userManager.GetRolesAsync(user);
             bool isAdminOrPM = userRoles.Contains("Admin") || userRoles.Contains("ProjectManager");
+            ViewBag.CanEdit = isAdminOrPM;
 
             if (!personId.HasValue)
             {
@@ -71,11 +72,18 @@ namespace TRS2._0.Controllers
             int validPersonId = personId.Value;
 
             // Validar si tiene permiso para acceder a esa ficha
-            if (!isAdminOrPM && user?.PersonnelId != validPersonId)
+            bool isOwner = user?.PersonnelId == validPersonId;
+            bool isLeader = userRoles.Contains("Leader");
+
+            if (!isAdminOrPM && !isOwner && !isLeader)
             {
                 _logger.LogWarning($"User {userId} tried to view timesheets of personId {validPersonId} without permission.");
                 return Forbid();
             }
+
+            // Decide si se permite editar
+            ViewBag.AllowEdit = isAdminOrPM || isOwner;
+
 
             // Determina el año y mes actual si no se proporcionan
             var currentYear = year ?? DateTime.Now.Year;
@@ -126,6 +134,10 @@ namespace TRS2._0.Controllers
 
             // Obtener las bajas y viajes del mes
             var leavesthismonth = await _workCalendarService.GetLeavesForPerson(validPersonId, currentYear, currentMonth);
+            // Solo bajas completas para excluir del cálculo
+            var leavesForExclusion = leavesthismonth
+                .Where(l => (l.Type != 11 && l.Type != 12) || (l.LeaveReduction == null || l.LeaveReduction == 1))
+                .ToList();
             var travelsthismonth = await _workCalendarService.GetTravelsForThisMonth(validPersonId, currentYear, currentMonth);
 
             // Obtener los datos de la persona
@@ -205,8 +217,9 @@ namespace TRS2._0.Controllers
 
             // Calcular las horas totales trabajadas excluyendo los días con bajas y festivos
             var totalWorkHours = hoursPerDayWithDedication
-                                .Where(entry => !leavesthismonth.Any(leave => leave.Day == entry.Key) && !holidays.Contains(entry.Key))
-                                .Sum(entry => entry.Value);
+    .Where(entry => !leavesForExclusion.Any(leave => leave.Day == entry.Key) && !holidays.Contains(entry.Key))
+    .Sum(entry => entry.Value);
+
 
 
 
@@ -935,7 +948,7 @@ namespace TRS2._0.Controllers
                         row.ConstantItem(100).Column(col =>
                         {
                             col.Item().Border(1).BorderColor("#004488") // Changed to dark blue
-                            .AlignCenter().Text($"{roundedtotalHours}");
+                            .AlignCenter().Text($"{roundedtotalHours:0.0}");
 
                             col.Item().Background("#004488").Border(1) // Background and border changed to dark blue
                             .BorderColor("#004488").AlignCenter()
@@ -1076,7 +1089,7 @@ namespace TRS2._0.Controllers
                                             var date = new DateTime(year, month, day);
                                             var otherProjectHoursForDay = model.HoursForOtherProjects.ContainsKey(date) ? model.HoursForOtherProjects[date] : 0;
                                             var isHolidayOrLeave = model.Holidays.Any(h => h.Date == date) || model.LeavesthisMonth.Any(l => l.Day == date);
-                                            decimal roundedOtherProjectHoursForDay = isHolidayOrLeave ? 0 : Math.Round(otherProjectHoursForDay * 2, MidpointRounding.AwayFromZero) / 2;
+                                            decimal roundedOtherProjectHoursForDay = isHolidayOrLeave ? 0 : Math.Round(otherProjectHoursForDay, 1, MidpointRounding.AwayFromZero);
                                             footer.Cell().BorderVertical(1).BorderColor("#00BFFF").Background("#D3D3D3").Padding(2).AlignCenter().Text($"{roundedOtherProjectHoursForDay:0.#}").ExtraBold().FontColor("#000000").FontSize(8);
                                         }
                                         footer.Cell().Background("#D3D3D3").Padding(2).AlignCenter().Text($"{model.TotalHoursForOtherProjects:0.#}").ExtraBold().FontColor("#000000").Bold().FontSize(8);

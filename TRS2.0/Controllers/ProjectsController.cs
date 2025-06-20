@@ -127,6 +127,7 @@ namespace TRS2._0.Controllers
 
             // Añadir wpDetails al ViewBag para acceder desde la vista
             ViewBag.WpDetails = wpDetails;
+            ViewBag.CurrentProject = project.Acronim;
 
             return View(project);
         }
@@ -281,6 +282,7 @@ namespace TRS2._0.Controllers
                                                                  
                 };
                 ViewBag.ProjId = projId;
+                ViewBag.CurrentProject = project.Acronim;
                 return View(emptyModel);
             }
 
@@ -332,6 +334,7 @@ namespace TRS2._0.Controllers
                 wpEffort.TotalEffort = (float)Math.Round(sumEffort, 2);
             }
             ViewBag.ProjId = projId;
+            ViewBag.CurrentProject = project.Acronim;
 
             // Ordenar por nombre y mover "TRAVELS" al final
             effortPlanViewModel.WorkPackages = effortPlanViewModel.WorkPackages
@@ -377,6 +380,7 @@ namespace TRS2._0.Controllers
             ViewBag.PiFullName = pi != null ? $"{pi.Name} {pi.Surname}" : "No asignado";
             ViewBag.FmFullName = fm != null ? $"{fm.Name} {fm.Surname}" : "No asignado";
             ViewBag.projId = projId;
+            ViewBag.CurrentProject = projectDetails.Acronim;
             var viewModel = new ProjectPersonnelViewModel
             {
                 ProjectDetails = projectDetails,
@@ -497,11 +501,12 @@ namespace TRS2._0.Controllers
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew(); // Inicia el cronómetro
 
-            ViewBag.projId = projId;            
+            ViewBag.projId = projId;     
+            
 
             // Obtener el proyecto
             var project = await _context.Projects.FindAsync(projId);
-
+            ViewBag.CurrentProject = project.Acronim;
             if (project == null)
             {
                 return NotFound();
@@ -640,6 +645,7 @@ namespace TRS2._0.Controllers
 
                 ViewBag.FilteredProjectEfforts = filteredProjectEfforts;
                 ViewBag.EffortSumByMonth = effortSumByMonthDict;
+
 
                 ViewBag.SelectedWpId = wpId.Value;
             }
@@ -1022,6 +1028,7 @@ namespace TRS2._0.Controllers
 
                 ViewBag.ProjectMonths = projectMonths;
 
+
                 return View(viewModel);
             }
             catch (Exception ex)
@@ -1046,7 +1053,7 @@ namespace TRS2._0.Controllers
             {
                 return NotFound("Proyecto no encontrado.");
             }
-
+            ViewBag.CurrentProject = project.Acronim;
             DateTime projectStartDate = (DateTime)project.Start;
             DateTime projectEndDate = (DateTime)project.End;
 
@@ -1114,7 +1121,7 @@ namespace TRS2._0.Controllers
         [HttpGet]
         public IActionResult ReportPeriodForm(int projId)
         {
-            // Asumiendo que tienes un modelo de vista que espera una lista de ReportPeriods y quizás otros datos relacionados
+            
             var viewModel = new ReportPeriodViewModel();
 
             // Suponiendo que tienes un DbSet<ReportPeriod> en tu contexto llamado ReportPeriods
@@ -1518,6 +1525,13 @@ namespace TRS2._0.Controllers
                 Console.WriteLine($"Total execution time of PeriodDetails was {totalStopwatch.ElapsedMilliseconds} ms");
                 ViewBag.ProjectId = projectId;
                 ViewBag.PeriodId = id;
+                var project = await _context.Projects
+                                        .FirstOrDefaultAsync(p => p.ProjId == projectId);
+                if (project == null)
+                {
+                    return NotFound("Proyecto no encontrado.");
+                }
+                ViewBag.CurrentProject = project.Acronim;
 
                 return PartialView("_DetallesPeriodo", model);
             }
@@ -1696,7 +1710,8 @@ namespace TRS2._0.Controllers
                     csv.AppendLine();
                 }
 
-                var bytes = Encoding.UTF8.GetBytes(csv.ToString());
+                var utf8WithBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+                var bytes = utf8WithBom.GetBytes(csv.ToString());
                 return File(bytes, "text/csv", $"PersonnelEffortPlan_{request.ProjectId}_{DateTime.Now:yyyyMMddHHmmss}.csv");
             }
             catch (Exception ex)
@@ -1792,7 +1807,8 @@ namespace TRS2._0.Controllers
                     csv.AppendLine();
                 }
 
-                var bytes = Encoding.UTF8.GetBytes(csv.ToString());
+                var utf8WithBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+                var bytes = utf8WithBom.GetBytes(csv.ToString());
                 return File(bytes, "text/csv", $"PersonnelEffortPlan_{request.ProjectId}_{DateTime.Now:yyyyMMddHHmmss}.csv");
             }
             catch (Exception ex)
@@ -1865,10 +1881,14 @@ namespace TRS2._0.Controllers
 
                                 var estimatedHours = await _workCalendarService.CalculateEstimatedHoursForPersonInWorkPackage(person.Id, wp.Id, year, month);
 
+                                var monthStart = new DateTime(date.Year, date.Month, 1);
+                                var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
                                 var affiliation = _context.AffxPersons
-                                    .Where(ap => ap.PersonId == person.Id && ap.Start <= date && ap.End >= date)
+                                    .Where(ap => ap.PersonId == person.Id && ap.End >= monthStart && ap.Start <= monthEnd)
                                     .OrderByDescending(ap => ap.Start)
                                     .FirstOrDefault()?.AffId;
+
 
                                 if (affiliation != null)
                                 {
@@ -1921,7 +1941,8 @@ namespace TRS2._0.Controllers
                     csv.AppendLine();
                 }
 
-                var bytes = Encoding.UTF8.GetBytes(csv.ToString());
+                var utf8WithBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+                var bytes = utf8WithBom.GetBytes(csv.ToString());
                 _logger.LogInformation("Exportación completada con éxito.");
                 return File(bytes, "text/csv", $"PmsAuditByWP_{request.ProjectId}_{DateTime.Now:yyyyMMddHHmmss}.csv");
             }

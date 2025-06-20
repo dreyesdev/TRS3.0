@@ -15,13 +15,18 @@ namespace TRS2._0.Services
             _userManager = userManager;
         }
 
-        public async Task AssignRoleToUser(string userId, string roleName)
+        public async Task<IdentityResult> AssignRoleToUser(string userId, string roleName)
         {
             var user = await _userManager.FindByIdAsync(userId);
-            if (user != null && await _roleManager.RoleExistsAsync(roleName))
-            {
-                await _userManager.AddToRoleAsync(user, roleName);
-            }
+            if (user == null)
+                return IdentityResult.Failed(new IdentityError { Description = "User not found." });
+
+            if (!await _roleManager.RoleExistsAsync(roleName))
+                return IdentityResult.Failed(new IdentityError { Description = $"Role '{roleName}' does not exist." });
+
+            var result = await _userManager.AddToRoleAsync(user, roleName);
+            return result;
         }
+
     }
 }
