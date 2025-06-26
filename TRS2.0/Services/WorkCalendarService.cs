@@ -1064,7 +1064,7 @@ public class WorkCalendarService
 
         // Obtener las horas contractuales (100% del día) desde AffHours
         var affHours = await _context.AffHours
-            .FirstOrDefaultAsync(ah => ah.AffId == affiliation.AffId);
+            .FirstOrDefaultAsync(ah => ah.AffId == affiliation.AffId && ah.StartDate <= date && ah.EndDate >= date);
 
         if (affHours == null)
         {
@@ -1414,9 +1414,28 @@ public class WorkCalendarService
                 return;
             }
 
-            var maxHoursForMonth = await CalculateMaxHoursForPersonInMonth(personId, monthStart.Year, monthStart.Month);
+            // Detectar si la persona tiene dedicación activa todo el mes
+            bool worksWholeMonth = await _context.Dedications
+                .AnyAsync(d => d.PersId == personId &&
+                               d.Type != 0 &&
+                               d.Start <= monthStart &&
+                               (d.End == null || d.End >= monthEnd));
+
+            decimal maxHoursForMonth;
+
+            if (worksWholeMonth)
+            {
+                maxHoursForMonth = await CalculateMaxHoursForPersonInMonth(personId, monthStart.Year, monthStart.Month);
+                logger.Information($"[{personName} {personSurname}] Se detecta mes completo. Cálculo real con días hábiles y bajas.");
+            }
+            else
+            {
+                maxHoursForMonth = await CalculateTheoreticalMonthlyHoursAsync(personId, monthStart.Year, monthStart.Month);
+                logger.Information($"[{personName} {personSurname}] Dedicación parcial. Cálculo teórico con effort aplicado sobre mes completo.");
+            }
 
             decimal totalMonthlyHours = ajusteCompleto ? maxHoursForMonth * maxEffort : monthlyEffort * maxHoursForMonth;
+            //decimal totalMonthlyHours = ajusteCompleto ? maxHoursForMonth : monthlyEffort * maxHoursForMonth;
             decimal rawDailyHours = totalMonthlyHours / validWorkDays.Count;
             //decimal adjustedDailyHours = Math.Round(rawDailyHours * 2, MidpointRounding.AwayFromZero) / 2; // ANTERIOR AL CAMBIO DECIMAL
             decimal adjustedDailyHours = Math.Round(rawDailyHours, 1, MidpointRounding.AwayFromZero);
@@ -2259,6 +2278,56 @@ public class WorkCalendarService
             );
 
         return result;
+    }
+
+
+    /// <summary>
+    /// Calcula el número total de horas teóricas que una persona debería trabajar en un mes completo,
+    /// considerando únicamente los días laborables (excluyendo fines de semana y festivos).
+    /// Si la persona tiene alguna afiliación activa durante el mes, se toma la jornada diaria asociada
+    /// a esa afiliación y se aplica a todos los días laborables del mes, sin tener en cuenta si la afiliación
+    /// cubre cada día individualmente. No se consideran bajas ni ausencias.
+    /// </summary>
+    /// <param name="personId">ID de la persona</param>
+    /// <param name="year">Año del mes a evaluar</param>
+    /// <param name="month">Mes a evaluar (1-12)</param>
+    /// <returns>Total de horas teóricas del mes</returns>
+
+    public async Task<decimal> CalculateTheoreticalMonthlyHoursAsync(int personId, int year, int month)
+    {
+        var startOfMonth = new DateTime(year, month, 1);
+        var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
+
+        // Obtener afiliación principal (cualquiera que esté activa durante el mes)
+        var affiliation = await _context.AffxPersons
+            .Where(ap => ap.PersonId == personId && ap.Start <= endOfMonth && ap.End >= startOfMonth)
+            .Select(ap => ap.AffId)
+            .FirstOrDefaultAsync();
+
+        if (affiliation == 0)
+            return 0;
+
+        // Obtener horas diarias de esa afiliación (válidas para ese mes)
+        var dailyHours = await _context.AffHours
+            .Where(ah => ah.AffId == affiliation && ah.StartDate <= endOfMonth && ah.EndDate >= startOfMonth)
+            .Select(ah => ah.Hours)
+            .FirstOrDefaultAsync();
+
+        if (dailyHours == 0)
+            return 0;
+
+        // Obtener días laborables del mes
+        var holidays = await _context.NationalHolidays
+            .Where(h => h.Date >= startOfMonth && h.Date <= endOfMonth)
+            .Select(h => h.Date)
+            .ToListAsync();
+
+        var workingDays = Enumerable.Range(0, (endOfMonth - startOfMonth).Days + 1)
+            .Select(offset => startOfMonth.AddDays(offset))
+            .Where(day => day.DayOfWeek != DayOfWeek.Saturday && day.DayOfWeek != DayOfWeek.Sunday && !holidays.Contains(day))
+            .Count();
+
+        return workingDays * dailyHours;
     }
 
 

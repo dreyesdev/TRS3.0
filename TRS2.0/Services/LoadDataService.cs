@@ -1748,6 +1748,12 @@ namespace TRS2._0.Services
 
                             processedDays.Add(date);
                         }
+                        if (agreementEvent == null)
+                        {
+                            logger.Warning($"AgreementEventId {agreementEventId} not found for PersonId={personId}, Date={date}. Skipping leave.");
+                            continue;
+                        }
+
                     }
 
                     var daysToDelete = existingLeaves
