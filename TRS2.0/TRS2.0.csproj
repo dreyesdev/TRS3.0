@@ -51,6 +51,7 @@
 
   <ItemGroup>
     <Folder Include="Logs\" />
+    <Folder Include="wwwroot\docs\" />
   </ItemGroup>
 
   <ItemGroup>

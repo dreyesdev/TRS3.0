@@ -217,7 +217,8 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (var wp in Model.Wps)
+            @foreach (var wp in Model.Wps
+                        .OrderBy(w => w.Name.Equals("Travels", StringComparison.OrdinalIgnoreCase) ? "ZZZZZZ" : w.Name.ToUpper()))
             {
                 <tr>
                     <!-- Campos de Texto y Fecha -->
@@ -239,7 +240,8 @@
                     </td>
                     <td class="text-center">
                         <span class="editable" id="wpPms_@wp.Id">@wp.Pms</span>
-                        <input type="text" class="edit-field form-control" id="editWpPms_@wp.Id" value="@wp.Pms" style="display: none;" />
+                        <input type="number" step="0.01" inputmode="decimal" class="edit-field form-control" id="editWpPms_@wp.Id" value="@wp.Pms" style="display:none;" />
+
                     </td>
                     <!-- Botones -->
                     <td class="text-center">
@@ -379,39 +381,54 @@
         parentCell.querySelector('.cancel-link').style.display = 'inline';
     }
 
-    function updateWp(wpId) {
-        // Recolectar los datos de los campos de entrada
-        var updatedData = {
-            Id: wpId,
-            Name: document.getElementById('editWpName_' + wpId).value,
-            Title: document.getElementById('editWpTitle_' + wpId).value,
-            StartDate: document.getElementById('editWpStartDate_' + wpId).value,
-            EndDate: document.getElementById('editWpEndDate_' + wpId).value,
-            Pms: document.getElementById('editWpPms_' + wpId).value
-        };
+        function normalizeDecimal(input) {
+      let s = (input || '').toString().trim().replace(/\s+/g, '');
 
-        // Enviar solicitud AJAX al servidor
-        $.ajax({
-            type: 'POST',
-            url: '@Url.Action("UpdateWp", "Wps")', // Asegúrate de que la URL y el nombre del controlador sean correctos
-            contentType: 'application/json',
-            data: JSON.stringify(updatedData),
-            success: function (response) {
-                if (response.success) {
-                    alert('WP actualizado con éxito');
-                    // Aquí puedes actualizar la interfaz de usuario según sea necesario
-                    location.reload(); // Recarga la página
-                    // Por ejemplo, actualizar los elementos span con los nuevos valores y cambiar la visibilidad de los botones
-                    cancelEdit(wpId); // Llama a cancelEdit para restablecer la fila a su estado original
-                } else {
-                    alert('Error al actualizar el WP');
-                }
-            },
-            error: function () {
-                alert('Error en la solicitud AJAX');
-            }
-        });
+      if (s.includes(',') && s.includes('.')) {
+        // El último separador que aparezca lo tratamos como decimal; el otro, miles
+        const lastComma = s.lastIndexOf(',');
+        const lastDot = s.lastIndexOf('.');
+        if (lastComma > lastDot) {
+          s = s.replace(/\./g, '').replace(',', '.'); // miles . => fuera, decimal , => .
+        } else {
+          s = s.replace(/,/g, ''); // miles , => fuera (decimal . ya está)
+        }
+      } else if (s.includes(',')) {
+        s = s.replace(',', '.'); // sólo coma => decimal
+      }
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
     }
+
+    function updateWp(wpId) {
+      const pmsRaw = document.getElementById('editWpPms_' + wpId).value;
+      const pms = normalizeDecimal(pmsRaw);
+      if (pms === null) {
+        alert('PMS no válido');
+        return;
+      }
+
+      var updatedData = {
+        Id: wpId,
+        Name: document.getElementById('editWpName_' + wpId).value,
+        Title: document.getElementById('editWpTitle_' + wpId).value,
+        StartDate: document.getElementById('editWpStartDate_' + wpId).value, // yyyy-MM-dd
+        EndDate: document.getElementById('editWpEndDate_' + wpId).value,     // yyyy-MM-dd
+        Pms: pms // número con punto decimal
+      };
+
+      $.ajax({
+        type: 'POST',
+        url: '@Url.Action("UpdateWp", "Wps")',
+        data: updatedData, // form-urlencoded
+        success: function (response) {
+          if (response.success) location.reload();
+          else alert(response.message || 'Error al actualizar el WP');
+        },
+        error: function () { alert('Error en la solicitud AJAX'); }
+      });
+    }
+
 function deleteWp(wpId) {
         wpId = parseInt(wpId, 10); // Convierte wpId a un número si no lo es
         console.log("WP ID:", wpId);

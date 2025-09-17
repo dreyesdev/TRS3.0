@@ -126,6 +126,7 @@
                         <button class="btn btn-success m-2" onclick="triggerJob('/UpdateLeaveTable')">Ausencias y Vacaciones</button>
                         <button class="btn btn-success m-2" onclick="triggerJob('/Carga')">PMs Mensuales</button>      
                         <button class="btn btn-success m-2" onclick="triggerJob('/AdjustGlobalEffort')">Ajuste de Effort Global</button>
+                        <button class="btn btn-success m-2" onclick="triggerJob('/OutOfContractLoad')">Out of Contract</button>
                     </div>
                 </div>
             </div>
@@ -439,6 +440,29 @@
         </div>
     </div>
 </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white">
+            <h4>Prueba de Envío de Recordatorio Timesheet (Solo para david.reyes@bsc.es)</h4>
+        </div>
+        <div class="card-body">
+            <form asp-action="SendTimesheetReminderTest" method="post" class="row g-3">
+                <div class="col-md-8">
+                    <label class="form-label">Tipo de recordatorio:</label>
+                    <select class="form-select" name="firstWeek">
+                        <option value="true">Primera semana del mes (completo + históricos)</option>
+                        <option value="false">Semanas siguientes (solo mes anterior si incompleto)</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-warning w-100">
+                        Enviar Recordatorio de Prueba
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 
 @section Scripts {
     <script>

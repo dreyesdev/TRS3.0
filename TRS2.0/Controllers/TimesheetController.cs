@@ -699,7 +699,7 @@ namespace TRS2._0.Controllers
                                                 cellBackground = "#ADD8E6"; // Vacation
                                                 break;
                                             case 3:
-                                                cellBackground = "#DDA0DD"; // Out of Contract
+                                                cellBackground = "#800080"; // Out of Contract
                                                 break;
                                         }
                                     }
@@ -862,7 +862,7 @@ namespace TRS2._0.Controllers
 
 
         [HttpGet]
-        public async Task<IActionResult> ExportTimesheetToPdf2(int personId, int year, int month, int project, string manualDate = null)
+        public async Task<IActionResult> ExportTimesheetToPdf2(int personId, int year, int month, int project, string manualDate = null, string manualCode = null)
         {
             QuestPDF.Settings.License = LicenseType.Professional;
             TextStyle.Default.FontFamily("Arial");
@@ -873,9 +873,58 @@ namespace TRS2._0.Controllers
             }
             var lastLoginDateInvestigator = await GetLastLoginDateForNextMonth(personId, year, month);
             var model = await GetTimesheetDataForPerson(personId, year, month, project);
-            var responsible = await _context.Personnel.FindAsync(model.Person.Resp);
-            var responsibleId = responsible.Id;
-            var lastLoginDateResponsible = await GetLastLoginDateForNextMonth(responsibleId, year, month);
+
+
+            // --- Responsable histórico para el periodo de la timesheet ---
+            var monthStart = new DateTime(year, month, 1);
+            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
+            // Tramos de afiliación que se solapan con el mes de la TS
+            var affLines = await _context.AffxPersons
+                .Where(a => a.PersonId == personId && a.Start <= monthEnd && a.End >= monthStart)
+                .ToListAsync();
+
+            Personnel responsible = null;
+            int responsibleId = 0;
+
+            if (affLines.Any())
+            {
+                // Elegimos el tramo con MAYOR INTERSECCIÓN de días con el mes
+                var chosen = affLines
+                    .OrderByDescending(a =>
+                    {
+                        var s = a.Start > monthStart ? a.Start : monthStart;
+                        var e = a.End < monthEnd ? a.End : monthEnd;
+                        return (e - s).TotalDays;
+                    })
+                    .First();
+
+                if (chosen.ResponsibleId.HasValue && chosen.ResponsibleId.Value > 0)
+                {
+                    responsible = await _context.Personnel.FindAsync(chosen.ResponsibleId.Value);
+                }
+            }
+
+            if (responsible == null)
+            {
+                // Fallback al responsable actual en Personnel si no hay histórico
+                responsible = await _context.Personnel.FindAsync(model.Person.Resp);
+            }
+
+            responsibleId = responsible?.Id ?? 0;
+
+            // Sobrescribe lo que imprime el PDF en la firma del manager
+            model.Responsible = responsible != null
+                ? $"{responsible.Name} {responsible.Surname}"
+                : "N/A";
+
+            // Usar este responsable para la fecha de firma (último login)
+            var lastLoginDateResponsible = responsibleId != 0
+                ? await GetLastLoginDateForNextMonth(responsibleId, year, month)
+                : null;
+
+
+
             var totalhours = model.TotalHours;
             var totalhoursworkedonproject = model.WorkPackages.Sum(wp => wp.Timesheets.Sum(ts => ts.Hours));
             // Actualización del cálculo de días trabajados en el proyecto para incluir decimales
@@ -928,7 +977,12 @@ namespace TRS2._0.Controllers
                             var monthName = new DateTime(year, month, 1).ToString("MMMM", CultureInfo.CreateSpecificCulture("en"));
                             col.Item().AlignCenter().Text($"{model.Person.Name} {model.Person.Surname} Timesheet").Bold().FontSize(12);
                             col.Item().AlignCenter().Text($"{monthName} {year}").FontSize(10);
-                            col.Item().AlignCenter().Text($"REF: {model.ProjectData.Contract} - {model.ProjectData.Acronim}").Bold().FontSize(12);
+                            string refText = string.IsNullOrEmpty(manualCode)
+                                            ? $"REF: {model.ProjectData.Contract} - {model.ProjectData.Acronim}"
+                                            : $"REF: {model.ProjectData.Contract} / {manualCode} - {model.ProjectData.Acronim}";
+
+                            col.Item().AlignCenter().Text(refText).Bold().FontSize(12);
+
                             col.Item().AlignCenter().Text($"{model.ProjectData.Title}").FontSize(10);
                         });
 
@@ -1048,7 +1102,7 @@ namespace TRS2._0.Controllers
                                                         cellBackground = "#ADD8E6"; // Vacation
                                                         break;
                                                     case 3:
-                                                        cellBackground = "#DDA0DD"; // Out of Contract
+                                                        cellBackground = "#800080"; // Out of Contract
                                                         break;
                                                 }
                                             }

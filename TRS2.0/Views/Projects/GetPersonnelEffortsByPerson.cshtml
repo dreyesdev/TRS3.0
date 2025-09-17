@@ -24,7 +24,18 @@
                         <th>WP</th>
                         @foreach (var monthKey in ViewBag.ProjectMonths)
                         {
-                            <th>@DateTime.Parse(monthKey + "-01").ToString("MMM yyyy")</th>
+                            var parsedMonth = DateTime.Parse(monthKey + "-01");
+                            var personId = Model.ProjectsPersonnelEfforts.First().WorkPackages.First().PersonnelEfforts.First().PersonId;
+                            <th style="text-align:center;">
+                                @parsedMonth.ToString("MMM yyyy", CultureInfo.CreateSpecificCulture("es-ES"))
+                                <button class="refresh-btn"
+                                        data-month="@monthKey"
+                                        data-personid="@personId"
+                                        style="border:none; background:none; padding:0; margin-left:4px; cursor:pointer;"
+                                        title="Recalcular PM">
+                                    <i class="bi bi-arrow-repeat" style="font-size: 0.9em; color:white;"></i>
+                                </button>
+                            </th>
                         }
                     </tr>
                     <tr>
@@ -308,6 +319,51 @@
         link.click();
         document.body.removeChild(link);
     });
+
+        document.querySelectorAll('.refresh-btn').forEach(button => {
+        button.addEventListener('click', async function () {
+            const personId = parseInt(this.dataset.personid, 10);
+            const monthKey = this.dataset.month;
+
+            if (!personId || !monthKey || !monthKey.includes("-")) {
+                alert("Parámetros inválidos para el cálculo de PM.");
+                return;
+            }
+
+            const [yearStr, monthStr] = monthKey.split("-");
+            const year = parseInt(yearStr, 10);
+            const month = parseInt(monthStr, 10);
+
+            if (!year || !month || month < 1 || month > 12) {
+                alert("Fecha inválida.");
+                return;
+            }
+
+            try {
+                const response = await fetch('/Projects/RecalculatePMValue', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ personId, year, month })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`PM actualizado a: ${data.pm}`);
+                    location.reload();
+                } else {
+                    alert('Error al recalcular el PM: ' + data.message);
+                }
+            } catch (err) {
+                alert('Error inesperado al comunicar con el servidor.');
+            }
+        });
+    });
+
+
+
 
 </script>
     

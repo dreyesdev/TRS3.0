@@ -275,15 +275,12 @@ namespace TRS2._0.Controllers
         [HttpGet]
         public async Task<IActionResult> GetLeaveEvents(int? personId)
         {
-            ViewBag.SelectedPersonId = personId;
             if (!personId.HasValue)
-            {
-                return Json(new List<object>()); // Devuelve una lista vacía si no hay personId
-            }
+                return Json(new List<object>());
 
+            // Ejecutar en secuencia para evitar acceso simultáneo al DbContext
             var nationalHolidays = await _context.NationalHolidays
-                .Select(n => new
-                {
+                .Select(n => new {
                     title = n.Description,
                     start = n.Date.ToString("yyyy-MM-dd"),
                     color = "green"
@@ -292,8 +289,7 @@ namespace TRS2._0.Controllers
 
             var travels = await _context.liqdayxproject
                 .Where(l => l.PersId == personId)
-                .Select(l => new
-                {
+                .Select(l => new {
                     title = "Travel",
                     start = l.Day.ToString("yyyy-MM-dd"),
                     color = "pink"
@@ -302,22 +298,27 @@ namespace TRS2._0.Controllers
 
             var leaves = await _context.Leaves
                 .Where(l => l.PersonId == personId)
-                .Select(l => new
-                {
-                    title = l.Type == 1 ? "Leave" : l.Type == 2 ? "Personal Holiday" : l.Type == 3 ? "No Contract Period" : l.Type == 11 ? "Partial Leave" : "Partial Leave",
+                .Select(l => new {
+                    title = l.Type == 1 ? "Leave" :
+                            l.Type == 2 ? "Personal Holiday" :
+                            l.Type == 3 ? "No Contract Period" : "Partial Leave",
                     start = l.Day.ToString("yyyy-MM-dd"),
-                    color = l.Type == 1 ? "darkorange" : l.Type == 2 ? "lightblue" : l.Type == 3 ? "red" : "lightcoral"
+                    color = l.Type == 1 ? "darkorange" :
+                            l.Type == 2 ? "lightblue" :
+                            l.Type == 3 ? "red" : "lightcoral"
                 })
                 .ToListAsync();
 
-            // Unir las tres listas en una sola
-            var events = nationalHolidays.Cast<object>()
-                .Concat(travels.Cast<object>())
-                .Concat(leaves.Cast<object>())
+            var events = nationalHolidays
+                .Concat(travels)
+                .Concat(leaves)
+                .Cast<object>()
                 .ToList();
 
             return Json(events);
         }
+
+
 
 
         [HttpGet]

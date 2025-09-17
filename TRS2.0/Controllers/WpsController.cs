@@ -132,36 +132,50 @@ namespace TRS2._0.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> UpdateWp([FromBody] Wp updatedWp)
+        public async Task<IActionResult> UpdateWp(Wp updatedWp)
         {
-            if (ModelState.IsValid)
+            if (!ModelState.IsValid || updatedWp == null)
+                return Json(new { success = false, message = "Datos inválidos." });
+
+            var existingWp = await _context.Wps.FindAsync(updatedWp.Id);
+            if (existingWp == null)
+                return Json(new { success = false, message = "WP no encontrado." });
+
+            // Reparsea PMS desde el formulario por si llegó con coma o miles
+            var pmsRaw = Request.Form["Pms"].ToString();
+            if (!string.IsNullOrEmpty(pmsRaw))
             {
-                var existingWp = await _context.Wps.FindAsync(updatedWp.Id);
-                if (existingWp != null)
+                var s = pmsRaw.Trim().Replace(" ", "");
+                // Si tiene ambos separadores, toma el último como decimal y elimina el otro
+                int li = Math.Max(s.LastIndexOf(','), s.LastIndexOf('.'));
+                if (li >= 0)
                 {
-                    // Actualizar las propiedades del WP existente con los valores del WP actualizado
-                    existingWp.Name = updatedWp.Name;
-                    existingWp.Title = updatedWp.Title;
-                    existingWp.StartDate = updatedWp.StartDate;
-                    existingWp.EndDate = updatedWp.EndDate;
-                    existingWp.Pms = updatedWp.Pms;
-
-                    // Guardar los cambios en la base de datos
-                    _context.Update(existingWp);
-                    await _context.SaveChangesAsync();
-
-                    return Json(new { success = true, message = "WP actualizado con éxito." });
+                    char dec = s[li];
+                    char other = dec == ',' ? '.' : ',';
+                    s = s.Replace(other.ToString(), "");
+                    if (dec == ',') s = s.Replace(',', '.');
                 }
                 else
                 {
-                    return Json(new { success = false, message = "WP no encontrado." });
+                    s = s.Replace(',', '.'); // sólo coma => decimal
                 }
+
+                if (decimal.TryParse(s, NumberStyles.Number, CultureInfo.InvariantCulture, out var pmsParsed))
+                    updatedWp.Pms = (float)pmsParsed;
             }
-            else
-            {
-                return Json(new { success = false, message = "Datos inválidos." });
-            }
+
+            existingWp.Name = updatedWp.Name;
+            existingWp.Title = updatedWp.Title;
+            existingWp.StartDate = updatedWp.StartDate;
+            existingWp.EndDate = updatedWp.EndDate;
+            existingWp.Pms = updatedWp.Pms;
+
+            _context.Update(existingWp);
+            await _context.SaveChangesAsync();
+            return Json(new { success = true, message = "WP actualizado con éxito." });
         }
+
+
 
 
         // GET: Wps/Delete/5

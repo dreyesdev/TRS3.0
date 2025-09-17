@@ -882,8 +882,16 @@ namespace TRS2._0.Services
             .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
             .CreateLogger();
         var personIds = await _context.Personnel.Select(p => p.Id).ToListAsync();
+            var personIdSet = new HashSet<int>(personIds);
 
-        List<string> lineasFallidas = new List<string>();
+            // Mapa PersonId -> Resp (0 lo tratamos como NULL)
+            var personRespMap = await _context.Personnel
+                .AsNoTracking()
+                .Select(p => new { p.Id, p.Resp })
+                .ToDictionaryAsync(x => x.Id, x => x.Resp == 0 ? (int?)null : x.Resp);
+
+
+            List<string> lineasFallidas = new List<string>();
 
             logger.Information("Iniciando la carga de afiliaciones y dedicaciones desde el archivo: {FilePath}", filePath);
 
@@ -948,7 +956,7 @@ namespace TRS2._0.Services
                         logger.Information("No se encontró una codificación de afiliación específica para Contract: {Contract}, Dist: {Dist}. Asignando afiliación por defecto: {AffiliationIdDefault}.", contract, dist);
                         
                     }
-                    int affId = affCodification > 0 ? affCodification : (string.IsNullOrWhiteSpace(contract) && string.IsNullOrWhiteSpace(dist) ? 0 : 1);
+                    int affId = affCodification > 0 ? affCodification : 0;
 
                     // Antes de intentar encontrar o insertar en AffxPersons, registra el intento con el PersonId
                     logger.Debug("Procesando PersonId: {PersonId} con LineId: {LineId}.", personId, lineId);
@@ -963,6 +971,56 @@ namespace TRS2._0.Services
                         continue;
                     }
 
+                    // --- Resolver ResponsibleId histórico SIN EF en el bucle ---
+                    // Resp va en la última columna y es entero; antes suele venir un decimal (salario)
+                    int? responsibleIdFromFile = null;
+                    int respColumnIndex = -1;
+
+                    for (int i = fields.Length - 1; i >= 0; i--)
+                    {
+                        var token = fields[i]?.Trim();
+                        if (string.IsNullOrWhiteSpace(token)) continue;
+
+                        if (int.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rid))
+                        {
+                            if (rid > 0) { responsibleIdFromFile = rid; respColumnIndex = i; }
+                            break;
+                        }
+                    }
+
+                    // Validación usando datos en memoria (nada de EF aquí)
+                    if (responsibleIdFromFile.HasValue && !personIdSet.Contains(responsibleIdFromFile.Value))
+                    {
+                        logger.Warning("Resp {RespId} no existe en Personnel (cache in-memory). Línea: {Line}", responsibleIdFromFile, line);
+                        responsibleIdFromFile = null;
+                    }
+
+                    // Fallback SOLO si el fichero no trae resp válido
+                    int? fallbackResponsibleId = null;
+                    if (personRespMap.TryGetValue(personId, out var respVal) && respVal.HasValue)
+                        fallbackResponsibleId = respVal.Value;
+
+                    int? resolvedResponsibleId = responsibleIdFromFile ?? fallbackResponsibleId;
+
+                    if (responsibleIdFromFile.HasValue)
+                    {
+                        logger.Information("Resp del fichero (col {ColIndex}): PersonId:{PersonId}, LineId:{LineId}, Resp:{Resp}",
+                            respColumnIndex, personId, lineId, responsibleIdFromFile);
+                    }
+                    else if (resolvedResponsibleId.HasValue)
+                    {
+                        logger.Information("Resp por fallback (Personnel.Resp): PersonId:{PersonId}, LineId:{LineId}, Resp:{Resp}",
+                            personId, lineId, resolvedResponsibleId);
+                    }
+                    else
+                    {
+                        logger.Warning("Sin Resp para PersonId:{PersonId}, LineId:{LineId}. Línea: {Line}",
+                            personId, lineId, line);
+                    }
+
+
+
+
                     if (affPerson == null)
                     {
                         affPerson = new AffxPerson
@@ -972,18 +1030,24 @@ namespace TRS2._0.Services
                             Start = startDate,
                             End = endDate,
                             AffId = affId,
-                            Exist = true // Marcamos como existente al crear
+                            Exist = true,
+                            ResponsibleId = resolvedResponsibleId          // ← NUEVO
                         };
                         _context.AffxPersons.Add(affPerson);
-                        logger.Information("Creando nueva entidad AffxPerson con PersonId: {PersonId}, LineId: {LineId}, Start: {Start}, End: {End}, AffId: {AffId}, Exist: {Exist}", personId, lineId, startDate, endDate, affId, affPerson.Exist);
+                        logger.Information("Creando AffxPerson P:{PersonId}, L:{LineId}, [{Start}..{End}], Aff:{AffId}, Resp:{Resp}, Exist:{Exist}",
+                            personId, lineId, startDate, endDate, affId, resolvedResponsibleId, affPerson.Exist);
+
                     }
                     else
                     {
                         affPerson.Start = startDate;
                         affPerson.End = endDate;
                         affPerson.AffId = affId;
-                        affPerson.Exist = true; // Marcamos como existente al actualizar
-                        logger.Information("Actualizando entidad AffxPerson existente con PersonId: {PersonId}, LineId: {LineId}, Start: {Start}, End: {End}, AffId: {AffId}, Exist: {Exist}", personId, lineId, startDate, endDate, affId, affPerson.Exist);
+                        affPerson.Exist = true;
+                        affPerson.ResponsibleId = resolvedResponsibleId;   // ← NUEVO
+                        logger.Information("Actualizando AffxPerson P:{PersonId}, L:{LineId}, [{Start}..{End}], Aff:{AffId}, Resp:{Resp}, Exist:{Exist}",
+                            personId, lineId, startDate, endDate, affId, resolvedResponsibleId, affPerson.Exist);
+
                     }
 
                     // Procesamiento de Dedication
@@ -1250,7 +1314,7 @@ namespace TRS2._0.Services
 
                         // Calcular EndReportDate
                         DateTime endReportDate = endDate != default(DateTime) ? endDate : DateTime.Now;
-                    if (fields[15] == "Y" && (type == "EU-H2020" || type == "EU-OTROS"))
+                    if (fields[15] == "Y" && (type == "EU-H2020" || type == "EU-OTROS" || type == "EU-HE"))
                     {
                         endReportDate = endReportDate.AddMonths(3);
                     }
@@ -1694,6 +1758,18 @@ namespace TRS2._0.Services
                         var agreementEventId = dayGroup.AgreementEventId;
 
                         var agreementEvent = await _context.AgreementEvents.FindAsync(agreementEventId);
+                        if (agreementEvent == null)
+                        {
+                            logger.Warning($"AgreementEventId {agreementEventId} not found for PersonId={personId}, Date={date}. Skipping leave.");
+                            continue;
+                        }
+
+                        // 🔹 Ignorar bajas con Type = 0 (ej. Working from home, Office, Travels)
+                        if (agreementEvent.Type == 0)
+                        {
+                            logger.Information($"Skipping leave with Type=0 for PersonId={personId}, Date={date}, AgreementEventId={agreementEventId}");
+                            continue;
+                        }
                         if (agreementEvent != null)
                         {
                             decimal leaveReduction;
@@ -1747,12 +1823,7 @@ namespace TRS2._0.Services
                             }
 
                             processedDays.Add(date);
-                        }
-                        if (agreementEvent == null)
-                        {
-                            logger.Warning($"AgreementEventId {agreementEventId} not found for PersonId={personId}, Date={date}. Skipping leave.");
-                            continue;
-                        }
+                        }                        
 
                     }
 
@@ -2383,7 +2454,8 @@ namespace TRS2._0.Services
                 // Obtener todos los contratos de las personas
                 logger.Information("Cargando contratos de todas las personas...");
                 var allContracts = await _context.Dedications
-                    .OrderBy(d => d.PersId)
+                    .Where(d => d.Type == 0)
+                    .OrderBy(d => d.PersId)                    
                     .ThenBy(d => d.Start)
                     .ToListAsync();
 

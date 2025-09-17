@@ -24,5 +24,11 @@ namespace TRS2._0.Models.DataModels
 
         public int LineId { get; set; }
         public bool Exist { get; set; }
+
+        // NUEVO: responsable histórico del tramo
+        public int? ResponsibleId { get; set; }
+
+        [ForeignKey(nameof(ResponsibleId))]
+        public virtual Personnel? Responsible { get; set; }
     }
 }

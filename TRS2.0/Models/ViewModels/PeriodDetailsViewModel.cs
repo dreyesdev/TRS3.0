@@ -42,6 +42,9 @@ namespace TRS2._0.Models.ViewModels
 
             public Dictionary<DateTime, decimal> CompletionPercentage { get; set; }
 
+            public Dictionary<DateTime, (string InvestigatorDate, string ResponsibleDate)> LoginStatusByMonth { get; set; }
+
+
         }
     }
 }

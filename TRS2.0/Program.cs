@@ -27,7 +27,9 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
     serverOptions.ListenAnyIP(5001, listenOptions =>
     {
         //listenOptions.UseHttps("C:\\Users\\premo\\source\\repos\\trs3.0nuevo\\TRS2.0\\opstrs03.bsc.es.pfx", "seidor");// Colegio
-        listenOptions.UseHttps("C:\\Users\\dreyes\\Desktop\\Desarrollo\\TRS2.0\\TRS2.0\\Resources\\opstrs03.bsc.es.pfx", "seidor");//Casa
+        //listenOptions.UseHttps("C:\\Users\\dreyes\\Desktop\\Desarrollo\\TRS2.0\\TRS2.0\\Resources\\opstrs03.bsc.es.pfx", "seidor");//Casa 
+        listenOptions.UseHttps("C:\\Users\\dreyes\\Source\\Repos\\trs3.0\\TRS2.0\\Resources\\opstrs03.bsc.es.pfx", "seidor");//Casa
+
     });
 });
 
@@ -85,6 +87,7 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddScoped<WorkCalendarService>();
+builder.Services.AddScoped<ReminderService>();
 builder.Services.AddScoped<LoadDataService>();
 
 // Envio de Correos
@@ -107,6 +110,22 @@ builder.Services.AddQuartz(q =>
        .WithSchedule(CronScheduleBuilder.DailyAtHourAndMinute(1, 00)
            .WithMisfireHandlingInstructionFireAndProceed()) // 1:00 AM con manejo de misfire
        .StartNow());
+
+    var reminderJobKey = new JobKey("TimesheetReminderJob");
+    q.AddJob<TimesheetReminderJob>(opts => opts
+        .WithIdentity(reminderJobKey)
+        .StoreDurably());
+
+    q.AddTrigger(opts => opts
+        .ForJob(reminderJobKey)
+        .WithIdentity("WeeklyTimesheetReminder_Mon0900")
+        .WithSchedule(
+            CronScheduleBuilder
+                .CronSchedule("0 0 9 ? * MON") // Lunes 09:00
+                .InTimeZone(TimeZoneInfo.FindSystemTimeZoneById("Europe/Madrid"))
+                .WithMisfireHandlingInstructionFireAndProceed()
+        )
+        .StartNow());
 
 });
 

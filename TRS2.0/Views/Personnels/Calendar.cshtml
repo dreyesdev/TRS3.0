@@ -134,35 +134,30 @@
             calendar.render();
         });
 
-        function loadCalendarEvents(personId) {
-            // Asegúrate de que la variable 'calendar' está definida y es una instancia de FullCalendar
+                function loadCalendarEvents(personId) {
             if (typeof calendar !== 'undefined') {
                 $.ajax({
-                    url: '@Url.Action("GetLeaveEvents", "Personnels")',
+                    url: '/Personnels/GetLeaveEvents',
                     type: 'GET',
                     data: { personId: personId },
                     success: function (events) {
-                        // Primero, eliminamos los eventos existentes
+                        console.log("Total de eventos recibidos:", events.length);
+
+                        // Elimina todos los eventos previos
                         calendar.getEvents().forEach(function (event) {
                             event.remove();
                         });
 
-                        // Ahora, agregamos los nuevos eventos
-                        events.forEach(function (event) {
-                            calendar.addEvent({
-                                title: event.title,
-                                start: event.start,                                
-                                color: event.color
-                            });
-                        });
+                        // 🧠 Versión optimizada: añadir eventos de golpe
+                        calendar.addEventSource(events);
                     },
-                    error: function (error) {
-                        // Manejo de errores
-                        console.error('Error cargando los eventos: ', error);
+                    error: function (xhr, status, error) {
+                        console.error("Error al cargar eventos:", status, error);
                     }
                 });
             }
         }
+
         document.getElementById('personnelSelect').addEventListener('change', function () {
             var personId = this.value;
             fetchPersonDetails(personId);

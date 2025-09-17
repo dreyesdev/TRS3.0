@@ -522,16 +522,28 @@ namespace TRS2._0.Controllers
 
             // Obtener el rango de fechas del proyecto
             var projectStartDate = project.Start;
-            var projectEndDate = project.EndReportDate;
+            DateTime projectEndReportDate = project.EndReportDate;
 
 
-            // Asegurar de que projectStartDate y projectEndDate no sean null
+            // NEW: fin efectivo si algún WP se extiende más allá del EndReportDate
+            DateTime? maxWpEndDate = workPackages.Count > 0
+                ? workPackages.Max(wp => (DateTime?)wp.EndDate)
+                : null;
+
+            DateTime effectiveEndDate = (maxWpEndDate.HasValue && maxWpEndDate.Value > projectEndReportDate)
+                ? maxWpEndDate.Value
+                : projectEndReportDate;
+
+            // Normaliza a inicio/fin de mes
             DateTime adjustedProjectStartDate = project.Start.HasValue
                 ? new DateTime(project.Start.Value.Year, project.Start.Value.Month, 1)
-                : DateTime.MinValue; 
+                : DateTime.MinValue;
 
-            // Ajustar projectEndDate para que sea el último día del mes de finalización
-            DateTime adjustedProjectEndDate = new DateTime(projectEndDate.Year, projectEndDate.Month, DateTime.DaysInMonth(projectEndDate.Year, projectEndDate.Month));
+            DateTime adjustedProjectEndDate = new DateTime(
+                effectiveEndDate.Year,
+                effectiveEndDate.Month,
+                DateTime.DaysInMonth(effectiveEndDate.Year, effectiveEndDate.Month)
+            );
 
 
             // Recuperar todos los registros relevantes de PersMonthEfforts usando las fechas ajustadas
@@ -602,6 +614,39 @@ namespace TRS2._0.Controllers
                                 ((l.Year > adjustedProjectStartDate.Year || (l.Year == adjustedProjectStartDate.Year && l.Month >= adjustedProjectStartDate.Month)) &&
                                 (l.Year < adjustedProjectEndDate.Year || (l.Year == adjustedProjectEndDate.Year && l.Month <= adjustedProjectEndDate.Month))))
                     .ToListAsync();
+
+            // --- Datos para "Work Packages Details" (traspuesto) ---
+
+            var wpIds = workPackages.Select(wp => wp.Id).ToList();
+
+            // Distributed (plan)
+            var distributedByWp = await _context.Projefforts
+                .Where(pe => wpIds.Contains(pe.Wp))
+                .GroupBy(pe => pe.Wp)
+                .Select(g => new { WpId = g.Key, Total = g.Sum(x => x.Value) })
+                .ToDictionaryAsync(x => x.WpId, x => x.Total);
+
+            // Covered (real) desde persefforts ya cargados
+            var coveredByWp = persefforts
+                .GroupBy(pe => pe.WpxPersonNavigation.Wp)
+                .ToDictionary(g => g.Key, g => g.Sum(x => x.Value));
+
+            // Proyección (sin WP Id)
+            var wpDetailsTransposed = workPackages.Select(wp => new
+            {
+                Name = wp.Name,                                                  // Para el encabezado de columna
+                Estimated = wp.Pms,                                              // Antes "Pms"
+                Distributed = distributedByWp.TryGetValue(wp.Id, out var d) ? d : 0m,
+                CoveredWithPersonnel = coveredByWp.TryGetValue(wp.Id, out var c) ? c : 0m // Antes "Covered"
+            })
+            // Orden: alfabético y TRAVELS al final
+            .OrderBy(x => string.Equals(x.Name, "TRAVELS", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+            .ThenBy(x => string.Equals(x.Name, "TRAVELS", StringComparison.OrdinalIgnoreCase) ? "" : x.Name)
+            .ToList();
+
+            ViewBag.WpDetailsTransposed = wpDetailsTransposed;
+
+
 
             if (wpId.HasValue)
             {
@@ -725,9 +770,7 @@ namespace TRS2._0.Controllers
 
             return View(viewModel);
         }
-
-
-        [HttpPost]
+               
         
 
 
@@ -791,12 +834,12 @@ namespace TRS2._0.Controllers
                     DateTime effortMonthEnd = new DateTime(effortData.Month.Year, effortData.Month.Month, DateTime.DaysInMonth(effortData.Month.Year, effortData.Month.Month));
                     decimal maxPM = decimal.MaxValue; // Por defecto, no limitar el esfuerzo
 
-                    if ((effortMonthStart < projectStartDate && effortMonthEnd >= projectStartDate) ||
-                        (effortMonthStart <= projectEndDate && effortMonthEnd > projectEndDate))
+                    if (!isOutOfContract && ((effortMonthStart < projectStartDate && effortMonthEnd >= projectStartDate) || (effortMonthStart <= projectEndDate && effortMonthEnd >= projectEndDate)))
                     {
                         maxPMPerson = await _workCalendarService.CalculateAdjustedMonthlyPM(effortData.PersonId, effortData.Month.Year, effortData.Month.Month, projectStartDate, projectEndDate);
                         notifications.Add($"Adjusted PM value for {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy} is {maxPMPerson} due to date limitations.");
                     }
+
 
                     decimal availableEffort = maxPMPerson - totalEffortsPerMonth;
 
@@ -873,16 +916,28 @@ namespace TRS2._0.Controllers
                     return NotFound("Proyecto no encontrado.");
                 }
 
-                DateTime projectStartDate = (DateTime)project.Start;
-                DateTime projectEndDate = (DateTime)project.EndReportDate;
+                DateTime projectStartDate = project.Start ?? DateTime.MinValue;
+                DateTime projectEndReportDate = project.EndReportDate;
 
-                // Asegúrate de que projectStartDate y projectEndDate no sean null
+                // NEW: calcular fin efectivo con los WPs del proyecto raíz
+                DateTime? maxWpEndDate = await _context.Wps
+                    .Where(wp => wp.ProjId == projId)
+                    .MaxAsync(wp => (DateTime?)wp.EndDate);
+
+                DateTime effectiveEndDate = (maxWpEndDate.HasValue && maxWpEndDate.Value > projectEndReportDate)
+                    ? maxWpEndDate.Value
+                    : projectEndReportDate;
+
+                // Asegúrate que start no sea null y normaliza a inicio/fin de mes
                 DateTime adjustedProjectStartDate = project.Start.HasValue
                     ? new DateTime(project.Start.Value.Year, project.Start.Value.Month, 1)
                     : DateTime.MinValue;
 
-                // Ajustar projectEndDate para que sea el último día del mes de finalización
-                DateTime adjustedProjectEndDate = new DateTime(projectEndDate.Year, projectEndDate.Month, DateTime.DaysInMonth(projectEndDate.Year, projectEndDate.Month));
+                DateTime adjustedProjectEndDate = new DateTime(
+                    effectiveEndDate.Year,
+                    effectiveEndDate.Month,
+                    DateTime.DaysInMonth(effectiveEndDate.Year, effectiveEndDate.Month)
+                );
 
                 // Filtrar WPs basados en la persona, sin importar el proyecto, pero que se solapen con el periodo del proyecto raíz
                 var wpxPersons = await _context.Wpxpeople
@@ -895,14 +950,18 @@ namespace TRS2._0.Controllers
 
                 // Obtener esfuerzos del personal y mapearlos
                 var persefforts = await _context.Persefforts
-                                    .Include(pe => pe.WpxPersonNavigation)
-                                    .Where(pe => pe.WpxPersonNavigation.Person == personId &&
-                                                 pe.Month >= adjustedProjectStartDate && pe.Month <= adjustedProjectEndDate)
-                                    .ToListAsync();
+                                        .Include(pe => pe.WpxPersonNavigation)
+                                        .Where(pe => pe.WpxPersonNavigation.Person == personId &&
+                                                     pe.Month >= adjustedProjectStartDate &&
+                                                     pe.Month <= adjustedProjectEndDate)
+                                        .ToListAsync();
 
                 var persMonthEfforts = await _context.PersMonthEfforts
-                                        .Where(pme => pme.PersonId == personId && pme.Month >= adjustedProjectStartDate && pme.Month <= adjustedProjectEndDate)
+                                        .Where(pme => pme.PersonId == personId &&
+                                                      pme.Month >= adjustedProjectStartDate &&
+                                                      pme.Month <= adjustedProjectEndDate)
                                         .ToListAsync();
+
 
                 var pmValuesPerMonth = persMonthEfforts
                                         .ToDictionary(
@@ -913,7 +972,8 @@ namespace TRS2._0.Controllers
                 var effortsByMonth = await _context.Persefforts
                                         .Include(pe => pe.WpxPersonNavigation)
                                         .Where(pe => pe.WpxPersonNavigation.Person == personId &&
-                                                     pe.Month >= projectStartDate && pe.Month <= projectEndDate)
+                                                     pe.Month >= adjustedProjectStartDate &&
+                                                     pe.Month <= adjustedProjectEndDate)
                                         .GroupBy(pe => new { Year = pe.Month.Year, Month = pe.Month.Month })
                                         .Select(group => new
                                         {
@@ -1055,7 +1115,7 @@ namespace TRS2._0.Controllers
             }
             ViewBag.CurrentProject = project.Acronim;
             DateTime projectStartDate = (DateTime)project.Start;
-            DateTime projectEndDate = (DateTime)project.End;
+            DateTime projectEndDate = (DateTime)project.EndReportDate;
 
             // Asegúrate de que projectStartDate y projectEndDate no sean null
             DateTime adjustedProjectStartDate = project.Start.HasValue
@@ -1218,10 +1278,28 @@ namespace TRS2._0.Controllers
                 {
                     return Json(new { success = false, message = "Project not found." });
                 }
-                if (startDate < project.Start || endDate > project.End)
+                // Validación: asegurar que el periodo cae dentro de los meses del proyecto
+                if (project.Start == null || project.EndReportDate == null)
                 {
-                    return Json(new { success = false, message = "Start or end date is out of the project date range." });
+                    return Json(new { success = false, message = "Project start or end date is not defined." });
                 }
+
+                // Primer día del mes de inicio del proyecto
+                var projMonthStart = new DateTime(project.Start.Value.Year, project.Start.Value.Month, 1);
+
+                // Último día del mes de fin del proyecto
+                var projMonthEnd = new DateTime(
+                    project.EndReportDate.Year,
+                    project.EndReportDate.Month,
+                    DateTime.DaysInMonth(project.EndReportDate.Year, project.EndReportDate.Month)
+                );
+
+                // Ahora valida por mes/año (no por día exacto)
+                if (startDate < projMonthStart || endDate > projMonthEnd)
+                {
+                    return Json(new { success = false, message = "Start or end date is out of the project month range." });
+                }
+
                 if (startDate > endDate)
                 {
                     return Json(new { success = false, message = "Start date must be before end date." });
@@ -1263,18 +1341,18 @@ namespace TRS2._0.Controllers
 
         public async Task<IActionResult> PeriodDetails(int id, int projectId)
         {
-            var totalStopwatch = Stopwatch.StartNew(); // Cronómetro total de la función
+            var totalStopwatch = Stopwatch.StartNew();
 
             try
             {
-                var reportPeriodStopwatch = Stopwatch.StartNew(); // Cronómetro para buscar el periodo de reporte
+                var reportPeriodStopwatch = Stopwatch.StartNew();
                 var reportPeriod = await _context.ReportPeriods.FindAsync(id);
                 reportPeriodStopwatch.Stop();
                 Console.WriteLine($"Finding report period took {reportPeriodStopwatch.ElapsedMilliseconds} ms");
 
                 if (reportPeriod == null) return NotFound();
 
-                var workPackagesStopwatch = Stopwatch.StartNew(); // Cronómetro para obtener los WorkPackages
+                var workPackagesStopwatch = Stopwatch.StartNew();
                 var workPackages = _context.Wps
                     .Include(wp => wp.Wpxpeople)
                         .ThenInclude(wpxp => wpxp.PersonNavigation)
@@ -1285,12 +1363,8 @@ namespace TRS2._0.Controllers
                 workPackagesStopwatch.Stop();
                 Console.WriteLine($"Fetching work packages took {workPackagesStopwatch.ElapsedMilliseconds} ms");
 
-                // Obtener relaciones entre personal y proyecto
                 var projectPersonnel = await _context.Projectxpeople.Where(px => px.ProjId == projectId).ToListAsync();
-
-                // Obtener IDs de las personas involucradas en el proyecto
                 var personIds = projectPersonnel.Select(p => p.Person).Distinct().ToList();
-
 
                 var wpxPersonIds = workPackages.SelectMany(wp => wp.Wpxpeople)
                                 .Select(wpxp => wpxp.Id)
@@ -1312,27 +1386,22 @@ namespace TRS2._0.Controllers
                         })
                         .ToListAsync();
 
-                // Transformar los resultados en un diccionario que mapea el ID de la persona a otro diccionario,
-                // el cual a su vez mapea una clave de año-mes al esfuerzo total.
                 var totalEffortInProjectByPersonAndMonthDict = totalEffortInProjectByPersonAndMonth
                     .GroupBy(e => e.PersonId)
                     .ToDictionary(
-                        group => group.Key, // PersonId
+                        group => group.Key,
                         group => group.ToDictionary(
-                            e => new DateTime(e.Year, e.Month, 1), // Clave de tipo DateTime representando el primer día del mes
+                            e => new DateTime(e.Year, e.Month, 1),
                             e => e.TotalEffort
                         )
                     );
 
-
-                // Recuperar todos los registros relevantes de PersMonthEfforts usando las fechas ajustadas
                 var persMonthEfforts = await _context.PersMonthEfforts
                     .Where(pme => personIds.Contains(pme.PersonId) &&
                                   pme.Month >= reportPeriod.StartDate &&
                                   pme.Month <= reportPeriod.EndDate)
                     .ToListAsync();
 
-                // Transformar a un diccionario para facilitar el acceso
                 var pmValuesByPersonAndMonth = persMonthEfforts
                     .GroupBy(pme => pme.PersonId)
                     .ToDictionary(
@@ -1343,7 +1412,6 @@ namespace TRS2._0.Controllers
                         )
                     );
 
-                // Recuperar y sumar los esfuerzos por persona y mes usando las fechas ajustadas
                 var totalEffortsByPersonAndMonth = await _context.Persefforts
                     .Include(pe => pe.WpxPersonNavigation)
                     .Where(pe => personIds.Contains(pe.WpxPersonNavigation.Person) &&
@@ -1357,7 +1425,6 @@ namespace TRS2._0.Controllers
                     })
                     .ToListAsync();
 
-                // Transformar a un diccionario para facilitar el acceso
                 var totalEffortsByPersonAndMonthDict = totalEffortsByPersonAndMonth
                     .GroupBy(e => e.PersonId)
                     .ToDictionary(
@@ -1368,7 +1435,6 @@ namespace TRS2._0.Controllers
                         )
                     );
 
-
                 var lockStatuses = await _context.ProjectMonthLocks
                             .Where(l => personIds.Contains(l.PersonId) && l.ProjectId == projectId)
                             .ToListAsync();
@@ -1376,31 +1442,106 @@ namespace TRS2._0.Controllers
                 if (!workPackages.Any()) return NotFound("No work packages found for the given period and project.");
 
                 var personDetailsList = new List<PeriodDetailsViewModel.PersonnelDetails>();
-                var personsProcessingStopwatch = Stopwatch.StartNew(); // Cronómetro para procesar las personas
+                var personsProcessingStopwatch = Stopwatch.StartNew();
                 var declaredHoursStopwatch = new Stopwatch();
                 var totalHoursStopwatch = new Stopwatch();
                 var workingDaysPerMonth = await _workCalendarService.GetWorkingDaysFromDbForRange(reportPeriod.StartDate, reportPeriod.EndDate);
                 var months = await _workCalendarService.GenerateMonthList(reportPeriod.StartDate, reportPeriod.EndDate);
 
+                // ─────────────────────────────────────────────────────────────────────────
+                // NUEVO: Precargas para ESTADOS de login (INV/RESP) sin N+1
+                // ─────────────────────────────────────────────────────────────────────────
+                var firstMonth = new DateTime(reportPeriod.StartDate.Year, reportPeriod.StartDate.Month, 1);
+                var lastMonth = new DateTime(reportPeriod.EndDate.Year, reportPeriod.EndDate.Month, 1);
+
+                // AffxPersons solapados con el periodo para todas las personas
+                var affAll = await _context.AffxPersons
+                    .Where(a => personIds.Contains(a.PersonId) &&
+                                a.Start <= reportPeriod.EndDate &&
+                                a.End >= reportPeriod.StartDate)
+                    .ToListAsync();
+                var affByPerson = affAll.GroupBy(a => a.PersonId)
+                                        .ToDictionary(g => g.Key, g => g.ToList());
+
+                // Posibles responsables por persona/mes (para consultar logins en bloque)
+                var candidateResponsibleIds = new HashSet<int>();
+
+                // Cache de Personnel para fallback .Resp (evita hits por persona en FindAsync)
+                var peopleRespCache = await _context.Personnel
+                                                .Where(p => personIds.Contains(p.Id))
+                                                .ToDictionaryAsync(p => p.Id, p => p.Resp);
+
+                foreach (var pid in personIds)
+                {
+                    foreach (var m in months)
+                    {
+                        var monthStart = new DateTime(m.Year, m.Month, 1);
+                        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
+                        int? respId = null;
+
+                        if (affByPerson.TryGetValue(pid, out var affs))
+                        {
+                            var chosen = affs
+                                .Where(a => a.Start <= monthEnd && a.End >= monthStart)
+                                .OrderByDescending(a =>
+                                {
+                                    var s = a.Start > monthStart ? a.Start : monthStart;
+                                    var e = a.End < monthEnd ? a.End : monthEnd;
+                                    return (e - s).TotalDays;
+                                })
+                                .FirstOrDefault();
+
+                            if (chosen?.ResponsibleId is int r1 && r1 > 0) respId = r1;
+                        }
+
+                        if (!respId.HasValue
+    && peopleRespCache.TryGetValue(pid, out var fallbackRespInt)
+    && fallbackRespInt > 0)
+                        {
+                            respId = fallbackRespInt;
+                        }
+
+                        if (peopleRespCache.TryGetValue(pid, out var frInt) && frInt > 0)
+                            candidateResponsibleIds.Add(frInt);
+                    }
+                }
+
+                // Sujetos a consultar en UserLoginHistories (investigadores + responsables)
+                var subjectIds = personIds.Concat(candidateResponsibleIds).Distinct().ToList();
+
+                var minLoginDate = firstMonth.AddMonths(1);
+                var maxLoginDate = lastMonth.AddMonths(2).AddDays(-1);
+
+                var logins = await _context.UserLoginHistories
+                    .Where(ulh => subjectIds.Contains(ulh.PersonId) &&
+                                  ulh.LoginTime >= minLoginDate &&
+                                  ulh.LoginTime <= maxLoginDate)
+                    .ToListAsync();
+
+                // (personId, year, month) -> string fecha "dd/MM/yyyy" del último login
+                var lastLoginByKey = logins
+                    .GroupBy(l => new { l.PersonId, l.LoginTime.Year, l.LoginTime.Month })
+                    .ToDictionary(
+                        g => (g.Key.PersonId, g.Key.Year, g.Key.Month),
+                        g => g.OrderByDescending(x => x.LoginTime)
+                              .First().LoginTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
+                    );
+                // ─────────────────────────────────────────────────────────────────────────
+
                 foreach (var personId in workPackages.SelectMany(wp => wp.Wpxpeople).Select(wpxp => wpxp.Person).Distinct())
                 {
-                    
-
-                    var personFetchStopwatch = Stopwatch.StartNew(); // Cronómetro para buscar la persona
+                    var personFetchStopwatch = Stopwatch.StartNew();
                     var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == personId);
                     personFetchStopwatch.Stop();
                     Console.WriteLine($"Fetching person {personId} took {personFetchStopwatch.ElapsedMilliseconds} ms");
-                    
                     if (person == null) continue;
 
-
-                    var personLockStatusByMonth = new Dictionary<string, bool>();
-
+                    var personLockStatusByMonth = new Dictionary<String, bool>();
                     for (var dt = reportPeriod.StartDate; dt <= reportPeriod.EndDate; dt = dt.AddMonths(1))
                     {
                         var yearMonthKey = $"{dt.Year}-{dt.Month:00}";
                         var isLocked = lockStatuses.Any(l => l.PersonId == personId && l.Year == dt.Year && l.Month == dt.Month && l.IsLocked);
-
                         personLockStatusByMonth[yearMonthKey] = isLocked;
                     }
 
@@ -1428,87 +1569,114 @@ namespace TRS2._0.Controllers
                         string yearMonthKey = $"{month.Year}-{month.Month:D2}";
                         bool outOfContract = outOfContractStatus.GetValueOrDefault(month, false);
 
-                        // Obtiene el valor porcentual de esfuerzo total para el mes de totalEffortsByPersonAndMonthDict
                         totalEffortsByPersonAndMonthDict.TryGetValue(personId, out var effortsDict);
                         decimal totalEffortPercent = effortsDict?.GetValueOrDefault(yearMonthKey, 0) ?? 0;
 
-                        
                         decimal pmMax = pmValuesByPersonAndMonth.TryGetValue(personId, out var pmValues) ? pmValues.GetValueOrDefault(yearMonthKey, 0) : 0;
-                        
                         bool overloaded = totalEffortPercent > pmMax;
 
                         personStatusByMonth[yearMonthKey] = (outOfContract, overloaded);
 
-                        
                         if (totalEffortsByPersonAndMonthDict.TryGetValue(personId, out var effortsForPerson))
                         {
                             if (!effortsForPerson.TryGetValue(yearMonthKey, out totalEffortPercent))
                             {
-                                totalEffortPercent = 0; // Si no hay esfuerzo registrado, se considera 0%
+                                totalEffortPercent = 0;
                             }
                         }
                         else
                         {
-                            totalEffortPercent = 0; // Si no hay datos para esta persona, se considera 0%
+                            totalEffortPercent = 0;
                         }
+
                         var dateKey = new DateTime(month.Year, month.Month, 1);
-                        // Buscar las horas totales declaradas para este mes
-                        decimal totalHoursForMonth;
-                        if (!totalHoursResult.TryGetValue(month, out totalHoursForMonth))
-                        {
-                            totalHoursForMonth = 0; // Si no hay horas totales registradas, se considera 0
-                        }
-                        // Para TotalEffortInProject, verifica si hay esfuerzo registrado para el mes
+
+                        if (!totalHoursResult.TryGetValue(month, out var totalHoursForMonth))
+                            totalHoursForMonth = 0;
+
                         decimal totalEffortForMonth = 0;
                         if (totalEffortInProjectByPersonAndMonthDict.TryGetValue(personId, out var effortByMonth))
                         {
-                            if (!effortByMonth.TryGetValue(dateKey, out totalEffortForMonth))
-                            {
-                                // Si no hay esfuerzo registrado para este mes, totalEffortForMonth ya es 0
-                            }
+                            effortByMonth.TryGetValue(dateKey, out totalEffortForMonth);
                         }
-                        // Asigna el esfuerzo encontrado o el valor predeterminado (0) para este mes
-                        totalEffortInProyect[dateKey] = totalEffortForMonth;
 
-                        // Calcular HoursInProject como el producto del esfuerzo total por las horas totales
-                        var hoursInProjectForMonth = totalHoursForMonth * totalEffortForMonth; 
-                                                                                              
+                        var hoursInProjectForMonth = totalHoursForMonth * totalEffortForMonth;
                         var roundedHoursInProjectForMonth = Math.Round(hoursInProjectForMonth * 2, MidpointRounding.AwayFromZero) / 2;
-
                         hoursInProject[month] = roundedHoursInProjectForMonth;
 
-                        
-
-                        
-
-                        // Buscar las horas declaradas para este mes, si no existen, usar 0
                         declaredHoursResult.TryGetValue(month, out var declaredHoursForMonth);
-                        // Calcular el porcentaje completado, asegurándose de no dividir por cero
                         decimal percentCompleted = hoursInProjectForMonth > 0
-                            ? Math.Round((declaredHoursForMonth / roundedHoursInProjectForMonth) * 100, 2) // Redondea al segundo decimal
+                            ? Math.Round((declaredHoursForMonth / roundedHoursInProjectForMonth) * 100, 2)
                             : 0;
                         completionPercentage[month] = percentCompleted;
                     }
 
+                    // ─────────────────────────────────────────────────────────────────────────
+                    // NUEVO: construir LoginStatusByMonth usando diccionarios precargados
+                    // ─────────────────────────────────────────────────────────────────────────
+                    var loginStatusByMonth = new Dictionary<DateTime, (string InvestigatorDate, string ResponsibleDate)>();
 
+                    foreach (var m in months)
+                    {
+                        var y = m.Year; var mm = m.Month;
+
+                        var target = new DateTime(y, mm, 1).AddMonths(1);
+
+                        // Investigador
+                        lastLoginByKey.TryGetValue((personId, target.Year, target.Month), out var invDateStr);
+
+                        // Responsable: usa affByPerson -> chosen.ResponsibleId; fallback a Personnel.Resp
+                        int? respId = null;
+                        if (affByPerson.TryGetValue(personId, out var affsForPerson))
+                        {
+                            var mStart = new DateTime(y, mm, 1);
+                            var mEnd = mStart.AddMonths(1).AddDays(-1);
+
+                            var chosen = affsForPerson
+                                .Where(a => a.Start <= mEnd && a.End >= mStart)
+                                .OrderByDescending(a =>
+                                {
+                                    var s = a.Start > mStart ? a.Start : mStart;
+                                    var e = a.End < mEnd ? a.End : mEnd;
+                                    return (e - s).TotalDays;
+                                })
+                                .FirstOrDefault();
+
+                            if (chosen?.ResponsibleId is int rr && rr > 0) respId = rr;
+                        }
+                        if (!respId.HasValue
+    && peopleRespCache.TryGetValue(personId, out var fallbackRespInt)
+    && fallbackRespInt > 0)
+                        {
+                            respId = fallbackRespInt;
+                        }
+
+                        string respDateStr = null;
+                        if (respId.HasValue)
+                            lastLoginByKey.TryGetValue((respId.Value, target.Year, target.Month), out respDateStr);
+
+                        loginStatusByMonth[m] = (invDateStr, respDateStr);
+                    }
+                    // ─────────────────────────────────────────────────────────────────────────
 
                     var personnelDetails = new PeriodDetailsViewModel.PersonnelDetails
                     {
                         Personnel = person,
-                        // Asumiendo que las siguientes propiedades ya están correctamente calculadas y asignadas
                         DeclaredHours = declaredHoursResult,
                         TotalHours = totalHoursResult,
-                        // Inicializa y asigna el nuevo diccionario
                         PersonStatusByMonth = personStatusByMonth,
                         HoursinProyect = hoursInProject,
                         TotalEffortinProyect = totalEffortInProyect,
                         LockStatusByMonth = personLockStatusByMonth,
-                        CompletionPercentage = completionPercentage
-                };
+                        CompletionPercentage = completionPercentage,
 
-                    // Considera agregar cronómetros específicos para estas llamadas asíncronas si es necesario
+                        // NUEVO:
+                        LoginStatusByMonth = loginStatusByMonth
+                    };
+
                     personDetailsList.Add(personnelDetails);
                 }
+
                 personsProcessingStopwatch.Stop();
                 Console.WriteLine($"Processing persons took {personsProcessingStopwatch.ElapsedMilliseconds} ms");
 
@@ -1518,19 +1686,18 @@ namespace TRS2._0.Controllers
                     WorkPackages = workPackages,
                     Persons = personDetailsList,
                 };
-                
+
                 model.CalculateMonths(reportPeriod.StartDate, reportPeriod.EndDate);
 
                 totalStopwatch.Stop();
                 Console.WriteLine($"Total execution time of PeriodDetails was {totalStopwatch.ElapsedMilliseconds} ms");
                 ViewBag.ProjectId = projectId;
                 ViewBag.PeriodId = id;
-                var project = await _context.Projects
-                                        .FirstOrDefaultAsync(p => p.ProjId == projectId);
+
+                var project = await _context.Projects.FirstOrDefaultAsync(p => p.ProjId == projectId);
                 if (project == null)
-                {
                     return NotFound("Proyecto no encontrado.");
-                }
+
                 ViewBag.CurrentProject = project.Acronim;
 
                 return PartialView("_DetallesPeriodo", model);
@@ -1541,6 +1708,7 @@ namespace TRS2._0.Controllers
                 return StatusCode(500, "Internal Server Error. Please try again later.");
             }
         }
+
 
         [HttpPost]
         public async Task<IActionResult> Lock([FromBody] LockModel model)
@@ -2033,7 +2201,8 @@ namespace TRS2._0.Controllers
 
             return File(bytes, "text/csv", $"WorkedDays_{projectId}_{DateTime.Now:yyyyMMdd}.csv");
         }
-                
+        
+        
         private string RemoveAccents(string text)
         {
             return string.Concat(text.Normalize(NormalizationForm.FormD)
@@ -2057,7 +2226,41 @@ namespace TRS2._0.Controllers
             return lastValidContract.End < firstDayOfMonth;
         }
 
+        [HttpPost]
+        [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
+        public async Task<IActionResult> RecalculatePMValue([FromBody] PMUpdateRequest model)
+        {
+            if (model.Month < 1 || model.Month > 12 || model.Year < 1900)
+                return Json(new { success = false, message = "Fecha inválida." });
 
+            var targetDate = new DateTime(model.Year, model.Month, 1);
+
+            var existing = await _context.PersMonthEfforts
+                .FirstOrDefaultAsync(p => p.PersonId == model.PersonId && p.Month == targetDate);
+
+            var pmValue = await _workCalendarService.CalculateMonthlyPM(model.PersonId, model.Year, model.Month);
+
+            if (existing != null)
+            {
+                existing.Value = pmValue;
+            }
+            else
+            {
+                _context.PersMonthEfforts.Add(new PersMonthEffort
+                {
+                    PersonId = model.PersonId,
+                    Month = targetDate,
+                    Value = pmValue
+                });
+            }
+
+            await _context.SaveChangesAsync();
+            return Json(new { success = true, pm = pmValue });
+        }
+
+                
+
+        
 
 
         public class ExportRequest
@@ -2066,8 +2269,13 @@ namespace TRS2._0.Controllers
             public string StartDate { get; set; }
             public string EndDate { get; set; }
         }
-              
 
+        public class PMUpdateRequest
+        {
+            public int PersonId { get; set; }
+            public int Year { get; set; }
+            public int Month { get; set; }
+        }
 
     }
 

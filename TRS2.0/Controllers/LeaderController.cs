@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using TRS2._0.Models.DataModels;
 using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
@@ -11,7 +12,8 @@ using TRS2._0.Services;
 
 namespace TRS2._0.Controllers
 {
-    [Authorize(Roles = "Leader, Admin")]
+    [Authorize(Roles = "Leader, Admin, ProjectManager")]   
+
 
     public class LeaderController : Controller
     {
@@ -34,46 +36,50 @@ namespace TRS2._0.Controllers
 
             var currentUser = await _userManager.GetUserAsync(User);
 
-            if (!User.IsInRole("Admin") && currentUser?.PersonnelId == null)
+            var effectiveLeaderId = await GetEffectiveLeaderId(currentUser);
+            if (!effectiveLeaderId.HasValue)
                 return Forbid();
-
-            int? effectiveLeaderId = null;
-
-            if (User.IsInRole("Admin"))
-            {
-                if (Request.Query.ContainsKey("leaderId") && int.TryParse(Request.Query["leaderId"], out int parsedId))
-                    effectiveLeaderId = parsedId;
-                else
-                    effectiveLeaderId = 1061;
-            }
-            else if (User.IsInRole("Leader"))
-            {
-                effectiveLeaderId = currentUser?.PersonnelId;
-            }
 
             IQueryable<Personnel> personsQuery = _context.Personnel.AsQueryable();
 
-            if (effectiveLeaderId.HasValue)
-            {
-                var leaderEntry = await _context.Leaders
-                    .FirstOrDefaultAsync(l => l.LeaderId == effectiveLeaderId.Value);
+            // Cargar TODAS las entradas del líder
+            var leaderEntries = await _context.Leaders
+                .Where(l => l.LeaderId == effectiveLeaderId.Value)
+                .ToListAsync();
 
-                if (leaderEntry == null)
-                    return Forbid();
-
-                if (leaderEntry.Tipo == "D")
-                    personsQuery = personsQuery.Where(p => p.Department == leaderEntry.GrupoDepartamento);
-                else if (leaderEntry.Tipo == "G")
-                    personsQuery = personsQuery.Where(p => p.PersonnelGroup == leaderEntry.GrupoDepartamento);
-            }
-            else
+            if (!leaderEntries.Any())
             {
+                if (User.IsInRole("ProjectManager"))
+                    return View("NotLeaderMessage");
+
                 return Forbid();
             }
 
+            // Identificar todos los grupos y departamentos del líder
+            var groupIds = leaderEntries
+                .Where(l => l.Tipo == "G")
+                .Select(l => l.GrupoDepartamento)
+                .ToList();
+
+            var deptIds = leaderEntries
+                .Where(l => l.Tipo == "D")
+                .Select(l => l.GrupoDepartamento)
+                .ToList();
+
+            // Filtrar personas que pertenezcan a cualquiera de los grupos o departamentos del líder
+            personsQuery = personsQuery.Where(p =>                            
+                            (
+                                (groupIds.Any() && groupIds.Contains((int)p.PersonnelGroup)) ||
+                                (deptIds.Any() && deptIds.Contains((int)p.Department))
+                            )
+                        );
+
+
+            // Fechas de inicio y fin del año
             var monthStart = new DateTime(year.Value, 1, 1);
             var monthEnd = new DateTime(year.Value, 12, 31);
 
+            // Filtrar solo personas con contrato activo en cualquier momento del año
             personsQuery = personsQuery.Where(p =>
                 _context.Dedications.Any(d =>
                     d.PersId == p.Id &&
@@ -84,6 +90,7 @@ namespace TRS2._0.Controllers
             var persons = await personsQuery.ToListAsync();
             var personIds = persons.Select(p => p.Id).ToList();
 
+            // Obtener los WPX de esas personas
             var wpxPeople = await _context.Wpxpeople
                 .Include(wpx => wpx.WpNavigation)
                     .ThenInclude(wp => wp.Proj)
@@ -92,11 +99,13 @@ namespace TRS2._0.Controllers
 
             var wpxIds = wpxPeople.Select(wpx => wpx.Id).ToList();
 
+            // Cargar efforts
             var persefforts = await _context.Persefforts
                 .Where(p => wpxIds.Contains(p.WpxPerson) &&
                             p.Month >= monthStart && p.Month <= monthEnd)
                 .ToListAsync();
 
+            // Agrupar efforts por persona → proyecto → WP
             var effortsByPerson = wpxPeople
                 .GroupBy(wpx => wpx.Person)
                 .ToDictionary(g => g.Key, g =>
@@ -122,7 +131,7 @@ namespace TRS2._0.Controllers
 
                                 return new { wpx, monthlyEffort, totalEffort };
                             })
-                            .Where(x => x.totalEffort > 0) // ⚠️ solo WPs con algo de esfuerzo
+                            .Where(x => x.totalEffort > 0) // Solo WPs con algo de esfuerzo
                             .Select(x => new LeaderEffortDetail
                             {
                                 WP = x.wpx.WpNavigation.Name,
@@ -143,6 +152,7 @@ namespace TRS2._0.Controllers
                     .ToList()
                 );
 
+            // Construir el modelo
             var model = new LeaderEffortViewModel
             {
                 Year = year.Value,
@@ -161,6 +171,7 @@ namespace TRS2._0.Controllers
             return View(model);
         }
 
+
         [HttpGet]
         public async Task<IActionResult> TimesheetOverview(int? year = null)
         {
@@ -176,7 +187,7 @@ namespace TRS2._0.Controllers
                 if (Request.Query.ContainsKey("leaderId") && int.TryParse(Request.Query["leaderId"], out int parsedId))
                     effectiveLeaderId = parsedId;
                 else
-                    effectiveLeaderId = 1061; // Simulación por defecto
+                    effectiveLeaderId = 1071; // Simulación por defecto
             }
             else if (User.IsInRole("Leader"))
             {
@@ -186,51 +197,74 @@ namespace TRS2._0.Controllers
             if (!effectiveLeaderId.HasValue)
                 return Forbid();
 
-            var leaderEntry = await _context.Leaders.FirstOrDefaultAsync(l => l.LeaderId == effectiveLeaderId);
-            if (leaderEntry == null)
+            // ⬇️ NUEVO: cargar TODAS las entradas del líder
+            var leaderEntries = await _context.Leaders
+                .Where(l => l.LeaderId == effectiveLeaderId.Value)
+                .ToListAsync();
+
+            if (!leaderEntries.Any())
+            {
+                if (User.IsInRole("ProjectManager"))
+                    return View("NotLeaderMessage");
+
                 return Forbid();
+            }
 
-            // Personas bajo liderazgo
+            // ⬇️ NUEVO: identificar todos los grupos y departamentos del líder
+            var groupIds = leaderEntries
+                .Where(l => l.Tipo == "G")
+                .Select(l => l.GrupoDepartamento)
+                .ToList();
+
+            var deptIds = leaderEntries
+                .Where(l => l.Tipo == "D")
+                .Select(l => l.GrupoDepartamento)
+                .ToList();
+
+            // ⬇️ NUEVO: filtrar personas que pertenezcan a cualquiera de los grupos/departamentos
             IQueryable<Personnel> personsQuery = _context.Personnel.AsQueryable();
-            if (leaderEntry.Tipo == "D")
-                personsQuery = personsQuery.Where(p => p.Department == leaderEntry.GrupoDepartamento);
-            else if (leaderEntry.Tipo == "G")
-                personsQuery = personsQuery.Where(p => p.PersonnelGroup == leaderEntry.GrupoDepartamento);
+            personsQuery = personsQuery.Where(p =>
+                (groupIds.Any() && groupIds.Contains((int)p.PersonnelGroup)) ||
+                (deptIds.Any() && deptIds.Contains((int)p.Department))
+            );
 
+            // Fechas del año seleccionado
             var monthStart = new DateTime(selectedYear, 1, 1);
             var monthEnd = new DateTime(selectedYear, 12, 31);
 
-            // Solo personas con contrato activo en ese año
+            // Igual que en EffortSummary: sólo personas con contrato activo en algún momento del año
             personsQuery = personsQuery.Where(p =>
-                _context.Dedications.Any(d => d.PersId == p.Id && d.Start <= monthEnd && (d.End == null || d.End >= monthStart))
+                _context.Dedications.Any(d =>
+                    d.PersId == p.Id &&
+                    d.Start <= monthEnd &&
+                    (d.End == null || d.End >= monthStart))
             );
 
-            var persons = await personsQuery.OrderBy(p => p.Surname).ThenBy(p => p.Name).ToListAsync();
+            // A partir de aquí, el código original
+            var persons = await personsQuery
+                .OrderBy(p => p.Surname).ThenBy(p => p.Name)
+                .ToListAsync();
+
             var personIds = persons.Select(p => p.Id).ToList();
 
-            // WPxPerson para todos los usuarios
             var wpxPeople = await _context.Wpxpeople
                 .Where(wpx => personIds.Contains(wpx.Person))
                 .ToListAsync();
 
             var wpxIds = wpxPeople.Select(wpx => wpx.Id).ToList();
 
-            // Todas las timesheets del año
             var allTimesheets = await _context.Timesheets
                 .Where(ts => wpxIds.Contains(ts.WpxPersonId) && ts.Day.Year == selectedYear)
                 .ToListAsync();
 
-            // Todas las ausencias del año
             var allLeaves = await _context.Leaves
                 .Where(l => l.Day.Year == selectedYear)
                 .ToListAsync();
 
-            // Todos los festivos del año
             var allHolidays = await _context.NationalHolidays
                 .Where(h => h.Date.Year == selectedYear)
                 .ToListAsync();
 
-            // Cache de horas máximas diarias
             var dailyHoursCache = await _workCalendarService.PreloadDailyWorkHoursWithDedicationAsync(personIds, selectedYear);
 
             var result = new LeaderTimesheetOverviewViewModel
@@ -255,14 +289,12 @@ namespace TRS2._0.Controllers
                     var monthStartDate = new DateTime(selectedYear, m, 1);
                     var monthEndDate = monthStartDate.AddMonths(1).AddDays(-1);
 
-                    // Horas registradas por timesheet
                     var declared = allTimesheets
                         .Where(ts => wpxForPerson.Contains(ts.WpxPersonId) &&
                                      ts.Day >= monthStartDate &&
                                      ts.Day <= monthEndDate)
                         .Sum(ts => ts.Hours);
 
-                    // Horas máximas esperadas desde caché
                     var max = _workCalendarService.CalculateGlobalHoursFromCache(
                         person.Id, selectedYear, m, dailyHoursCache, allLeaves, allHolidays);
 
@@ -275,64 +307,88 @@ namespace TRS2._0.Controllers
             return View("TimesheetOverview", result);
         }
 
+
         [HttpGet]
         public async Task<IActionResult> GlobalEffortSummary(int? year = null)
         {
-            if (year == null)
-                year = DateTime.Today.Year;
+            int selectedYear = year ?? DateTime.Today.Year;
 
             var currentUser = await _userManager.GetUserAsync(User);
-            if (!User.IsInRole("Admin") && currentUser?.PersonnelId == null)
-                return Forbid();
-
-            int? effectiveLeaderId = null;
-            if (User.IsInRole("Admin"))
-                effectiveLeaderId = 1061;
-            else if (User.IsInRole("Leader"))
-                effectiveLeaderId = currentUser?.PersonnelId;
-
+            var effectiveLeaderId = await GetEffectiveLeaderId(currentUser);
             if (!effectiveLeaderId.HasValue)
                 return Forbid();
 
-            var leaderEntry = await _context.Leaders.FirstOrDefaultAsync(l => l.LeaderId == effectiveLeaderId);
-            if (leaderEntry == null)
+            // 1) Cargar TODAS las entradas del líder (G y D)
+            var leaderEntries = await _context.Leaders
+                .Where(l => l.LeaderId == effectiveLeaderId.Value)
+                .ToListAsync();
+
+            if (!leaderEntries.Any())
+            {
+                if (User.IsInRole("ProjectManager"))
+                    return View("NotLeaderMessage");
+
                 return Forbid();
+            }
 
+            var groupIds = leaderEntries
+                .Where(l => l.Tipo == "G")
+                .Select(l => l.GrupoDepartamento)
+                .ToList();
+
+            var deptIds = leaderEntries
+                .Where(l => l.Tipo == "D")
+                .Select(l => l.GrupoDepartamento)
+                .ToList();
+
+            // 2) Fechas del año (usaremos rango en vez de comparar por .Year)
+            var yearStart = new DateTime(selectedYear, 1, 1);
+            var yearEnd = new DateTime(selectedYear, 12, 31);
+
+            // 3) Personas en el ámbito (unión de grupos/deptos) y con contrato activo en algún momento del año
             IQueryable<Personnel> personsQuery = _context.Personnel.AsQueryable();
-            if (leaderEntry.Tipo == "D")
-                personsQuery = personsQuery.Where(p => p.Department == leaderEntry.GrupoDepartamento);
-            else if (leaderEntry.Tipo == "G")
-                personsQuery = personsQuery.Where(p => p.PersonnelGroup == leaderEntry.GrupoDepartamento);
-
-            var monthStart = new DateTime(year.Value, 1, 1);
-            var monthEnd = new DateTime(year.Value, 12, 31);
 
             personsQuery = personsQuery.Where(p =>
-                _context.Dedications.Any(d => d.PersId == p.Id && d.Start <= monthEnd && (d.End == null || d.End >= monthStart))
+                (groupIds.Any() && groupIds.Contains((int)p.PersonnelGroup)) ||
+                (deptIds.Any() && deptIds.Contains((int)p.Department))
             );
 
-            var persons = await personsQuery.OrderBy(p => p.Surname).ThenBy(p => p.Name).ToListAsync();
-            var personIds = persons.Select(p => p.Id).ToList();
+            personsQuery = personsQuery.Where(p =>
+                _context.Dedications.Any(d =>
+                    d.PersId == p.Id &&
+                    d.Start <= yearEnd &&
+                   (d.End == null || d.End >= yearStart))
+            );
 
-            // Obtener todos los WpxPerson de las personas filtradas
+            var persons = await personsQuery
+                .OrderBy(p => p.Surname).ThenBy(p => p.Name)
+                .ToListAsync();
+
+            var personIds = persons.Select(p => p.Id).ToList();
+            if (personIds.Count == 0)
+                return View("GlobalEffortSummary", new LeaderGlobalEffortViewModel
+                {
+                    Year = selectedYear,
+                    People = new List<LeaderGlobalEffortPersonViewModel>()
+                });
+
+            // 4) WPxPerson de las personas filtradas
             var wpxpeople = await _context.Wpxpeople
                 .Where(wpx => personIds.Contains(wpx.Person))
                 .ToListAsync();
 
             var wpxIds = wpxpeople.Select(wpx => wpx.Id).ToList();
 
-            // Obtener efforts totales por mes y persona
+            // Mapa rápido wpxId -> personId para evitar First(...) en el GroupBy
+            var wpxToPerson = wpxpeople.ToDictionary(w => w.Id, w => w.Person);
+
+            // 5) Efforts del año (rango, no .Year) y agregado por persona/mes
             var efforts = await _context.Persefforts
-                .Where(p => wpxIds.Contains(p.WpxPerson) && p.Month.Year == year.Value)
+                .Where(p => wpxIds.Contains(p.WpxPerson) && p.Month >= yearStart && p.Month <= yearEnd)
                 .ToListAsync();
 
-            // Agrupar los efforts por persona y mes
             var effortData = efforts
-                .GroupBy(p => new
-                {
-                    PersonId = wpxpeople.First(w => w.Id == p.WpxPerson).Person,
-                    Month = p.Month.Month
-                })
+                .GroupBy(p => new { PersonId = wpxToPerson[p.WpxPerson], Month = p.Month.Month })
                 .Select(g => new
                 {
                     g.Key.PersonId,
@@ -341,27 +397,28 @@ namespace TRS2._0.Controllers
                 })
                 .ToList();
 
+            // 6) Máximos de la tabla PersMonthEfforts (mismo rango)
             var maxEfforts = await _context.PersMonthEfforts
-                .Where(p => personIds.Contains(p.PersonId) && p.Month.Year == year.Value)
+                .Where(p => personIds.Contains(p.PersonId) && p.Month >= yearStart && p.Month <= yearEnd)
                 .ToListAsync();
 
             var model = new LeaderGlobalEffortViewModel
             {
-                Year = year.Value,
+                Year = selectedYear,
                 People = new List<LeaderGlobalEffortPersonViewModel>()
             };
 
-
+            // 7) Construcción del modelo por persona
             foreach (var person in persons)
             {
                 var monthly = new Dictionary<int, (decimal Registered, decimal Max)>();
 
                 for (int m = 1; m <= 12; m++)
                 {
-                    var assigned = effortData.FirstOrDefault(e => e.PersonId == person.Id && e.Month == m)?.TotalEffort ?? 0;
-                    var max = maxEfforts.FirstOrDefault(x => x.PersonId == person.Id && x.Month.Month == m)?.Value ?? 0;
+                    var registered = effortData.FirstOrDefault(e => e.PersonId == person.Id && e.Month == m)?.TotalEffort ?? 0m;
+                    var max = maxEfforts.FirstOrDefault(x => x.PersonId == person.Id && x.Month.Month == m)?.Value ?? 0m;
 
-                    monthly[m] = (assigned, max);
+                    monthly[m] = (registered, max);
                 }
 
                 model.People.Add(new LeaderGlobalEffortPersonViewModel
@@ -375,6 +432,7 @@ namespace TRS2._0.Controllers
             return View("GlobalEffortSummary", model);
         }
 
+
         [HttpGet]
         public async Task<IActionResult> ExportGlobalEffortToCsv(int? year = null)
         {
@@ -382,11 +440,18 @@ namespace TRS2._0.Controllers
                 year = DateTime.Today.Year;
 
             var currentUser = await _userManager.GetUserAsync(User);
-            int? effectiveLeaderId = User.IsInRole("Admin") ? 1061 : currentUser?.PersonnelId;
-            if (!effectiveLeaderId.HasValue) return Forbid();
+            var effectiveLeaderId = await GetEffectiveLeaderId(currentUser);
+            if (!effectiveLeaderId.HasValue)
+                return Forbid();
 
             var leaderEntry = await _context.Leaders.FirstOrDefaultAsync(l => l.LeaderId == effectiveLeaderId);
-            if (leaderEntry == null) return Forbid();
+            if (leaderEntry == null)
+            {
+                if (User.IsInRole("ProjectManager"))
+                    return View("NotLeaderMessage");
+
+                return Forbid();
+            }
 
             IQueryable<Personnel> personsQuery = _context.Personnel;
             if (leaderEntry.Tipo == "D")
@@ -634,6 +699,22 @@ namespace TRS2._0.Controllers
             return File(csvBytes, "text/csv", fileName);
         }
 
+        private async Task<int?> GetEffectiveLeaderId(ApplicationUser currentUser)
+        {
+            if (User.IsInRole("Admin"))
+                return Request.Query.ContainsKey("leaderId") && int.TryParse(Request.Query["leaderId"], out int parsedId) ? parsedId : 1071;
+
+            if (User.IsInRole("Leader") || User.IsInRole("ProjectManager"))
+            {
+                if (currentUser?.PersonnelId == null)
+                    return null;
+
+                bool isLeader = await _context.Leaders.AnyAsync(l => l.LeaderId == currentUser.PersonnelId);
+                return isLeader ? currentUser.PersonnelId : null;
+            }
+
+            return null;
+        }
 
     }
 

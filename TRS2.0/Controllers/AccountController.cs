@@ -437,7 +437,7 @@ namespace TRS2._0.Controllers
             const string uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
             const string lowercase = "abcdefghijklmnopqrstuvwxyz";
             const string digits = "0123456789";
-            const string specialChars = "!@#$%^&*()-_=+<>,.?/";
+            const string specialChars = "!@#$%^&*()-_=+,.?/";
 
             string allChars = uppercase + lowercase + digits + specialChars;
             Random rnd = new Random();

@@ -236,6 +236,18 @@ public partial class TRSDBContext : IdentityDbContext<ApplicationUser>
             .WithMany() // Una Affiliation tiene muchos AffxPersons, si no tienes una propiedad de navegación en Affiliation, puedes dejar este lado sin especificar.
             .HasForeignKey(a => a.AffId); // La clave foránea en AffxPerson que apunta a Affiliation
 
+        modelBuilder.Entity<AffxPerson>()
+    .HasIndex(a => new { a.PersonId, a.Start, a.End });
+
+        modelBuilder.Entity<AffxPerson>()
+            .HasIndex(a => a.ResponsibleId);
+
+        modelBuilder.Entity<AffxPerson>()
+            .HasOne(a => a.Responsible)
+            .WithMany()
+            .HasForeignKey(a => a.ResponsibleId)
+            .OnDelete(DeleteBehavior.NoAction);
+
         // Configura la entidad AffHours
         modelBuilder.Entity<AffHours>(entity =>
         {

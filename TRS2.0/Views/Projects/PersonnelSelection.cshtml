@@ -131,7 +131,7 @@
                         @foreach (var person in Model.ProjectPersonnel.Select(px => px.PersonNavigation).OrderBy(p => p.Surname))
                         {
                             <tr>
-                                <td class="name-column sticky-col">@person.Name @person.Surname</td>
+                                <td class="name-column sticky-col">@($"{person.Surname}, {person.Name}")</td>
                                 @foreach (var wp in orderedWorkPackages)
                                 {
                                     bool isAssigned = Model.WorkPackagePersonnel.Any(wpx => wpx.Wp == wp.Id && wpx.Person == person.Id);

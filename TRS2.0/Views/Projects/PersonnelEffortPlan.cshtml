@@ -14,6 +14,7 @@
 @{
     ViewData["Title"] = "Personnel Effort Plan";
     var personnelInfosList = ViewBag.PersonnelInfos as List<PersonnelInfo>;
+    var wpDetailsT = ViewBag.WpDetailsTransposed as IEnumerable<dynamic>;
 }
 
 <div class="container-fluid">
@@ -204,6 +205,71 @@
                 <div><span style="height: 20px; width: 20px; background-color: darkgreen; display: inline-block;"></span> Inside Travel</div>
                 <div><span style="height: 20px; width: 20px; background-color: hotpink; display: inline-block;"></span> Outside Travel</div>
             </div>
+            <hr>
+
+            @if (wpDetailsT != null && wpDetailsT.Any())
+            {
+                <hr />
+                <h2 class="mt-3 mb-2">Work Packages Details</h2>
+
+                <div class="table-responsive transposed-wrapper" style="overflow-x:auto;">
+                    <table class="table table-bordered table-striped table-hover transposed-wp-details">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th class="sticky-left" style="min-width:220px"></th>
+                                @foreach (var wp in wpDetailsT)
+                                {
+                                    <th class="text-center">@wp.Name</th>
+                                }
+                                <th class="total-header">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="sticky-left"><strong>Estimated</strong></td>
+                                @{
+                                    decimal totalEstimated = 0m;
+                                }
+                                @foreach (var wp in wpDetailsT)
+                                {
+                                    decimal val = (decimal)wp.Estimated;
+                                    totalEstimated += val;
+                                    <td class="text-center">@String.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.00}", val)</td>
+                                }
+                                <td class="total-cell"><strong>@String.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.00}", totalEstimated)</strong></td>
+                            </tr>
+
+                            <tr>
+                                <td class="sticky-left"><strong>Distributed</strong></td>
+                                @{
+                                    decimal totalDistributed = 0m;
+                                }
+                                @foreach (var wp in wpDetailsT)
+                                {
+                                    decimal val = (decimal)wp.Distributed;
+                                    totalDistributed += val;
+                                    <td class="text-center">@String.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.00}", val)</td>
+                                }
+                                <td class="total-cell"><strong>@String.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.00}", totalDistributed)</strong></td>
+                            </tr>
+
+                            <tr>
+                                <td class="sticky-left"><strong>Covered with Personnel</strong></td>
+                                @{
+                                    decimal totalCovered = 0m;
+                                }
+                                @foreach (var wp in wpDetailsT)
+                                {
+                                    decimal val = (decimal)wp.CoveredWithPersonnel;
+                                    totalCovered += val;
+                                    <td class="text-center">@String.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.00}", val)</td>
+                                }
+                                <td class="total-cell"><strong>@String.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.00}", totalCovered)</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            }
 }
 else
 {
@@ -585,6 +651,51 @@ else
 
     .container-fluid {
         margin-top: 10px; /* Ajusta este valor según necesites */
+    }
+
+    .transposed-wp-details th:first-child,
+    .transposed-wp-details td:first-child {
+        background-color: #f8f9fa;
+        font-weight: 600;
+    }
+
+    .transposed-wp-details th, .transposed-wp-details td {
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .transposed-wp-details .sticky-left {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background: white; /* Evita traslucir celdas debajo */
+    }
+
+    .transposed-wp-details .sticky-right {
+        position: sticky;
+        right: 0;
+        z-index: 2;
+        background: white;
+        box-shadow: -4px 0 6px -4px rgba(0,0,0,0.2); /* Separador visual a la derecha */
+    }
+
+    /* Si el thead va a ser también pegajoso al hacer scroll vertical en el contenedor: */
+    .transposed-wrapper .thead-dark th {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+    }
+
+    .total-header {
+        background-color: #343a40 !important;
+        color: white !important;
+        text-align: center;
+    }
+
+    .total-cell {
+        background-color: #d6d8d9 !important; /* gris claro */
+        font-weight: bold;
+        text-align: center;
     }
 </style>
 

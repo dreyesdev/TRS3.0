@@ -18,7 +18,8 @@
         <div class="d-flex align-items-center" style="width: 40%;">
             <!-- Botón Previous -->
             <button id="prevMonthButton" class="btn btn-primary">Previous</button>
-
+            <!-- Botón Next -->
+            <button id="nextMonthButton" class="btn btn-primary mx-2">Next</button
             <!-- Selectores de Mes y Año -->
             <select id="monthSelect" class="form-control mx-2">
                 <option value="">Select the month</option>
@@ -42,10 +43,8 @@
                     <option value="@year">@year</option>
                 }
             </select>
-
-            <button id="goButton" class="btn btn-primary mx-2">Ir</button>
-            <!-- Botón Next -->
-            <button id="nextMonthButton" class="btn btn-primary mx-2">Next</button>
+            <button id="goButton" class="btn btn-success mx-2">Go</button>
+            
         </div>
 
         @if ((bool?)ViewBag.AllowEdit == true)
@@ -205,22 +204,20 @@
                                 @{
                                     var totalActual = wp.Timesheets.Sum(ts => ts.Hours);
                                     var totalEstimado = wp.EstimatedHours;
+                                    var difference = Math.Abs(totalActual - totalEstimado); // diferencia absoluta
                                     string textColor;
 
-                                    if (totalActual == totalEstimado)
+                                    if (difference <= 0.5m)
                                     {
                                         textColor = "#006400"; // Verde oscuro
-                                        
                                     }
                                     else if (totalActual > totalEstimado)
                                     {
                                         textColor = "#FF8C00"; // Naranja oscuro
-                                        
                                     }
                                     else
                                     {
                                         textColor = "#00008B"; // Azul oscuro
-                                        
                                     }
                                 }
                                 <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center; font-weight: bold; color: @textColor">

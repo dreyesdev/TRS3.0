@@ -5,16 +5,25 @@
     <table class="table table-bordered table-striped table-hover">
         <thead class="thead-dark">
             <tr>
-                <th class="nombre-columna text-center sticky-header sticky-col">
-
+                <th class="nombre-columna text-center sticky-header sticky-col align-middle">
                     <div>Nombre</div>
-                    <div class="d-flex justify-content-between mt-2">
-                        <button id="lockAllButton" class="btn btn-success btn-sm btn-lock-all">
-                            Lock All
+
+                    <!-- Botones principales -->
+                    <div class="d-flex justify-content-center gap-2 mt-2 mb-1 flex-wrap">
+                        <button id="lockAllButton" class="btn btn-success btn-sm">Lock All</button>
+                        <button id="reopenAllButton" class="btn btn-danger btn-sm">Reopen All</button>
+                    </div>
+
+                    <!-- Dropdown de acciones -->
+                    <div class="dropdown mt-1">
+                        <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="actionDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            Actions
                         </button>
-                        <button id="reopenAllButton" class="btn btn-danger btn-sm btn-reopen-all">
-                            Reopen All
-                        </button>
+                        <ul class="dropdown-menu dropdown-menu-dark text-small shadow" aria-labelledby="actionDropdown">
+                            <li><a class="dropdown-item" href="#" id="lockSelectedButton">Lock Selected</a></li>
+                            <li><a class="dropdown-item" href="#" id="reopenSelectedButton">Reopen Selected</a></li>
+                            <li><a class="dropdown-item" href="#" id="downloadTimesheetsButton">Download Timesheets</a></li>
+                        </ul>
                     </div>
                 </th>
                 @foreach (var monthDetail in Model.MonthDetails)
@@ -30,10 +39,41 @@
             @foreach (var person in Model.Persons.OrderBy(p => p.Personnel.Surname))
             {
                 <tr>
-                    <td class="font-weight-bold sticky-col">@person.Personnel.Surname, @person.Personnel.Name </td>
+                    <td class="font-weight-bold sticky-col">
+                        @person.Personnel.Surname, @person.Personnel.Name
+                        <div class="mt-2 d-flex flex-row justify-content-center gap-2">
+                            <button class="btn btn-outline-success btn-sm lock-person-btn"
+                                    data-personid="@person.Personnel.Id"
+                                    data-projectid="@ViewBag.ProjectId"
+                                    data-periodid="@ViewBag.PeriodId">
+                                Lock
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm unlock-person-btn"
+                                    data-personid="@person.Personnel.Id"
+                                    data-projectid="@ViewBag.ProjectId"
+                                    data-periodid="@ViewBag.PeriodId">
+                                Reopen
+                            </button>
+                        </div>
+                    </td>
+
                     @foreach (var monthDetail in Model.MonthDetails)
                     {
                         var monthDate = DateTime.Parse(monthDetail.Value);
+                        var hasLoginInv = false;
+                        var hasLoginResp = false;
+                        string loginInvDate = null;
+                        string loginRespDate = null;
+
+                        if (person.LoginStatusByMonth != null && person.LoginStatusByMonth.TryGetValue(monthDate, out var logins))
+                        {
+                            hasLoginInv = !string.IsNullOrWhiteSpace(logins.InvestigatorDate);
+                            hasLoginResp = !string.IsNullOrWhiteSpace(logins.ResponsibleDate);
+                            loginInvDate = logins.InvestigatorDate;
+                            loginRespDate = logins.ResponsibleDate;
+                        }
+
+
                         decimal declaredHours = person.DeclaredHours.ContainsKey(monthDate) ? person.DeclaredHours[monthDate] : 0;
                         decimal hoursInProject = person.HoursinProyect.ContainsKey(monthDate) ? person.HoursinProyect[monthDate] : 0;
                         decimal completionPercentage = person.CompletionPercentage.ContainsKey(monthDate) ? person.CompletionPercentage[monthDate] : 0;
@@ -46,7 +86,35 @@
                         var isLocked = person.LockStatusByMonth.ContainsKey(statusKey) && person.LockStatusByMonth[statusKey];
                         var backgroundColor = status.OutOfContract ? "#FF8C00" : (status.Overloaded ? "#FFFF00" : "");
 
-                        <td style="background-color: @backgroundColor; padding: 4px; vertical-align: top;" data-declared-hours="@declaredHours" data-hours-in-project="@hoursInProject" data-total-effort="@totalEffort" personId="@personnelId" year="@year">
+                        <td class="position-relative"
+                            style="background-color: @backgroundColor; padding: 4px; vertical-align: top;"
+                            data-declared-hours="@declaredHours"
+                            data-hours-in-project="@hoursInProject"
+                            data-total-effort="@totalEffort"
+                            personId="@personnelId"
+                            year="@year"
+                            data-month="@monthDate.Month">
+
+                            @* ✅ Solo mostrar checkbox si NO está "Out of Contract" *@
+                            @if (!status.OutOfContract)
+                            {
+                                <input type="checkbox"
+                                       class="cell-checkbox"                                       
+                                       data-personid="@personnelId"
+                                       data-year="@year"
+                                       data-month="@monthDate.Month"
+                                       data-projectid="@ViewBag.ProjectId"
+                                       data-islocked="@isLocked.ToString().ToLower()" />
+
+                            }
+
+                            <!-- I / R en la esquina superior derecha -->
+                            <div class="cell-flags" title="I=@(loginInvDate ?? "—") · R=@(loginRespDate ?? "—")">
+                                <span>I: <span class="icon @(hasLoginInv ? "ok" : "ko")">@(hasLoginInv ? "✔" : "✖")</span></span>
+                                <span>R: <span class="icon @(hasLoginResp ? "ok" : "ko")">@(hasLoginResp ? "✔" : "✖")</span></span>
+                            </div>
+
+
                             <div class="d-flex justify-content-center align-items-center" style="flex-grow: 1; font-size: 0.875rem; font-weight:bold;">
                                 <span>@declaredHours | @hoursInProject</span>
                             </div>
@@ -171,6 +239,34 @@
     .sticky-header.sticky-col {
         z-index: 11;
     }
+
+    .cell-checkbox {
+        transform: scale(1.4); /* Tamaño ligeramente más grande */
+        accent-color: #007bff; /* Color visible en blanco */
+        border: 1px solid #333; /* Borde más marcado */
+        margin-top: 2px;
+        margin-left: 2px;
+    }
+
+    .cell-flags {
+        position: absolute;
+        top: 4px;
+        right: 6px;
+        font-size: .8rem;
+        font-weight: 700;
+        display: flex;
+        gap: 8px;
+    }
+
+    .icon.ok {
+        color: #28a745;
+    }
+    /* verde */
+    .icon.ko {
+        color: #dc3545;
+    }
+    /* rojo  */
+
 </style>
 
 
@@ -208,11 +304,19 @@
         }
     });
 
-
-
-
-    function updateLockStatus(personId, year, month, projectId, periodId, actionUrl) {
+        function updateLockStatus(personId, year, month, projectId, periodId, actionUrl) {
         console.log("Updating lock status:", { personId, year, month, projectId, periodId, actionUrl });
+
+        document.getElementById('loadingOverlay').style.display = 'flex';
+
+        // Guardar scroll de la página
+        const windowScrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+
+        // Guardar scroll interno del contenedor
+        const oldContainer = document.getElementById('detallesPeriodoContainer');
+        const containerScrollTop = oldContainer ? oldContainer.scrollTop : 0;
+        const containerScrollLeft = oldContainer ? oldContainer.scrollLeft : 0;
+
         var data = { personId: personId, projectId: projectId, year: year, month: month };
 
         $.ajax({
@@ -222,32 +326,222 @@
             contentType: 'application/json; charset=utf-8',
             success: function (response) {
                 if (response.success) {
-                    // Solicitud AJAX para obtener la vista parcial actualizada
                     $.ajax({
                         url: '/Projects/PeriodDetails',
-                        data: { id: periodId, projectId: projectId }, // Asegúrate de pasar los parámetros necesarios
+                        data: { id: periodId, projectId: projectId },
                         success: function (partialViewResult) {
-                            // Actualiza el contenedor de la vista parcial con el nuevo contenido
                             $('#detallesPeriodoContainer').html(partialViewResult);
+
+                            // Esperar al repaint completo del DOM antes de restaurar el scroll
+                            requestAnimationFrame(() => {
+                                requestAnimationFrame(() => {
+                                    const newContainer = document.getElementById('detallesPeriodoContainer');
+                                    if (newContainer) {
+                                        newContainer.scrollTop = containerScrollTop;
+                                        newContainer.scrollLeft = containerScrollLeft;
+                                    }
+
+                                    // Restaurar scroll global de la ventana
+                                    window.scrollTo({ top: windowScrollTop, behavior: 'instant' });
+                                });
+                            });
+                        },
+                        complete: function () {
+                            document.getElementById('loadingOverlay').style.display = 'none';
                         }
                     });
                 } else {
                     alert('No se pudo actualizar el estado de bloqueo.');
+                    document.getElementById('loadingOverlay').style.display = 'none';
                 }
             },
             error: function (error) {
                 console.log(error);
                 alert('Ocurrió un error al intentar actualizar el estado de bloqueo.');
+                document.getElementById('loadingOverlay').style.display = 'none';
             }
         });
     }
 
-    function exportTimesheetWithDate(personId, year, month, projectId) {
-        var manualDate = document.getElementById('manualDate').value;
-        var url = '@Url.Action("ExportTimesheetToPdf2", "Timesheet")' + '?personId=' + personId + '&year=' + year + '&month=' + month + '&project=' + projectId + '&manualDate=' + manualDate;
-        window.location.href = url;
-    }
+            
 
-    
+
+        document.body.addEventListener('click', function (event) {
+        // Lock all cells of a person
+        if (event.target.matches('.lock-person-btn')) {
+            const personId = event.target.dataset.personid;
+            const projectId = event.target.dataset.projectid;
+            const periodId = event.target.dataset.periodid;
+
+            const cells = document.querySelectorAll(`td[personId="${personId}"]`);
+            cells.forEach(cell => {
+                const year = cell.getAttribute('year');
+                const month = cell.getAttribute('data-month');
+                const isOutOfContract = cell.innerHTML.includes('Out of Contract');
+                const isAlreadyLocked = cell.querySelector('.unlock-button') !== null;
+
+                if (!isOutOfContract && !isAlreadyLocked) {
+                    updateLockStatus(personId, year, month, projectId, periodId, '/Projects/Lock');
+                }
+            });
+        }
+
+        // Unlock all cells of a person
+        if (event.target.matches('.unlock-person-btn')) {
+            const personId = event.target.dataset.personid;
+            const projectId = event.target.dataset.projectid;
+            const periodId = event.target.dataset.periodid;
+
+            const cells = document.querySelectorAll(`td[personId="${personId}"]`);
+            cells.forEach(cell => {
+                const year = cell.getAttribute('year');
+                const month = cell.getAttribute('data-month');
+                const isOutOfContract = cell.innerHTML.includes('Out of Contract');
+                const isLocked = cell.querySelector('.unlock-button') !== null;
+
+                if (!isOutOfContract && isLocked) {
+                    updateLockStatus(personId, year, month, projectId, periodId, '/Projects/Unlock');
+                }
+            });
+        }
+    });
+
+            document.body.addEventListener('click', async function (event) {
+        if (event.target.id === 'lockSelectedButton' || event.target.id === 'reopenSelectedButton') {
+            const isLock = event.target.id === 'lockSelectedButton';
+            const action = isLock ? 'Lock' : 'Unlock';
+            const actionUrl = `/Projects/${action}`;
+
+            const selectedCheckboxes = document.querySelectorAll('.cell-checkbox:checked');
+            const cellsToProcess = [];
+
+            selectedCheckboxes.forEach(cb => {
+                const td = cb.closest('td');
+                const hasUnlockButton = td.querySelector('.unlock-button') !== null;
+                const hasLockButton = td.querySelector('.lock-button') !== null;
+
+                const shouldInclude =
+                    (isLock && hasLockButton) ||
+                    (!isLock && hasUnlockButton);
+
+                if (shouldInclude) {
+                    cellsToProcess.push({
+                        personId: parseInt(cb.dataset.personid),
+                        year: parseInt(cb.dataset.year),
+                        month: parseInt(cb.dataset.month),
+                        projectId: parseInt(@ViewBag.ProjectId),
+                        periodId: parseInt(@ViewBag.PeriodId)
+                    });
+                }
+            });
+
+            if (cellsToProcess.length === 0) {
+                alert("No hay celdas válidas seleccionadas para esta acción.");
+                return;
+            }
+
+            document.getElementById('loadingOverlay').style.display = 'flex';
+
+            try {
+                for (const cell of cellsToProcess) {
+                    await fetch(actionUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(cell)
+                    });
+                }
+
+                // Recargar la vista parcial tras los cambios
+                $.ajax({
+                    url: '/Projects/PeriodDetails',
+                    data: {
+                        id: @ViewBag.PeriodId,
+                        projectId: @ViewBag.ProjectId
+                    },
+                    success: function (partialViewResult) {
+                        $('#detallesPeriodoContainer').html(partialViewResult);
+                    },
+                    error: function () {
+                        alert("Error al recargar la tabla tras el bloqueo/desbloqueo.");
+                    },
+                    complete: function () {
+                        document.getElementById('loadingOverlay').style.display = 'none';
+                    }
+                });
+            } catch (error) {
+                console.error(error);
+                alert("Error al procesar los cambios.");
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }
+        }
+    });
+
+        document.getElementById('downloadTimesheetsButton').addEventListener('click', function () {
+        const checkboxes = document.querySelectorAll('.cell-checkbox:checked');
+
+        checkboxes.forEach(cb => {
+            const td = cb.closest('td');
+            const timesheetBtn = td.querySelector('.btn-info');
+
+            if (timesheetBtn) {
+                const personId = cb.dataset.personid;
+                const year = cb.dataset.year;
+                const month = cb.dataset.month;
+                const projectId = @ViewBag.ProjectId;
+
+                // Construir la URL y lanzar la descarga
+                const url = `/Timesheet/ExportTimesheetToPdf2?personId=${personId}&year=${year}&month=${month}&project=${projectId}`;
+                window.open(url, '_blank');
+            }
+        });
+    });
+
+    function exportTimesheetWithDate(personId, year, month, projectId) {
+    const manualDateEl = document.getElementById('manualDate');
+    const manualDate = manualDateEl && manualDateEl.value
+        ? `&manualDate=${encodeURIComponent(manualDateEl.value)}`
+        : '';
+    const url = `/Timesheet/ExportTimesheetToPdf2?personId=${personId}&year=${year}&month=${month}&project=${projectId}${manualDate}`;
+    window.open(url, '_blank');
+  }
+
+  function getManualParams() {
+    const dateEl = document.getElementById('manualDate');
+    const codeEl = document.getElementById('manualCode');
+
+    let query = '';
+    if (dateEl && dateEl.value) {
+      query += `&manualDate=${encodeURIComponent(dateEl.value)}`;
+    }
+    if (codeEl && codeEl.value && codeEl.value.trim().length > 0) {
+      // No lo trates como número: puede llevar ceros a la izquierda o letras
+      query += `&manualCode=${encodeURIComponent(codeEl.value.trim())}`;
+    }
+    return query;
+  }
+
+  // Botón individual de cada celda
+  function exportTimesheetWithDate(personId, year, month, projectId) {
+    const extra = getManualParams();
+    const url = `/Timesheet/ExportTimesheetToPdf2?personId=${personId}&year=${year}&month=${month}&project=${projectId}${extra}`;
+    window.open(url, '_blank');
+  }
+
+  // "Download Timesheets" (cabecera, múltiple)
+  document.getElementById('downloadTimesheetsButton')?.addEventListener('click', function () {
+    const checkboxes = document.querySelectorAll('.cell-checkbox:checked');
+    const extra = getManualParams();
+
+    checkboxes.forEach(cb => {
+      const personId = cb.dataset.personid;
+      const year = cb.dataset.year;
+      const month = cb.dataset.month;
+      const projectId = @ViewBag.ProjectId;
+
+      const url = `/Timesheet/ExportTimesheetToPdf2?personId=${personId}&year=${year}&month=${month}&project=${projectId}${extra}`;
+      window.open(url, '_blank');
+    });
+  });
+
 </script>
 

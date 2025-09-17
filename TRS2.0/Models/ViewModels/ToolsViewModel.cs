@@ -4,5 +4,8 @@
     {
         public int Year { get; set; }
         public GlobalHoursViewModel GlobalHours { get; set; }
+
+        public GlobalEffortViewModel GlobalEffort { get; set; }
+
     }
 }

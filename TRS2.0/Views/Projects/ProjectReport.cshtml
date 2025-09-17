@@ -241,7 +241,13 @@
                             <label for="manualDate" class="mb-0 mr-2 font-weight-bold">Manual Date:</label>
                             <input type="date" id="manualDate" class="form-control ml-2" />
                         </div>
+
+                        <div class="col-md-4 d-flex align-items-center">
+                            <label for="manualCode" class="mb-0 ml-3 mr-2 font-weight-bold">Manual Code:</label>
+                            <input type="text" id="manualCode" class="form-control ml-2"/>
+                        </div>
                     </div>
+
 
                     <div class="row text-center">
                         <div class="col-md-4 mb-2">
@@ -294,6 +300,20 @@
 
 
 <script>
+      // Helper para limpiar textos de celdas (quita botones/etiquetas UI)
+    function cleanCellText(col) {
+        // Texto plano sin saltos
+        let txt = col.innerText.replace(/(\r\n|\n|\r)/gm, ' ').trim();
+
+        // Quitar etiquetas/botones habituales
+        txt = txt
+          .replace(/\b(Lock All|Reopen All|Lock|Reopen|Timesheet)\b/gi, '')
+          .replace(/\s{2,}/g, ' ') // espacios dobles
+          .trim();
+
+        return txt;
+    }
+
 
     $(document).ready(function () {
         $(document).on('click', '.periodo', function () {
@@ -389,19 +409,27 @@
         document.body.removeChild(link);
     }
 
-    function exportDeclaredHoursToCSV() {
+      function exportDeclaredHoursToCSV() {
         var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
         var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
 
         rows.forEach(function (row) {
             var cols = row.querySelectorAll('th, td');
             var rowData = [];
-            cols.forEach(function (col) {
+            cols.forEach(function (col, colIdx) {
                 var declaredHours = col.getAttribute('data-declared-hours');
+
                 if (declaredHours) {
+                    // Si hay atributo con el dato limpio, úsalo
                     rowData.push(declaredHours.replace('.', ','));
                 } else {
-                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
+                    // Si no, limpiamos el texto de la celda (quitando Lock/Reopen/etc.)
+                    var txt = cleanCellText(col);
+
+                    // Si quieres, limita la primera columna a “Nombre Apellidos” sin más adornos:
+                    // if (colIdx === 0) { ... }  // opcional si en la primera columna es donde salen esos botones
+
+                    rowData.push(txt.replace('.', ','));
                 }
             });
             csvContent += rowData.join(";") + "\r\n";

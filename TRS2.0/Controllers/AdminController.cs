@@ -29,10 +29,11 @@ namespace TRS2._0.Controllers
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly ILogger<AdminController> _logger;
         private readonly LoadDataService _loadDataService;
+        private readonly ReminderService _reminderService;
         private readonly string _logDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Logs");
 
 
-        public AdminController(WorkCalendarService workCalendarService, TRSDBContext context, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, ILogger<AdminController> logger, LoadDataService loadDataService)
+        public AdminController(WorkCalendarService workCalendarService, TRSDBContext context, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, ILogger<AdminController> logger, LoadDataService loadDataService, ReminderService reminderService)
         {
             _workCalendarService = workCalendarService;
             _context = context;
@@ -40,6 +41,7 @@ namespace TRS2._0.Controllers
             _roleManager = roleManager;
             _logger = logger;
             _loadDataService = loadDataService;
+            _reminderService = reminderService;
         }
 
         public async Task<IActionResult> Index()
@@ -816,6 +818,20 @@ namespace TRS2._0.Controllers
                 message = $"✅ Rol 'Researcher' asignado a {fixedCount} usuario(s) sin rol. Otros {alreadyOk} ya estaban correctamente configurados."
             });
         }
+
+        [HttpPost]
+        public async Task<IActionResult> SendTimesheetReminderTest(bool firstWeek)
+        {
+            var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Email == "david.reyes@bsc.es");
+
+            if (person == null)
+                return Json(new { success = false, message = "No se encontró la persona con ese correo." });
+
+            await _reminderService.SendTimesheetRemindersToSingleUserAsync(person.Id, firstWeek);
+
+            return Json(new { success = true, message = "Recordatorio enviado (ver logs del servidor para confirmar)." });
+        }
+
 
 
     }

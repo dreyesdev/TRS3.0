@@ -177,3 +177,8 @@ h2, .card-header {
             margin: 0; /* Elimina el margen en dispositivos móviles */
         }
 }
+
+
+#loadingOverlay {
+    display: flex; /* importante para centrar el spinner */
+}
