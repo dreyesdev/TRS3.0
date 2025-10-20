@@ -566,12 +566,14 @@ namespace TRS2._0.Controllers
                     return Json(new { success = false, message = "Registro de viaje no encontrado." });
                 }
 
-                // Cambiamos el estado a 3 (aprobado)
-                travel.Status = "0";
+                // Cambiamos el estado a 7 (aprobado y validado)
+                travel.Status = "7";
                 _context.Update(travel); // Marcamos el cambio
                 await _context.SaveChangesAsync(); // Guardamos en la base de datos
                 // Cargar de nuevo las liquidaciones a 0
-                _loadDataService.ProcessLiquidationsAsync();
+                await _loadDataService.ProcessLiquidationsAsync();
+
+                await _loadDataService.ProcessAdvancedLiquidationsAsync();
 
 
                 return Json(new { success = true, message = "Viaje aprobado correctamente." }); // Respuesta de éxito

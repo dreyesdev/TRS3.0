@@ -2257,10 +2257,86 @@ namespace TRS2._0.Controllers
             await _context.SaveChangesAsync();
             return Json(new { success = true, pm = pmValue });
         }
-
-                
-
         
+
+
+
+
+
+
+        [HttpPost]
+        public async Task<IActionResult> ExportEstimatedWorkedDaysToCSV([FromBody] ExportRequest model)
+        {
+            var projectId = model.ProjectId;
+
+            if (!DateTime.TryParse(model.StartDate, out var startDate) || !DateTime.TryParse(model.EndDate, out var endDate))
+                return BadRequest("Invalid date format.");
+
+            var periodStart = new DateTime(startDate.Year, startDate.Month, 1);
+            var periodEnd = new DateTime(endDate.Year, endDate.Month, DateTime.DaysInMonth(endDate.Year, endDate.Month));
+
+            var project = await _context.Projects
+                .Include(p => p.Projectxpeople)
+                    .ThenInclude(px => px.PersonNavigation)
+                .FirstOrDefaultAsync(p => p.ProjId == projectId);
+
+            if (project == null)
+                return NotFound();
+
+            var personnelList = project.Projectxpeople
+                .Select(px => px.PersonNavigation)
+                .Distinct()
+                .ToList();
+
+            var result = new StringBuilder();
+
+            // Cabecera con meses en "MMM-yyyy" (Jan-2025)
+            result.Append("Name");
+            var current = periodStart;
+            while (current <= periodEnd)
+            {
+                result.Append($";{current.ToString("MMM-yyyy", CultureInfo.InvariantCulture)}");
+                current = current.AddMonths(1);
+            }
+            result.AppendLine();
+
+            foreach (var person in personnelList.OrderBy(p => p.Surname))
+            {
+                result.Append($"{person.Surname}, {person.Name}");
+
+                // NUEVO: días estimados por mes para la persona en ESTE proyecto/rango
+                var estimatedDaysDict = await _workCalendarService
+                    .GetEstimatedWorkedDaysPerMonthForPersonInProject(person.Id, periodStart, periodEnd, projectId);
+
+                current = periodStart;
+                while (current <= periodEnd)
+                {
+                    if (estimatedDaysDict.TryGetValue(new DateTime(current.Year, current.Month, 1), out var estimatedDays))
+                    {
+                        if (estimatedDays == -1)
+                            result.Append(";SIN AFILIACIÓN");
+                        else
+                            result.Append($";{estimatedDays.ToString("0.0", new CultureInfo("es-ES"))}");
+                    }
+                    else
+                    {
+                        result.Append(";0.0");
+                    }
+
+                    current = current.AddMonths(1);
+                }
+
+                result.AppendLine();
+            }
+
+            var utf8WithBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+            var bytes = utf8WithBom.GetBytes(result.ToString());
+
+            return File(bytes, "text/csv", $"EstimatedWorkedDays_{projectId}_{DateTime.Now:yyyyMMdd}.csv");
+        }
+
+
+
 
 
         public class ExportRequest

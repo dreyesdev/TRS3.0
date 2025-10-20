@@ -443,20 +443,24 @@
 
     <div class="card mb-4">
         <div class="card-header bg-danger text-white">
-            <h4>Prueba de Envío de Recordatorio Timesheet (Solo para david.reyes@bsc.es)</h4>
+            <h4>Prueba de Envío de Recordatorio Timesheet (Prueba individual por correo)</h4>
         </div>
         <div class="card-body">
             <form asp-action="SendTimesheetReminderTest" method="post" class="row g-3">
-                <div class="col-md-8">
+                <div class="col-md-6">
+                    <label class="form-label">Correo de la persona:</label>
+                    <input type="email" name="email" class="form-control" placeholder="ejemplo@bsc.es" required />
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Tipo de recordatorio:</label>
                     <select class="form-select" name="firstWeek">
                         <option value="true">Primera semana del mes (completo + históricos)</option>
                         <option value="false">Semanas siguientes (solo mes anterior si incompleto)</option>
                     </select>
                 </div>
-                <div class="col-md-4 d-flex align-items-end">
+                <div class="col-md-2 d-flex align-items-end">
                     <button type="submit" class="btn btn-warning w-100">
-                        Enviar Recordatorio de Prueba
+                        Enviar
                     </button>
                 </div>
             </form>

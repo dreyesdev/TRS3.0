@@ -16,11 +16,13 @@ namespace TRS2._0.Services;
 public class WorkCalendarService
 {
         private readonly TRSDBContext _context;
+        private readonly ILogger<WorkCalendarService> _logger;
 
-        public WorkCalendarService(TRSDBContext context, ILogger<WorkCalendarService> @object)
-        {
+    public WorkCalendarService(TRSDBContext context, ILogger<WorkCalendarService> logger)
+    {
             _context = context;
-        }
+            _logger = logger;
+    }
 
         public async Task<int> CalculateWorkingDays(int year, int month)
         {
@@ -2330,6 +2332,237 @@ public class WorkCalendarService
         return workingDays * dailyHours;
     }
 
+
+    public async Task<Dictionary<DateTime, decimal>> GetEstimatedWorkedDaysPerMonthForPersonInProject(
+    int personId, DateTime startDate, DateTime endDate, int projectId)
+    {
+        // Normalizar fin de rango al último día del mes
+        endDate = new DateTime(endDate.Year, endDate.Month, DateTime.DaysInMonth(endDate.Year, endDate.Month));
+
+        // 1) Obtener el esfuerzo mensual en el proyecto
+        var monthlyEfforts = await CalculateMonthlyEffortForPersonInProject(personId, startDate, endDate, projectId);
+
+        // 2) Obtener todas las afiliaciones y sus horas de referencia
+        var affiliations = await _context.AffxPersons
+            .Where(a => a.PersonId == personId &&
+                        a.Start <= endDate && a.End >= startDate)
+            .ToListAsync();
+
+        var affHoursList = await _context.AffHours.ToListAsync();
+
+        var result = new Dictionary<DateTime, decimal>();
+
+        // 3) Iterar por cada mes dentro del rango
+        for (var cursor = new DateTime(startDate.Year, startDate.Month, 1);
+             cursor <= endDate;
+             cursor = cursor.AddMonths(1))
+        {
+            // Effort del mes en este proyecto (0 si no hay)
+            decimal effort = monthlyEfforts.TryGetValue(cursor, out var e) ? e : 0m;
+
+            if (effort <= 0)
+            {
+                // Sin esfuerzo asignado → 0 días estimados
+                result[cursor] = 0.0m;
+                continue;
+            }
+
+            // 4) Calcular las horas totales del mes (según dedicación activa)
+            var hoursPerDayWithDedication = await CalculateDailyWorkHoursWithDedicationNotRounded(personId, cursor.Year, cursor.Month);
+            var totalMonthlyHours = hoursPerDayWithDedication.Values.Sum(); // Excluye fines de semana/festivos
+
+            // 5) Obtener afiliaciones activas en este mes
+            var monthAffiliations = affiliations
+                .Where(a => a.Start <= cursor.AddMonths(1).AddDays(-1) && a.End >= cursor)
+                .ToList();
+
+            if (!monthAffiliations.Any())
+            {
+                // No hay afiliaciones activas → SIN AFILIACIÓN
+                result[cursor] = -1;
+                continue;
+            }
+
+            // 6) Obtener las horas base por día de la afiliación (mínimo de AffHours válidas ese mes)
+            List<decimal> activeAffiliationHours = new List<decimal>();
+            foreach (var affiliation in monthAffiliations)
+            {
+                var validAffHours = affHoursList
+                    .Where(ah => ah.AffId == affiliation.AffId &&
+                                 ah.StartDate <= cursor.AddMonths(1).AddDays(-1) &&
+                                 ah.EndDate >= cursor)
+                    .Select(ah => ah.Hours)
+                    .Where(h => h > 0)
+                    .ToList();
+
+                if (validAffHours.Any())
+                    activeAffiliationHours.AddRange(validAffHours);
+            }
+
+            if (!activeAffiliationHours.Any())
+            {
+                // No se encontraron horas base válidas
+                result[cursor] = -1;
+                continue;
+            }
+
+            var baseDailyHours = activeAffiliationHours.Min(); // Ej: 7.5 h/día
+
+            // 7) Obtener reducción activa en Dedication para el mes
+            var dedication = await _context.Dedications
+                .Where(d => d.PersId == personId && d.Start <= cursor.AddMonths(1).AddDays(-1) && d.End >= cursor)
+                .OrderByDescending(d => d.Type)
+                .ThenByDescending(d => d.Start)
+                .FirstOrDefaultAsync();
+
+            var reduc = dedication?.Reduc ?? 0m; // Ej: 0.125 → 12.5%
+            var factor = 1m - reduc;
+            if (factor < 0m) factor = 0m;
+            if (factor > 1m) factor = 1m;
+
+            // 8) Calcular las horas/día efectivas (aplicando reducción)
+            var effectiveDailyHours = Math.Round(baseDailyHours * factor, 1, MidpointRounding.AwayFromZero);
+
+            // 9) Calcular horas estimadas del proyecto
+            var estimatedProjectHours = Math.Round(totalMonthlyHours * effort, 1, MidpointRounding.AwayFromZero);
+
+            // 10) Convertir a días estimados (redondeo a 1 decimal)
+            decimal estimatedDays = estimatedProjectHours > 0
+                ? Math.Round(estimatedProjectHours / effectiveDailyHours, 1, MidpointRounding.AwayFromZero)
+                : 0.0m;
+
+            // Guardar resultado
+            result[cursor] = estimatedDays;
+
+            // 11) Logging de diagnóstico (puedes dejarlo en DEBUG mientras pruebas)
+            _logger.LogInformation(
+              "EST-DEBUG | P{PersonId} | Proj{ProjectId} | {Year}-{Month:D2} | Effort={Effort:P1} | BaseDaily={BaseDaily:F2} | Reduc={Reduc:P1} | EffDaily={EffDaily:F2} | TotalMonth={Total:F1} | EstHours={EstH:F1} | EstDays={EstD:F1}",
+              personId, projectId, cursor.Year, cursor.Month,
+              effort, baseDailyHours, reduc, effectiveDailyHours, totalMonthlyHours, estimatedProjectHours, estimatedDays
+            );
+        }
+
+        return result;
+    }
+
+    private async Task<(decimal? EffectiveDailyHours, decimal? BaseDailyHours, decimal ReducUsed)>
+    GetEffectiveDailyHoursForMonthAsync(int personId, DateTime monthStart, DateTime monthEnd)
+    {
+        // 1) Afiliaciones activas
+        var affIds = await _context.AffxPersons
+            .Where(a => a.PersonId == personId && a.Start <= monthEnd && a.End >= monthStart)
+            .Select(a => a.AffId)
+            .Distinct()
+            .ToListAsync();
+
+        if (!affIds.Any())
+            return (null, null, 0m); // SIN AFILIACIÓN
+
+        // 2) Horas/día base desde AffHours (válidas ese mes) → usar la MÍNIMA
+        var baseCandidates = await _context.AffHours
+            .Where(ah => affIds.Contains(ah.AffId) &&
+                         ah.StartDate <= monthEnd &&
+                         ah.EndDate >= monthStart &&
+                         ah.Hours > 0)
+            .Select(ah => ah.Hours)
+            .ToListAsync();
+
+        if (!baseCandidates.Any())
+            return (null, null, 0m); // SIN AFILIACIÓN efectiva
+
+        var baseDailyHours = baseCandidates.Min();
+
+        // 3) Reducción activa en Dedication (elige la línea más relevante)
+        var dedication = await _context.Dedications
+            .Where(d => d.PersId == personId && d.Start <= monthEnd && d.End >= monthStart)
+            .OrderByDescending(d => d.Type)   // tu prioridad habitual
+            .ThenByDescending(d => d.Start)
+            .FirstOrDefaultAsync();
+
+        var reduc = dedication?.Reduc ?? 0m;  // ej. 0.125
+        var factor = 1m - reduc;
+        if (factor < 0m) factor = 0m;
+        if (factor > 1m) factor = 1m;
+
+        var effective = Math.Round(baseDailyHours * factor, 1, MidpointRounding.AwayFromZero);
+        return (effective, baseDailyHours, reduc);
+    }
+
+    public async Task<Dictionary<DateTime, decimal>> CalculateDailyWorkHoursWithDedicationAndLeaves(
+    int personId, int year, int month)
+    {
+        var dailyWorkHours = new Dictionary<DateTime, decimal>();
+        DateTime startDate = new DateTime(year, month, 1);
+        DateTime endDate = startDate.AddMonths(1).AddDays(-1);
+        int daysInMonth = DateTime.DaysInMonth(year, month);
+
+        // Afiliaciones del mes
+        var affiliations = await _context.AffxPersons
+            .Where(ap => ap.PersonId == personId && ap.Start <= endDate && ap.End >= startDate)
+            .ToListAsync();
+
+        // Horas de afiliación relevantes
+        var affIds = affiliations.Select(a => a.AffId).Distinct().ToList();
+        var affHoursList = await _context.AffHours
+            .Where(ah => affIds.Contains(ah.AffId) && ah.StartDate <= endDate && ah.EndDate >= startDate)
+            .ToListAsync();
+
+        // Dedicaciones
+        var dedications = await _context.Dedications
+            .Where(d => d.PersId == personId && d.Start <= endDate && d.End >= startDate)
+            .ToListAsync();
+
+        // Bajas / vacaciones del mes (LeaveReduction + Type)
+        var leaves = await _context.Leaves
+            .Where(l => l.PersonId == personId && l.Day >= startDate && l.Day <= endDate)
+            .ToDictionaryAsync(l => l.Day, l => new { l.LeaveReduction, l.Type });
+
+        for (int day = 1; day <= daysInMonth; day++)
+        {
+            DateTime currentDate = new DateTime(year, month, day);
+
+            // Saltar findes y festivos
+            if (currentDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday || await IsHoliday(currentDate))
+                continue;
+
+            // Horas base por afiliación en ese día
+            var baseHours = affiliations
+                .Where(ap => currentDate >= ap.Start && currentDate <= ap.End)
+                .SelectMany(ap => affHoursList.Where(ah => ah.AffId == ap.AffId && currentDate >= ah.StartDate && currentDate <= ah.EndDate))
+                .Select(ah => ah.Hours)
+                .FirstOrDefault();
+
+            // Dedicación aplicable (Type más alto)
+            var dedication = dedications
+                .Where(d => currentDate >= d.Start && currentDate <= d.End)
+                .OrderByDescending(d => d.Type)
+                .Select(d => d.Reduc)
+                .FirstOrDefault();
+
+            // Baja/ausencia del día (si existe)
+            leaves.TryGetValue(currentDate, out var leave);
+            var leaveReduction = leave?.LeaveReduction ?? 0m;
+            var leaveType = leave?.Type ?? 0;
+
+            decimal dailyHours;
+            if (leaveType == 12) // paternidad: misma regla especial que usas en otros cálculos
+            {
+                dailyHours = baseHours * (1 - dedication) * (1 - leaveReduction);
+            }
+            else
+            {
+                var totalReduction = Math.Min(1m, dedication + leaveReduction);
+                dailyHours = baseHours * (1 - totalReduction);
+            }
+
+            // Redondeo igual que el método original
+            dailyHours = RoundToNearestHalfOrWhole(dailyHours);
+
+            dailyWorkHours[currentDate] = dailyHours;
+        }
+
+        return dailyWorkHours;
+    }
 
 
 }

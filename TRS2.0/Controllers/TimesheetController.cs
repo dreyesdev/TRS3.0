@@ -71,6 +71,12 @@ namespace TRS2._0.Controllers
 
             int validPersonId = personId.Value;
 
+            // DEBUG: ¿A qué servidor/BD está conectando EF ahora mismo?
+            var conn = _context.Database.GetDbConnection();
+            _logger.LogInformation("DB DEBUG | DataSource={DataSource} | Database={Database} | ConnStr={ConnStr}",
+                conn.DataSource, conn.Database, conn.ConnectionString);
+
+
             // Validar si tiene permiso para acceder a esa ficha
             bool isOwner = user?.PersonnelId == validPersonId;
             bool isLeader = userRoles.Contains("Leader");
@@ -104,7 +110,42 @@ namespace TRS2._0.Controllers
 
             bool isPastMonth = new DateTime(currentYear, currentMonth, 1) < new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
 
-            ViewBag.ShowAutoFillButton = canAutoFill && isPastMonth;
+            // Obtener el único WpxPerson.Id del mes (para saber el proyecto a chequear)
+            var unicoWpxId = await (from pe in _context.Persefforts
+                                    join wpx in _context.Wpxpeople on pe.WpxPerson equals wpx.Id
+                                    where pe.Value != 0
+                                          && pe.Month.Year == currentYear
+                                          && pe.Month.Month == currentMonth
+                                          && wpx.Person == validPersonId
+                                    group wpx by 1 into g
+                                    where g.Count() == 1
+                                    select g.First().Id)
+                                   .FirstOrDefaultAsync();
+
+            bool isLockedForUnique = false;
+
+            if (unicoWpxId != 0)
+            {
+                // ProjId del único WP
+                var projId = await _context.Wpxpeople
+                                .Include(x => x.WpNavigation).ThenInclude(wp => wp.Proj)
+                                .Where(x => x.Id == unicoWpxId)
+                                .Select(x => x.WpNavigation.Proj.ProjId)
+                                .FirstOrDefaultAsync();
+
+                // ¿Bloqueado para esa persona-proyecto-mes?
+                isLockedForUnique = await _context.ProjectMonthLocks.AnyAsync(l =>
+                    l.PersonId == validPersonId &&
+                    l.ProjectId == projId &&
+                    l.Year == currentYear &&
+                    l.Month == currentMonth &&
+                    l.IsLocked);
+            }
+
+            // Mostrar botón solo si: único WP + mes pasado + NO bloqueado
+            ViewBag.ShowAutoFillButton = canAutoFill && isPastMonth && !isLockedForUnique;
+
+            
 
 
 
@@ -681,13 +722,19 @@ namespace TRS2._0.Controllers
                                     var isFuture = day.Date > DateTime.Now.Date;
                                     var isHoliday = model.Holidays.Any(h => h.Date == day.Date);
 
-                                    var cellBackground = "#FFFFFF"; // Por defecto, blanco
+                                    var cellBackground = "#FFFFFF";
 
-                                    // PRIORIDAD: Holiday o Leave → aunque sea futuro
+                                    // 1) Festivo nacional: mayor prioridad
                                     if (isHoliday)
                                     {
                                         cellBackground = "#008000"; // National Holidays
                                     }
+                                    // 2) Fin de semana: segunda prioridad (pisa leave/vacaciones y viajes)
+                                    else if (isWeekend)
+                                    {
+                                        cellBackground = "#6c757d"; // Weekend (gris)
+                                    }
+                                    // 3) Ausencias (solo si no es festivo ni finde)
                                     else if (leave != null)
                                     {
                                         switch (leave.Type)
@@ -703,14 +750,17 @@ namespace TRS2._0.Controllers
                                                 break;
                                         }
                                     }
+                                    // 4) Viajes (si no es futuro y no se pintó antes)
                                     else if (hasTravel && !isFuture)
                                     {
                                         cellBackground = "#FF69B4"; // Travel Days
                                     }
-                                    else if (isWeekend || isFuture)
+                                    // 5) Futuro (solo si nada anterior aplicó)
+                                    else if (isFuture)
                                     {
-                                        cellBackground = "#6c757d"; // Gris clásico original
+                                        cellBackground = "#6c757d"; // Gris para futuro
                                     }
+
                                     // Directly add cells for each day within the same iteration that adds the work package name
                                     tabla.Cell().Background(cellBackground).Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.#") ?? "0").Bold().FontSize(8);
                                 }
@@ -1085,13 +1135,20 @@ namespace TRS2._0.Controllers
                                             var isFuture = day.Date > DateTime.Now.Date;
                                             var isHoliday = model.Holidays.Any(h => h.Date == day.Date);
 
-                                            var cellBackground = "#FFFFFF"; // Color por defecto más claro para mejorar contraste
+                                            var cellBackground = "#FFFFFF";
 
+                                            // 1) Festivo nacional: mayor prioridad
                                             if (isHoliday)
                                             {
                                                 cellBackground = "#008000"; // National Holidays
                                             }
-                                            if (leave != null)
+                                            // 2) Fin de semana: segunda prioridad (pisa leave/vacaciones y viajes)
+                                            else if (isWeekend)
+                                            {
+                                                cellBackground = "#6c757d"; // Weekend (gris)
+                                            }
+                                            // 3) Ausencias (solo si no es festivo ni finde)
+                                            else if (leave != null)
                                             {
                                                 switch (leave.Type)
                                                 {
@@ -1106,13 +1163,15 @@ namespace TRS2._0.Controllers
                                                         break;
                                                 }
                                             }
-                                            if (hasTravel && !isFuture && cellBackground == "#FFFFFF")
+                                            // 4) Viajes (si no es futuro y no se pintó antes)
+                                            else if (hasTravel && !isFuture)
                                             {
                                                 cellBackground = "#FF69B4"; // Travel Days
                                             }
-                                            if ((isWeekend || isFuture) && cellBackground == "#FFFFFF")
+                                            // 5) Futuro (solo si nada anterior aplicó)
+                                            else if (isFuture)
                                             {
-                                                cellBackground = "#6c757d"; // Gris original si no fue sobreescrito antes
+                                                cellBackground = "#6c757d"; // Gris para futuro
                                             }
 
                                             tabla.Cell().Background(cellBackground).Border(1).BorderColor("#00BFFF").AlignMiddle().AlignCenter().Text(timesheetEntry?.Hours.ToString("0.#") ?? "0").Bold().FontSize(8);

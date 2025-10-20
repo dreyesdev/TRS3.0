@@ -1,11 +1,12 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TRS2._0.Models.DataModels;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace TRS2._0.Services
 {
@@ -64,56 +65,22 @@ namespace TRS2._0.Services
 
             var subject = "ACTION REQUIRED – Monthly Completion and Validation of Your TIMESHEET";
 
-            // Primer día del mes actual para acotar “meses pasados”
+            // Primer día del mes actual para acotar meses pasados
             var today = DateTime.Today;
             var cutoffFirstOfCurrentMonth = new DateTime(today.Year, today.Month, 1);
-
-            // Intento adjuntar PDF si existe y el EmailSender lo permite (ver overload/contrato)
-            byte[]? pdfBytes = null;
-            if (System.IO.File.Exists(GuidePdfPath))
-            {
-                try { pdfBytes = await System.IO.File.ReadAllBytesAsync(GuidePdfPath); }
-                catch (Exception ex) { _logger.LogWarning(ex, "No se pudo leer el PDF de guía en {Path}", GuidePdfPath); }
-            }
-            else
-            {
-                _logger.LogWarning("El PDF de guía no existe en {Path}. Se enviará sin adjunto.", GuidePdfPath);
-            }
 
             foreach (var person in personnelList)
             {
                 try
                 {
-                    // 🔎 NUEVO: calcular meses pendientes de ESTE usuario
+                    // Meses pendientes: año >= 2025, effort>0 en WP activo, required>0 y declared<required
                     var pendingMonths = await GetPendingMonthsAsync(person.Id, cutoffFirstOfCurrentMonth);
-                    if (pendingMonths.Count == 0)
-                    {
-                        // Nada pendiente → NO enviar el inicial
-                        continue;
-                    }
+                    if (pendingMonths.Count == 0) continue;
 
-                    // Construir cuerpo con listado de pendientes
                     var body = BuildInitialEmailBodyHtml(pendingMonths);
 
-                    // Envío con/sin adjunto (como ya tenías)
-                    if (pdfBytes != null && _emailSender is IEmailSenderWithAttachments senderWithAttach)
-                    {
-                        await senderWithAttach.SendEmailAsync(
-                            to: person.Email,
-                            subject: subject,
-                            htmlBody: body,
-                            attachments: new[]
-                            {
-                        new EmailAttachment("BSC TRS 3.0 - Guide.pdf", pdfBytes, GuidePdfContentType)
-                            });
-                    }
-                    else
-                    {
-                        var bodyWithLink = body.Replace("A detailed user guide is attached to this email",
-                            "A detailed user guide is available <a href=\"/docs/BSC_TRS_Guide_v1.pdf\">here</a>");
-
-                        await _emailSender.SendEmailAsync(person.Email, subject, bodyWithLink);
-                    }
+                    // ⬇️ Enviar con adjunto (o con enlace si no está el PDF)
+                    await SendEmailWithGuideAsync(person.Email, subject, body);
 
                     _logger.LogInformation("[INITIAL] Email enviado a {Email}", person.Email);
                 }
@@ -123,6 +90,7 @@ namespace TRS2._0.Services
                 }
             }
         }
+
 
 
         // ====== 2.2) LUNES SIGUIENTES: RECORDATORIO SOLO A PENDIENTES ======
@@ -136,7 +104,7 @@ namespace TRS2._0.Services
             {
                 try
                 {
-                    // NUEVO: filtrar por asignación + effort en el mes objetivo
+                    // Debe tener assignment + effort>0 en WP activo ese mes
                     var assignedWithEffort = await HasActiveAssignmentWithEffortAsync(
                         person.Id, targetMonth.Year, targetMonth.Month);
 
@@ -147,21 +115,26 @@ namespace TRS2._0.Services
                         continue;
                     }
 
-                    var declared = await _workCalendarService
+                    // HORAS declaradas
+                    var declaredDict = await _workCalendarService
                         .GetDeclaredHoursPerMonthForPerson(person.Id, targetMonth, targetMonth);
+                    declaredDict.TryGetValue(targetMonth, out decimal declaredHours);
 
-                    var pm = await _workCalendarService
-                        .CalculateMonthlyPM(person.Id, targetMonth.Year, targetMonth.Month);
+                    // HORAS requeridas (dedicación, festivos, bajas…)
+                    var dailyHours = await _workCalendarService
+                        .CalculateDailyWorkHoursWithDedicationAndLeaves(person.Id, targetMonth.Year, targetMonth.Month);
+                    var requiredHours = dailyHours.Values.Sum();
 
-                    declared.TryGetValue(targetMonth, out decimal declaredHours);
-                    bool stillIncomplete = declaredHours < pm && pm > 0;
-
+                    var stillIncomplete = requiredHours > 0 && declaredHours < requiredHours;
                     if (!stillIncomplete) continue;
 
                     var subject = $"Reminder: Timesheet pending for {targetMonth:MMMM yyyy}";
-                    var body = BuildReminderEmailBodyHtml();
+                    var body = BuildTimesheetFocusedReminderEmail(
+                        person.Name, targetMonth.ToString("MMMM yyyy"), declaredHours, requiredHours);
 
-                    await _emailSender.SendEmailAsync(person.Email, subject, body);
+                    // ⬇️ Adjunta guía también en los recordatorios semanales
+                    await SendEmailWithGuideAsync(person.Email, subject, body);
+
                     _logger.LogInformation("[REMINDER] Email enviado a {Email}", person.Email);
                 }
                 catch (Exception ex)
@@ -172,9 +145,11 @@ namespace TRS2._0.Services
         }
 
 
+
         public async Task SendTimesheetRemindersToSingleUserAsync(int personId, bool firstWeekOfMonth)
         {
-            var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == personId && p.Email == "david.reyes@bsc.es");
+            var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == personId);
+
             if (person == null) return;
 
             var today = DateTime.Today;
@@ -182,33 +157,38 @@ namespace TRS2._0.Services
             int previousMonth = today.Month == 1 ? 12 : today.Month - 1;
             var targetMonth = new DateTime(year, previousMonth, 1);
 
-            var reminders = new List<string>();
-
             if (firstWeekOfMonth)
             {
                 var cutoff = new DateTime(today.Year, today.Month, 1);
                 var pendingMonths = await GetPendingMonthsAsync(person.Id, cutoff);
-                if (pendingMonths.Any())
-                {
-                    var body = BuildInitialEmailBodyHtml(pendingMonths);
-                    await _emailSender.SendEmailAsync(person.Email,
-                        "TEST - ACTION REQUIRED – Monthly Completion and Validation of Your TIMESHEET", body);
-                }
+                if (!pendingMonths.Any()) return;
+
+                var body = BuildInitialEmailBodyHtml(pendingMonths);
+                var subject = "TEST - ACTION REQUIRED – Monthly Completion and Validation of Your TIMESHEET";
+
+                await SendEmailWithGuideAsync(person.Email, subject, body, "david.reyes@bsc.es");
+                _logger.LogInformation("[TEST-INITIAL] Email de prueba enviado a {Email}", person.Email);
                 return;
             }
             else
             {
                 var declared = await _workCalendarService.GetDeclaredHoursPerMonthForPerson(person.Id, targetMonth, targetMonth);
-                var pm = await _workCalendarService.CalculateMonthlyPM(person.Id, targetMonth.Year, targetMonth.Month);
                 declared.TryGetValue(targetMonth, out decimal declaredHours);
 
-                if (declaredHours < pm && pm > 0)
+                var dailyHours = await _workCalendarService
+                    .CalculateDailyWorkHoursWithDedication(person.Id, targetMonth.Year, targetMonth.Month);
+                var requiredHours = dailyHours.Values.Sum();
+
+                if (requiredHours > 0 && declaredHours < requiredHours)
                 {
-                    var body = BuildTimesheetFocusedReminderEmail(person.Name, targetMonth.ToString("MMMM yyyy"), declaredHours, pm);
-                    await _emailSender.SendEmailAsync(person.Email, $"TEST - Reminder for {targetMonth:MMMM yyyy}", body);
+                    var body = BuildTimesheetFocusedReminderEmail(person.Name, targetMonth.ToString("MMMM yyyy"), declaredHours, requiredHours);
+                    await SendEmailWithGuideAsync(person.Email, $"TEST - Reminder for {targetMonth:MMMM yyyy}", body, "david.reyes@bsc.es");
+                    _logger.LogInformation("[TEST-REMINDER] Email focalizado de prueba enviado a {Email}", person.Email);
                 }
             }
         }
+
+
 
 
         private string BuildTimesheetGeneralReminderEmail(string name, List<string> pending)
@@ -253,14 +233,14 @@ namespace TRS2._0.Services
             <p>Thank you for your cooperation.<br/>Best regards,<br/>Finance Projects Team</p>";
         }
 
-        private string BuildInitialEmailBodyHtml(List<(DateTime Month, decimal Declared, decimal Pm)> pending)
+        private string BuildInitialEmailBodyHtml(List<(DateTime Month, decimal Declared, decimal Required)> pending)
         {
             // Lista en HTML de los meses pendientes “Mes yyyy: Xh / Yh”
             var sbList = new StringBuilder();
             sbList.Append("<ul>");
-            foreach (var (Month, Declared, Pm) in pending.OrderBy(x => x.Month))
+            foreach (var (Month, Declared, Required) in pending.OrderBy(x => x.Month))
             {
-                sbList.Append($"<li>{Month:MMMM yyyy}: {Declared}h / {Pm}h</li>");
+                sbList.Append($"<li>{Month:MMMM yyyy}: {Declared}h / {Required}h</li>");
             }
             sbList.Append("</ul>");
 
@@ -303,27 +283,40 @@ namespace TRS2._0.Services
         }
 
         // Devuelve la lista de meses < cutoff (primer día del mes actual) en los que declared < pm (y pm>0)
-        private async Task<List<(DateTime Month, decimal Declared, decimal Pm)>> GetPendingMonthsAsync(int personId, DateTime cutoffFirstOfCurrentMonth)
+        private async Task<List<(DateTime Month, decimal Declared, decimal Pm)>> GetPendingMonthsAsync(
+    int personId, DateTime cutoffFirstOfCurrentMonth)
         {
             var pending = new List<(DateTime, decimal, decimal)>();
 
-            // Usa el servicio inyectado (no crear instancias nuevas)
+            // Meses candidatos (anteriores al primer día del mes actual)
             var months = await _loadDataService.RelevantMonths(personId);
 
-            foreach (var month in months.Where(m => m < cutoffFirstOfCurrentMonth))
+            foreach (var month in months
+                .Where(m => m < cutoffFirstOfCurrentMonth && m.Year >= 2025)   // 🔹 solo desde 2025 en adelante
+                .OrderBy(m => m))
             {
-                var declaredDict = await _workCalendarService.GetDeclaredHoursPerMonthForPerson(personId, month, month);
-                var pm = await _workCalendarService.CalculateMonthlyPM(personId, month.Year, month.Month);
+                // 🔎 Requisito: ese mes tuvo effort>0 en algún WP ACTIVO
+                var hasEffortInActiveWp = await HasActiveAssignmentWithEffortAsync(personId, month.Year, month.Month);
+                if (!hasEffortInActiveWp) continue;
 
+                // HORAS requeridas (según dedicación, festivos, bajas…)
+                var dailyHours = await _workCalendarService.CalculateDailyWorkHoursWithDedication(personId, month.Year, month.Month);
+                var requiredHours = dailyHours.Values.Sum();
+
+                // HORAS declaradas
+                var declaredDict = await _workCalendarService.GetDeclaredHoursPerMonthForPerson(personId, month, month);
                 declaredDict.TryGetValue(month, out decimal declared);
-                if (pm > 0 && declared < pm)
+
+                // Añadir a la lista solo si hay horas requeridas y está incompleto
+                if (requiredHours > 0 && declared < requiredHours)
                 {
-                    pending.Add((month, declared, pm));
+                    pending.Add((month, declared, requiredHours));
                 }
             }
 
             return pending;
         }
+
         // Comprueba si la persona tenía al menos un WP activo ese mes Y effort > 0 en ese mes
         private async Task<bool> HasActiveAssignmentWithEffortAsync(int personId, int year, int month)
         {
@@ -340,15 +333,43 @@ namespace TRS2._0.Services
             );
         }
 
-
-
-        // ====== (Opcional) contrato extendido de email con adjuntos ======
-        public interface IEmailSenderWithAttachments : IEmailSender
+        private async Task SendEmailWithGuideAsync(string to, string subject, string htmlBody, string? copyTo = null)
         {
-            Task SendEmailAsync(string to, string subject, string htmlBody, IEnumerable<EmailAttachment> attachments);
+            byte[]? pdfBytes = null;
+
+            if (System.IO.File.Exists(GuidePdfPath))
+            {
+                try { pdfBytes = await System.IO.File.ReadAllBytesAsync(GuidePdfPath); }
+                catch (Exception ex) { _logger.LogWarning(ex, "No se pudo leer el PDF de guía en {Path}", GuidePdfPath); }
+            }
+            else
+            {
+                _logger.LogWarning("El PDF de guía no existe en {Path}. Se enviará sin adjunto.", GuidePdfPath);
+            }
+
+            // Si el EmailSender soporta adjuntos
+            if (_emailSender is IEmailSenderWithAttachments senderWithAttach)
+            {
+                // Adaptación para incluir copia si existe
+                var attachment = pdfBytes != null
+                    ? new[] { new EmailAttachment("BSC TRS 3.0 - Guide.pdf", pdfBytes, GuidePdfContentType) }
+                    : Array.Empty<EmailAttachment>();
+
+                await senderWithAttach.SendEmailAsync(
+                    to: to,
+                    subject: subject,
+                    htmlBody: htmlBody,
+                    attachments: attachment,
+                    copyTo: copyTo // 👈 nuevo parámetro
+                );
+            }
+            else
+            {
+                var bodyWithLink = htmlBody.Replace(
+                    "A detailed user guide is attached to this email",
+                    "A detailed user guide is available <a href=\"/docs/BSC_TRS_Guide_v1.pdf\">here</a>");
+                await _emailSender.SendEmailAsync(to, subject, bodyWithLink);
+            }
         }
-
-        public record EmailAttachment(string FileName, byte[] Content, string ContentType);
-
     }
 }

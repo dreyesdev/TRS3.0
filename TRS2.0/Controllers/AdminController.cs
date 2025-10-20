@@ -819,18 +819,25 @@ namespace TRS2._0.Controllers
             });
         }
 
-        [HttpPost]
-        public async Task<IActionResult> SendTimesheetReminderTest(bool firstWeek)
+        [HttpPost]        
+        public async Task<IActionResult> SendTimesheetReminderTest(string email, bool firstWeek)
         {
-            var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Email == "david.reyes@bsc.es");
+            if (string.IsNullOrWhiteSpace(email))
+                return Json(new { success = false, message = "Debe indicar un correo electrónico válido." });
 
+            var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Email == email);
             if (person == null)
-                return Json(new { success = false, message = "No se encontró la persona con ese correo." });
+                return Json(new { success = false, message = $"No se encontró ninguna persona con el correo {email}." });
 
             await _reminderService.SendTimesheetRemindersToSingleUserAsync(person.Id, firstWeek);
 
-            return Json(new { success = true, message = "Recordatorio enviado (ver logs del servidor para confirmar)." });
+            return Json(new
+            {
+                success = true,
+                message = $"Recordatorio enviado a {email}. Ver logs del servidor para confirmar."
+            });
         }
+
 
 
 
