@@ -182,3 +182,39 @@ h2, .card-header {
 #loadingOverlay {
     display: flex; /* importante para centrar el spinner */
 }
+
+
+/* SweetAlert2 + Bootstrap look */
+.swal2-bootstrap-xxl {
+    border-radius: 1rem !important;
+    padding: 1rem !important;
+    box-shadow: 0 1rem 3rem rgba(0,0,0,.175) !important;
+}
+
+.swal2-title-bootstrap {
+    font-size: 1.25rem !important; /* ~h5 */
+    font-weight: 600 !important;
+    margin-bottom: .25rem !important;
+}
+
+.swal2-html-bootstrap {
+    text-align: left !important;
+}
+
+    .swal2-html-bootstrap .table {
+        margin-bottom: 0 !important;
+    }
+
+        .swal2-html-bootstrap .table td,
+        .swal2-html-bootstrap .table th {
+            padding: .5rem .75rem !important;
+            vertical-align: middle !important;
+        }
+
+.swal2-actions {
+    margin-top: 1rem !important;
+}
+
+.swal2-icon {
+    margin: .5rem auto 1rem !important;
+}

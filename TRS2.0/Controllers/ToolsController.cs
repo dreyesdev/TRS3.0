@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using TRS2._0.Models.DataModels;
@@ -125,6 +126,7 @@ namespace TRS2._0.Controllers
             {
                 var entry = new GlobalEffortEntry
                 {
+                    PersonId = person.Id,
                     PersonName = $"{person.Surname}, {person.Name}",
                     Department = person.DepartmentNavigation?.Name ?? "",
                     Group = person.PersonnelGroup.HasValue
@@ -170,6 +172,52 @@ namespace TRS2._0.Controllers
             return View("GlobalEffort", viewModel);
         }
 
+        [HttpGet]
+        [Route("Tools/GetPersonEffortBreakdown")]
+        public async Task<IActionResult> GetPersonEffortBreakdown(int personId, int year)
+        {
+            var raw = await _context.Persefforts
+                .Where(pe => pe.Month.Year == year &&
+                             pe.WpxPersonNavigation.Person == personId)
+                .Include(pe => pe.WpxPersonNavigation)
+                    .ThenInclude(wpp => wpp.WpNavigation)
+                        .ThenInclude(wp => wp.Proj)
+                .Select(pe => new
+                {
+                    Month = pe.Month.Month,
+                    Value = pe.Value,
+                    ProjectAcronim = pe.WpxPersonNavigation.WpNavigation.Proj != null
+                ? pe.WpxPersonNavigation.WpNavigation.Proj.Acronim
+                : "",
+                    // ⬇️ Mostrar SIEMPRE el Name del WP
+                    WpName = pe.WpxPersonNavigation.WpNavigation.Name
+                })
+                .ToListAsync();
+
+            var rows = raw
+                .GroupBy(r => new { r.ProjectAcronim, r.WpName })
+                .Select(g => new PersonEffortFlatRow
+                {
+                    ProjectAcronym = g.Key.ProjectAcronim ?? "",
+                    WpName = g.Key.WpName ?? "",
+                    MonthValues = g.GroupBy(x => x.Month)
+                                   .ToDictionary(mg => mg.Key, mg => mg.Sum(x => x.Value))
+                })
+                .OrderBy(r => r.ProjectAcronym)
+                .ThenBy(r => r.WpName)
+                .ToList();
+
+            return Json(new { rows });
+        }
+
+
+        public class PersonEffortFlatRow
+        {
+            public string ProjectAcronym { get; set; } = "";
+            public string WpName { get; set; } = "";
+            // Mes -> Valor
+            public Dictionary<int, decimal> MonthValues { get; set; } = new();
+        }
 
     }
 }

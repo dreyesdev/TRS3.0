@@ -35,17 +35,31 @@ namespace TRS2._0.Models.ViewModels
 
         public List<DateTime> GetMonthsForProject()
         {
-            List<DateTime> months = new List<DateTime>();
-            DateTime startDate = (DateTime)Project.Start; 
-            DateTime endDate = (DateTime)Project.EndReportDate; 
+            var months = new List<DateTime>();
 
-            for (var dt = new DateTime(startDate.Year, startDate.Month, 1); dt <= endDate; dt = dt.AddMonths(1))
-            {
+            // Si son no-nullable, necesitamos decidir si "traen valor" comparando con default(DateTime)
+            bool hasStartOverride = ProjectStartDate != default(DateTime);
+            bool hasEndOverride = ProjectEndDate != default(DateTime);
+
+            DateTime startDate = hasStartOverride
+                ? ProjectStartDate
+                : (Project.Start ?? DateTime.MinValue);
+
+            DateTime endDate = hasEndOverride
+                ? ProjectEndDate
+                : Project.EndReportDate;
+
+            // Normaliza a inicio/fin de mes
+            startDate = new DateTime(startDate.Year, startDate.Month, 1);
+            endDate = new DateTime(endDate.Year, endDate.Month, DateTime.DaysInMonth(endDate.Year, endDate.Month));
+
+            for (var dt = startDate; dt <= endDate; dt = dt.AddMonths(1))
                 months.Add(dt);
-            }
 
             return months;
         }
+
+
 
         public List<DateTime> GetUniqueMonthsforPerson()
         {

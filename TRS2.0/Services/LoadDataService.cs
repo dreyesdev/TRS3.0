@@ -1674,9 +1674,15 @@ namespace TRS2._0.Services
                         continue;
                     }
 
-                    var existingLeaves = _context.Leaves
+                    // Cargar existentes SIN tracking y clave por Day.Date
+                    var existingLeavesList = await _context.Leaves
+                        .AsNoTracking()
                         .Where(l => l.PersonId == personId)
-                        .ToDictionary(l => l.Day, l => l);
+                        .ToListAsync();
+
+                    var existingLeaves = existingLeavesList
+                        .GroupBy(l => l.Day.Date)
+                        .ToDictionary(g => g.Key, g => g.First());
 
                     await Task.Delay(1500);
 
@@ -1691,8 +1697,8 @@ namespace TRS2._0.Services
 
                         if (!requestsResponse.IsSuccessStatusCode)
                         {
-                            var responseContent = await requestsResponse.Content.ReadAsStringAsync();
-                            logger.Error($"HTTP request failed (userId={userId}). Status: {requestsResponse.StatusCode}, Content: {responseContent}");
+                            var responseContentReq = await requestsResponse.Content.ReadAsStringAsync();
+                            logger.Error($"HTTP request failed (userId={userId}). Status: {requestsResponse.StatusCode}, Content: {responseContentReq}");
                             morePages = false;
                             continue;
                         }
@@ -1734,10 +1740,10 @@ namespace TRS2._0.Services
                             var hours = (decimal?)r["NumberHoursRequested"] ?? 0;
                             var agreementEventId = r["AgreementEventId"]?.Value<int>() ?? 0;
 
-                            return Enumerable.Range(0, (endDate - startDate).Days + 1)
+                            return Enumerable.Range(0, (endDate.Date - startDate.Date).Days + 1)
                                 .Select(offset => new
                                 {
-                                    Date = startDate.AddDays(offset),
+                                    Date = startDate.Date.AddDays(offset), // normalizado a .Date
                                     Hours = hours,
                                     AgreementEventId = agreementEventId
                                 });
@@ -1745,16 +1751,17 @@ namespace TRS2._0.Services
                         .GroupBy(x => x.Date)
                         .Select(g => new
                         {
-                            Date = g.Key,
+                            Date = g.Key, // ya es .Date
                             TotalHours = g.Sum(x => x.Hours),
                             AgreementEventId = g.First().AgreementEventId
                         });
 
                     var processedDays = new HashSet<DateTime>();
 
+                    // ====== ALTAS / UPDATES ======
                     foreach (var dayGroup in groupedDays)
                     {
-                        var date = dayGroup.Date;
+                        var date = dayGroup.Date.Date; // seguridad: .Date
                         var totalHours = dayGroup.TotalHours;
                         var agreementEventId = dayGroup.AgreementEventId;
 
@@ -1765,49 +1772,71 @@ namespace TRS2._0.Services
                             continue;
                         }
 
-                        // 🔹 Ignorar bajas con Type = 0 (ej. Working from home, Office, Travels)
+                        // Ignorar bajas con Type = 0 (ej. Working from home, Office, Travels)
                         if (agreementEvent.Type == 0)
                         {
                             logger.Information($"Skipping leave with Type=0 for PersonId={personId}, Date={date}, AgreementEventId={agreementEventId}");
                             continue;
                         }
-                        if (agreementEvent != null)
-                        {
-                            decimal leaveReduction;
 
-                            if (agreementEventId == 1079914)
+                        decimal leaveReduction;
+                        if (agreementEventId == 1079914)
+                        {
+                            leaveReduction = 0.5m;
+                            logger.Information($"Processing paternity leave (ID=1079914): PersonId={personId}, Date={date}, Reduction={leaveReduction:P}");
+                        }
+                        else if (totalHours > 0)
+                        {
+                            leaveReduction = await _workCalendarService.CalculateLeaveReductionAsync(personId, date, totalHours);
+                        }
+                        else
+                        {
+                            leaveReduction = 1.00m;
+                        }
+
+                        // Buscar primero en el Local del contexto (por si ya se ha adjuntado en este ciclo)
+                        var localTracked = _context.Leaves.Local
+                            .FirstOrDefault(l => l.PersonId == personId && l.Day == date);
+
+                        Leave target = localTracked;
+
+                        if (target == null)
+                        {
+                            // Evitar segundo attach: consulta a BD (trackeada) para edición si existe
+                            target = await _context.Leaves
+                                .FirstOrDefaultAsync(l => l.PersonId == personId && l.Day == date);
+                        }
+
+                        if (target != null)
+                        {
+                            // Si ya existe y no es Type 3, actualiza campos
+                            if (target.Type == 3)
                             {
-                                leaveReduction = 0.5m;
-                                logger.Information($"Processing paternity leave (ID=1079914): PersonId={personId}, Date={date}, Reduction={leaveReduction:P}");
-                            }
-                            else if (totalHours > 0)
-                            {
-                                leaveReduction = await _workCalendarService.CalculateLeaveReductionAsync(personId, date, totalHours);
+                                logger.Information($"Skipping record with Type 3 for PersonId={personId}, Date={date}.");
                             }
                             else
                             {
-                                leaveReduction = 1.00m;
-                            }
+                                bool changed = false;
 
-                            if (existingLeaves.TryGetValue(date, out var existingLeave))
-                            {
-                                if (existingLeave.Type == 3)
+                                var newType = agreementEventId == 1079914 ? 12 : (int)agreementEvent.Type;
+                                var newHours = totalHours > 0 ? totalHours : (decimal?)null;
+
+                                if (target.LeaveReduction != leaveReduction) { target.LeaveReduction = leaveReduction; changed = true; }
+                                if (target.Hours != newHours) { target.Hours = newHours; changed = true; }
+                                if (target.Type != newType) { target.Type = newType; changed = true; }
+
+                                if (changed)
                                 {
-                                    logger.Information($"Skipping record with Type 3 for PersonId={personId}, Date={date}.");
-                                    continue;
-                                }
-
-                                if (existingLeave.LeaveReduction != leaveReduction || existingLeave.Hours != totalHours)
-                                {
-                                    existingLeave.LeaveReduction = leaveReduction;
-                                    existingLeave.Hours = totalHours > 0 ? totalHours : null;
-                                    existingLeave.Type = agreementEventId == 1079914 ? 12 : (int)agreementEvent.Type;
-                                    _context.Leaves.Update(existingLeave);
-
                                     logger.Information($"Updated leave record for PersonId={personId}, Date={date}, LeaveReduction={leaveReduction}");
                                 }
                             }
-                            else
+                        }
+                        else
+                        {
+                            // Asegúrate de que no haya otra instancia en Local con misma PK
+                            var alreadyLocal = _context.Leaves.Local
+                                .Any(l => l.PersonId == personId && l.Day == date);
+                            if (!alreadyLocal)
                             {
                                 var newLeave = new Leave
                                 {
@@ -1819,15 +1848,28 @@ namespace TRS2._0.Services
                                     Hours = totalHours > 0 ? totalHours : null
                                 };
                                 _context.Leaves.Add(newLeave);
-
                                 logger.Information($"Created new leave record for PersonId={personId}, Date={date}, LeaveReduction={leaveReduction}");
                             }
+                            else
+                            {
+                                // Si por cualquier razón existe en Local, actualiza esa instancia
+                                var local = _context.Leaves.Local.First(l => l.PersonId == personId && l.Day == date);
+                                local.Type = agreementEventId == 1079914 ? 12 : (int)agreementEvent.Type;
+                                local.Legacy = false;
+                                local.LeaveReduction = leaveReduction;
+                                local.Hours = totalHours > 0 ? totalHours : null;
+                                logger.Information($"Updated (local) leave record for PersonId={personId}, Date={date}, LeaveReduction={leaveReduction}");
+                            }
+                        }
 
-                            processedDays.Add(date);
-                        }                        
-
+                        processedDays.Add(date);
                     }
 
+                    // Guardar y limpiar tracker tras altas/updates del usuario
+                    await _context.SaveChangesAsync();
+                    _context.ChangeTracker.Clear();
+
+                    // ====== BAJAS ======
                     var daysToDelete = existingLeaves
                         .Where(e => !processedDays.Contains(e.Key) && e.Value.Legacy == false && e.Value.Type != 3)
                         .Select(e => e.Key)
@@ -1835,13 +1877,15 @@ namespace TRS2._0.Services
 
                     foreach (var day in daysToDelete)
                     {
-                        var leaveToRemove = existingLeaves[day];
-                        _context.Leaves.Remove(leaveToRemove);
+                        // Borrado por “stub” para no adjuntar duplicados
+                        _context.Leaves.Remove(new Leave { PersonId = personId, Day = day });
                         logger.Information($"Deleted leave record for PersonId={personId}, Date={day}");
                     }
+
+                    await _context.SaveChangesAsync();
+                    _context.ChangeTracker.Clear();
                 }
 
-                await _context.SaveChangesAsync();
                 logger.Information("=== Fin del proceso de actualización de la tabla Leave ===");
             }
             catch (Exception ex)

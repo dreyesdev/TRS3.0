@@ -10,8 +10,11 @@ namespace TRS2._0.Services
     // ✅ Nuevo contrato con adjuntos
     public interface IEmailSenderWithAttachments : IEmailSender
     {
-        Task SendEmailAsync(string to, string subject, string htmlBody, IEnumerable<EmailAttachment> attachments, string? copyTo = null);
-
+        Task SendEmailAsync(string to, string subject, string htmlBody,
+                            IEnumerable<EmailAttachment>? attachments,
+                            string? copyTo = null,
+                            string? replyTo = null,
+                            string? fromDisplayName = null);
     }
 
     // ✅ DTO adjunto reutilizable
@@ -26,19 +29,32 @@ namespace TRS2._0.Services
             _smtpSettings = smtpSettings.Value;
         }
 
-        // Método existente (sin adjuntos) – no se rompe nada
-        public async Task SendEmailAsync(string email, string subject, string message)
+        
+        // Método "simple" redirige al completo con parámetros opcionales
+        public async Task SendEmailAsync(string email, string subject, string message,
+                                         string? replyTo = null, string? fromDisplayName = null)
         {
-            await SendEmailAsync(email, subject, message, attachments: null);
+            await SendEmailAsync(
+                to: email,
+                subject: subject,
+                htmlBody: message,
+                attachments: null,
+                copyTo: null,
+                replyTo: replyTo,
+                fromDisplayName: fromDisplayName
+            );
         }
 
         // ✅ Nuevo: envío con adjuntos
+        // Método completo (con adjuntos + Reply-To + DisplayName)
         public async Task SendEmailAsync(
-    string to,
-    string subject,
-    string htmlBody,
-    IEnumerable<EmailAttachment> attachments,
-    string? copyTo = null)
+            string to,
+            string subject,
+            string htmlBody,
+            IEnumerable<EmailAttachment>? attachments,
+            string? copyTo = null,
+            string? replyTo = null,
+            string? fromDisplayName = null)
         {
             using var client = new SmtpClient(_smtpSettings.Host, _smtpSettings.Port)
             {
@@ -46,11 +62,12 @@ namespace TRS2._0.Services
                 EnableSsl = true
             };
 
-            var fromAddress = new MailAddress($"{_smtpSettings.Username}@bsc.es");
+            var from = new MailAddress($"{_smtpSettings.Username}@bsc.es",
+                string.IsNullOrWhiteSpace(fromDisplayName) ? null : fromDisplayName);
 
             using var mail = new MailMessage
             {
-                From = fromAddress,
+                From = from,
                 Subject = subject,
                 Body = htmlBody,
                 IsBodyHtml = true
@@ -58,9 +75,15 @@ namespace TRS2._0.Services
 
             mail.To.Add(to);
 
-            // 👇 Copia opcional
-            if (!string.IsNullOrEmpty(copyTo))
-                mail.Bcc.Add(copyTo); // puedes usar .CC.Add() si prefieres que se vea
+            if (!string.IsNullOrWhiteSpace(copyTo))
+                mail.Bcc.Add(copyTo); // usa CC si quieres que sea visible
+
+            if (!string.IsNullOrWhiteSpace(replyTo))
+                mail.ReplyToList.Add(new MailAddress(replyTo));
+
+            // Cabeceras útiles (opcional)
+            mail.Headers.Add("X-Auto-Response-Suppress", "All");
+            mail.Headers.Add("Auto-Submitted", "auto-generated");
 
             if (attachments != null)
             {
@@ -74,7 +97,7 @@ namespace TRS2._0.Services
 
             await client.SendMailAsync(mail);
         }
-
+       
     }
 
     public class SmtpSettings
@@ -87,7 +110,8 @@ namespace TRS2._0.Services
 
     public interface IEmailSender
     {
-        Task SendEmailAsync(string email, string subject, string message);
+        Task SendEmailAsync(string email, string subject, string message,
+                            string? replyTo = null, string? fromDisplayName = null);
     }
 }
 

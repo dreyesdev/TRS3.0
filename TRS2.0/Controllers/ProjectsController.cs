@@ -17,6 +17,7 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using System.Text;
 using OfficeOpenXml;
+using System.Text.RegularExpressions;
 
 namespace TRS2._0.Controllers
 {
@@ -702,6 +703,8 @@ namespace TRS2._0.Controllers
             var viewModel = new PersonnelEffortPlanViewModel
             {
                 Project = project,
+                ProjectStartDate = adjustedProjectStartDate,   
+                ProjectEndDate = adjustedProjectEndDate,
                 WorkPackages = workPackages.Select(wp => new WorkPackageInfo
                 {
                     WpId = wp.Id,
@@ -1053,10 +1056,16 @@ namespace TRS2._0.Controllers
                                                                                            pe.Month <= adjustedProjectEndDate)
                                                                               .ToDictionary(pe => pe.Month, pe => pe.Value),
                                                                  EffortId = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id)?.Code ?? 0
-                                                             }
-                                                                 }
-                                                             }).ToList()
-                                                         }).ToList()
+                                                              }
+                            }
+                                                             })
+                        .OrderBy(wp => GetWpSortKey(wp.WpName).groupKey)    // NEW
+                        .ThenBy(wp => GetWpSortKey(wp.WpName).numericKey)   // NEW
+                        .ThenBy(wp => GetWpSortKey(wp.WpName).tieBreak)     // NEW
+                        .ToList()
+                                                         })
+                .OrderBy(p => p.ProjectName) // NEW: proyectos por acrónimo A-Z
+                .ToList()
                 };
 
                 // Calcular los PMs del mes de una sola vez si es posible
@@ -2335,7 +2344,21 @@ namespace TRS2._0.Controllers
             return File(bytes, "text/csv", $"EstimatedWorkedDays_{projectId}_{DateTime.Now:yyyyMMdd}.csv");
         }
 
+        // =================== Helper de orden WP ===================
+        // Grupo 0: "WP<number>" (orden por número)
+        // Grupo 1: otros WPs (alfabético)
+        // Grupo 2: "TRAVELS" (siempre al final)
+        private static (int groupKey, int numericKey, string tieBreak) GetWpSortKey(string name)
+        {
+            if (string.Equals(name, "TRAVELS", StringComparison.OrdinalIgnoreCase))
+                return (2, int.MaxValue, "TRAVELS");
 
+            var m = Regex.Match(name ?? "", @"^\s*WP\s*(\d+)\s*$", RegexOptions.IgnoreCase);
+            if (m.Success && int.TryParse(m.Groups[1].Value, out var n))
+                return (0, n, name ?? "");
+
+            return (1, int.MaxValue - 1, name ?? "");
+        }
 
 
 

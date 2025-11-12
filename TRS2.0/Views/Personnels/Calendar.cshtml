@@ -120,19 +120,22 @@
         var calendar;
 
         document.addEventListener('DOMContentLoaded', function () {
-            var calendarEl = document.getElementById('calendar');
-            calendar = new FullCalendar.Calendar(calendarEl, {  
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay'
-                },
-                multiMonthMinWidth: 200,
-                initialView: "multiMonthYear",
-                height: 'auto'
-            });
-            calendar.render();
+          var calendarEl = document.getElementById('calendar');
+          calendar = new FullCalendar.Calendar(calendarEl, {
+            headerToolbar: {
+              left: 'prev,next today',
+              center: 'title',
+              right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            locale: 'es',          // ← NEW
+            firstDay: 1,           // ← NEW (lunes)
+            multiMonthMinWidth: 200,
+            initialView: 'multiMonthYear',
+            height: 'auto'
+          });
+          calendar.render();
         });
+
 
                 function loadCalendarEvents(personId) {
             if (typeof calendar !== 'undefined') {

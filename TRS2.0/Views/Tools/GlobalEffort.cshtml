@@ -10,13 +10,22 @@
     <h2 class="text-center fw-bold">
         Global Effort — @Model.Year
         <div class="d-flex justify-content-center align-items-center gap-3 mt-2">
-            <a class="btn btn-primary" asp-action="Global Effort" asp-route-year="@(Model.Year - 1)">
+            <a class="btn btn-primary"
+               asp-controller="Tools"
+               asp-action="GlobalEffort"
+               asp-route-year="@(Model.Year - 1)">
                 ← @(@Model.Year - 1)
             </a>
+
             <span class="btn btn-outline-dark disabled">@Model.Year</span>
-            <a class="btn btn-primary" asp-action="Global Effort" asp-route-year="@(Model.Year + 1)">
+
+            <a class="btn btn-primary"
+               asp-controller="Tools"
+               asp-action="GlobalEffort"
+               asp-route-year="@(Model.Year + 1)">
                 @(@Model.Year + 1) →
             </a>
+
             <input type="text" id="searchByPerson" class="form-control bg-white text-dark"
                    placeholder="Search by surname..." style="max-width: 250px;" />
             <button class="btn btn-success" onclick="downloadCSV()">
@@ -25,27 +34,31 @@
         </div>
     </h2>
 
-
-<div class="table-responsive scrollable-table-container mt-4">
-    <table class="table table-bordered table-hover table-sm global-hours-table">
-        <thead class="thead-dark">
-            <tr>
-                <th>Person</th>
-                <th>Department</th>
-                <th>Group</th>
-                @foreach (var month in Model.GlobalEffort.Entries.First().MonthlyEffortSummary.Keys)
+    <div class="table-responsive scrollable-table-container mt-4">
+        <table class="table table-bordered table-hover table-sm global-hours-table">
+            <thead class="thead-dark">
+                <tr>
+                    <th>Person</th>
+                    <th>Department</th>
+                    <th>Group</th>
+                    @foreach (var month in Model.GlobalEffort.Entries.First().MonthlyEffortSummary.Keys)
+                    {
+                        <th>@month</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.GlobalEffort.Entries)
                 {
-                    <th>@month</th>
-                }
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var row in Model.GlobalEffort.Entries)
-            {
-                <tr data-name="@row.PersonName.ToLower()" data-surname="@row.PersonName.Split(',')[0].Trim().ToLower()">
-                    <td class="fw-bold">@row.PersonName</td>
-                    <td>@row.Department</td>
-                    <td title="@row.Group">@row.Group</td>
+                    <tr data-personid="@row.PersonId"
+                        data-name="@row.PersonName.ToLower()"
+                        data-surname="@row.PersonName.Split(',')[0].Trim().ToLower()">
+                        <td class="fw-bold person-toggle" style="cursor:pointer">
+                            <i class="bi bi-caret-right-fill me-1"></i>@row.PersonName
+                        </td>
+                        <td>@row.Department</td>
+                        <td title="@row.Group">@row.Group</td>
+
                         @foreach (var val in row.MonthlyEffortSummary.Values)
                         {
                             string cssClass;
@@ -66,49 +79,51 @@
 
                             <td class="@cssClass">@display</td>
                         }
-
-
-                </tr>
-            }
-        </tbody>
-    </table>
+                    </tr>
+                    <!-- La fila de detalle se insertará dinámicamente aquí por JS -->
+                }
+            </tbody>
+        </table>
+    </div>
 </div>
-</div>
-
-
 
 @section Scripts {
     <script>
-        // Filtro en tiempo real por apellido o nombre
+        // -------- Buscador por apellido/nombre (oculta también la fila de detalle asociada) --------
         document.getElementById('searchByPerson').addEventListener('input', function () {
             const search = this.value.toLowerCase();
             document.querySelectorAll('.global-hours-table tbody tr').forEach(row => {
-                const surname = row.getAttribute('data-surname');
-                const fullname = row.getAttribute('data-name');
+                if (row.classList.contains('person-details')) return; // no filtrar sobre filas detalle
+                const surname = row.getAttribute('data-surname') || '';
+                const fullname = row.getAttribute('data-name') || '';
                 const visible = surname.includes(search) || fullname.includes(search);
                 row.style.display = visible ? '' : 'none';
+
+                // oculta también la fila detalle inmediatamente siguiente si existe
+                const next = row.nextElementSibling;
+                if (next && next.classList.contains('person-details')) {
+                    next.style.display = visible ? '' : 'none';
+                }
             });
         });
 
-        // Exportación CSV con coma decimal y punto y coma separador
+        // -------- Exportación CSV (omite filas detalle) --------
         function downloadCSV() {
             let csvBody = "";
 
             const headerRow = ["Person", "Department", "Group"];
             document.querySelectorAll(".global-hours-table thead th")
                 .forEach((th, index) => {
-                    if (index >= 3) {
-                        headerRow.push(th.innerText.trim());
-                    }
+                    if (index >= 3) headerRow.push(th.innerText.trim());
                 });
             csvBody += headerRow.join(";") + "\r\n";
 
             document.querySelectorAll(".global-hours-table tbody tr")
                 .forEach(row => {
+                    if (row.classList.contains('person-details')) return; // excluir filas detalle
                     const cols = row.querySelectorAll("td");
                     const rowData = [];
-
-                    cols.forEach((td, index) => {
+                    cols.forEach((td) => {
                         let value = td.innerText.trim();
                         if (!isNaN(value) && value.includes(".")) {
                             value = value.replace(".", ",");
@@ -116,7 +131,6 @@
                         value = value.replace(/(\r\n|\n|\r)/gm, "");
                         rowData.push(value);
                     });
-
                     csvBody += rowData.join(";") + "\r\n";
                 });
 
@@ -128,6 +142,105 @@
             link.click();
             document.body.removeChild(link);
         }
+
+        // -------- Expandible por persona (AJAX) --------
+                    (function () {
+          const year = @Model.Year;
+          const totalCols = document.querySelectorAll('.global-hours-table thead th').length;
+
+          const headerMonthNames = Array.from(document.querySelectorAll('.global-hours-table thead th'))
+              .slice(3).map(th => th.innerText.trim());
+
+          document.querySelectorAll('.global-hours-table tbody tr .person-toggle').forEach(cell => {
+            cell.addEventListener('click', async function () {
+              const personRow = this.closest('tr'); // <- ancla fija
+              const personId = personRow.getAttribute('data-personid');
+              const expanded = personRow.classList.contains('expanded');
+              const icon = this.querySelector('i');
+
+              if (expanded) {
+                icon.classList.remove('bi-caret-down-fill');
+                icon.classList.add('bi-caret-right-fill');
+                let next = personRow.nextElementSibling;
+                while (next && next.classList.contains('person-details')) {
+                  const toRemove = next;
+                  next = next.nextElementSibling;
+                  toRemove.remove();
+                }
+                personRow.classList.remove('expanded');
+                return;
+              } else {
+                icon.classList.remove('bi-caret-right-fill');
+                icon.classList.add('bi-caret-down-fill');
+                personRow.classList.add('expanded');
+              }
+
+              // placeholder
+              const ph = document.createElement('tr');
+              ph.className = 'person-details';
+              ph.innerHTML = `<td colspan="${totalCols}">
+                  <div class="p-2 text-muted">Loading breakdown…</div>
+                </td>`;
+              personRow.insertAdjacentElement('afterend', ph);
+
+              try {
+                const url = '@Url.Action("GetPersonEffortBreakdown", "Tools")' + `?personId=${personId}&year=${year}`;
+                const resp = await fetch(url);
+                if (!resp.ok) throw new Error('Network error ' + resp.status);
+                const data = await resp.json();
+                const rows = data.rows || [];
+
+                // quitamos placeholder
+                ph.remove();
+
+                // iremos insertando SIEMPRE debajo de "anchor"
+                let anchor = personRow;
+
+                rows.forEach(r => {
+                  const trDet = document.createElement('tr');
+                  trDet.className = 'person-details';
+
+                  let html = `<td class="text-start text-muted">↳</td>`;
+                  html += `<td>${sanitize(r.projectAcronym ?? "")}</td>`;
+                  const wp = r.wpName ?? "";
+                  html += `<td title="${sanitize(wp)}">${sanitize(wp)}</td>`;
+
+                  for (let i = 0; i < headerMonthNames.length; i++) {
+                    const m = i + 1;
+                    const mv = (r.monthValues && (r.monthValues[m] ?? r.monthValues[String(m)])) || 0;
+                    html += `<td>${mv > 0 ? Number(mv).toFixed(2) : ""}</td>`;
+                  }
+
+                  trDet.innerHTML = html;
+                  anchor.insertAdjacentElement('afterend', trDet);
+                  anchor = trDet; // <- ahora sí, avanzamos el ancla para la siguiente fila
+                });
+
+                if (rows.length === 0) {
+                  const empty = document.createElement('tr');
+                  empty.className = 'person-details';
+                  empty.innerHTML = `<td colspan="${totalCols}">
+                      <div class="p-2 text-muted">No assigned efforts for this year.</div>
+                    </td>`;
+                  personRow.insertAdjacentElement('afterend', empty);
+                }
+
+              } catch (e) {
+                ph.innerHTML = `<td colspan="${totalCols}">
+                    <div class="p-2 text-danger">Error loading breakdown: ${e.message}</div>
+                  </td>`;
+              }
+            });
+          });
+
+          function sanitize(str) {
+            if (str == null) return "";
+            return String(str)
+              .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+          }
+        })();
     </script>
 }
 
@@ -137,7 +250,6 @@
         box-sizing: border-box;
         border-right: 1px solid #dee2e6;
     }
-
 
     /* Contenedor con scroll */
     .scrollable-table-container {
@@ -207,18 +319,17 @@
             white-space: nowrap;
         }
 
-
     /* Unifica color de cabecera en las tres primeras columnas */
     .global-hours-table thead th:first-child,
     .global-hours-table thead th:nth-child(2),
     .global-hours-table thead th:nth-child(3) {
-        background-color: #003366; /* mismo azul que el resto de la cabecera */
+        background-color: #003366;
         color: white;
         z-index: 25;
     }
 
     /* Alternancia de filas */
-    .global-hours-table tbody tr:nth-child(even) {
+    .global-hours-table tbody tr:nth-child(even):not(.person-details) {
         background-color: #f2f2f2;
     }
 
@@ -238,6 +349,14 @@
         color: #0c5460 !important;
     }
 
+    /* ---- Estilos del bloque expandido ---- */
+    .person-details td {
+        background: #fbfbfb;
+        border-top: none;
+        padding: 0 !important;
+    }
 
-
+    .person-breakdown-table thead th {
+        background-color: #e9f0fb;
+    }
 </style>

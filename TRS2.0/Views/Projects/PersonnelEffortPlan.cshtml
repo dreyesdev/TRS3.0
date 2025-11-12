@@ -109,7 +109,7 @@
                                                     break;
 
                                                 case 4:                                                    
-                                                    var currentProjId = ViewBag.ProjId;
+                                                    var currentProjId = ViewBag.projId;
                                                     // Comprueba si hay viajes asociados al proyecto actual
                                                     var hasCurrentProjectTravel = monthStatus.UniqueProjIds.Contains(currentProjId);
                                                     var hasOtherProjectTravel = monthStatus.UniqueProjIds.Any(id => id != currentProjId);

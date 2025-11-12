@@ -1,0 +1,107 @@
+﻿@model List<TRS2._0.Services.ReminderService.ReminderCandidate>
+@{
+    Layout = "_Layout"; // o el layout que uses
+    var target = (string)ViewBag.TargetMonth;
+    bool useCap = (bool)ViewBag.UseAssignmentCap;
+    string replyTo = (string?)ViewBag.ReplyTo ?? "(no configurado)";
+    string q = (string)ViewBag.Query;
+    int year = (int)ViewBag.Year;
+    int month = (int)ViewBag.Month;
+
+    int total = Model.Count;
+    int will = Model.Count(x => x.WillSend);
+    int wont = total - will;
+}
+
+<div class="container mt-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap">
+        <h3 class="mb-3">Dry-run Recordatorio Semanal — @target</h3>
+        <div class="mb-3">
+            <span class="badge rounded-pill text-bg-primary me-2">Total: @total</span>
+            <span class="badge rounded-pill text-bg-success me-2">Enviaría: @will</span>
+            <span class="badge rounded-pill text-bg-secondary">No enviaría: @wont</span>
+        </div>
+    </div>
+
+    <div class="alert alert-info py-2">
+        <div><strong>Reply-To:</strong> @replyTo</div>
+        <div><strong>UseAssignmentCap:</strong> @useCap</div>
+    </div>
+
+    <form class="row g-2 mb-3" method="get" action="/Admin/RemindersWeeklyDryRunView">
+        <div class="col-md-2">
+            <label class="form-label">Año</label>
+            <input type="number" class="form-control" name="year" value="@year" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Mes</label>
+            <input type="number" class="form-control" name="month" value="@month" min="1" max="12" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Buscar (nombre/email)</label>
+            <input type="text" class="form-control" name="q" value="@q" placeholder="Ej. ana@bsc.es" />
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+            <button class="btn btn-primary me-2" type="submit">Refrescar</button>
+            <a class="btn btn-outline-secondary" href="/Admin/RemindersWeeklyDryRunView">Limpiar</a>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="min-width:220px">Persona</th>
+                    <th style="min-width:260px">Email</th>
+                    <th class="text-end">Declaradas (h)</th>
+                    <th class="text-end">Requeridas Base (h)</th>
+                    <th class="text-end">Asignación</th>
+                    <th class="text-end">Umbral (h)</th>
+                    <th class="text-center">¿Enviaría?</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model)
+                {
+                    var rowClass = r.WillSend ? "table-warning" : "";
+                    <tr class="@rowClass">
+                        <td>@r.PersonName (@r.PersonId)</td>
+                        <td><a href="mailto:@r.Email">@r.Email</a></td>
+                        <td class="text-end">@r.DeclaredHours</td>
+                        <td class="text-end">@r.RequiredBaseHours</td>
+                        <td class="text-end">
+                            @string.Format("{0:P0}", r.AssignedFraction == 0 && !useCap ? 1 : r.AssignedFraction)
+                        </td>
+                        <td class="text-end">@r.RequiredThresholdHours</td>
+                        <td class="text-center">
+                            @if (r.WillSend)
+                            {
+                                <span class="badge text-bg-warning">Sí</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">No</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot class="table-light">
+                <tr>
+                    <th colspan="2">Totales</th>
+                    <th class="text-end">@Model.Sum(x => x.DeclaredHours)</th>
+                    <th class="text-end">@Model.Sum(x => x.RequiredBaseHours)</th>
+                    <th class="text-end">—</th>
+                    <th class="text-end">@Model.Sum(x => x.RequiredThresholdHours)</th>
+                    <th class="text-center">
+                        <span class="badge text-bg-success">Enviaría: @will</span>
+                    </th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <div class="small text-muted">
+        <em>Las filas resaltadas indican candidatos a los que se <strong>enviaría</strong> el recordatorio.</em>
+    </div>
+</div>

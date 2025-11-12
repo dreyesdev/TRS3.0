@@ -4,18 +4,20 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using TRS2._0.Models.DataModels;
-using TRS2._0.Services;
+using Microsoft.Extensions.Logging;
+using OfficeOpenXml;
+using Serilog;
+using System.Globalization;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using TRS2._0.Models.DataModels;
 using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
 using TRS2._0.Models.ViewModels;
-using OfficeOpenXml;
-using System.Globalization;
-using Microsoft.Extensions.Logging;
-using Serilog;
-using System.Text.RegularExpressions;
-using System.Text;
+using TRS2._0.Services;
+using Microsoft.Extensions.Options;
+
 using static TRS2._0.Services.WorkCalendarService;
 
 namespace TRS2._0.Controllers
@@ -30,10 +32,12 @@ namespace TRS2._0.Controllers
         private readonly ILogger<AdminController> _logger;
         private readonly LoadDataService _loadDataService;
         private readonly ReminderService _reminderService;
+        private readonly ReminderEmailOptions _reminderOptions;
+        private readonly IEmailSender _emailSender;
         private readonly string _logDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Logs");
 
 
-        public AdminController(WorkCalendarService workCalendarService, TRSDBContext context, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, ILogger<AdminController> logger, LoadDataService loadDataService, ReminderService reminderService)
+        public AdminController(WorkCalendarService workCalendarService, TRSDBContext context, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, ILogger<AdminController> logger, LoadDataService loadDataService, ReminderService reminderService, IOptions<ReminderEmailOptions> reminderOptions, IEmailSender emailSender)
         {
             _workCalendarService = workCalendarService;
             _context = context;
@@ -42,6 +46,8 @@ namespace TRS2._0.Controllers
             _logger = logger;
             _loadDataService = loadDataService;
             _reminderService = reminderService;
+            _reminderOptions = reminderOptions.Value;
+            _emailSender = emailSender;
         }
 
         public async Task<IActionResult> Index()
@@ -838,7 +844,105 @@ namespace TRS2._0.Controllers
             });
         }
 
+        [HttpGet]
+        [Authorize(Policy = "AdminPolicy")]
+        public async Task<IActionResult> RemindersWeeklyDryRun(int? year, int? month, bool onlySend = true)
+        {
+            var today = DateTime.Today;
+            int y = year ?? (today.Month == 1 ? today.Year - 1 : today.Year);
+            int m = month ?? (today.Month == 1 ? 12 : today.Month - 1);
 
+            var targetMonth = new DateTime(y, m, 1);
+            var data = await _reminderService.ComputeWeeklyReminderCandidatesAsync(targetMonth, onlySend);
+
+            return Json(new
+            {
+                TargetMonth = targetMonth.ToString("yyyy-MM"),
+                UseAssignmentCap = _reminderOptions.UseAssignmentCap,
+                ReplyTo = _reminderOptions.ReplyTo,
+                CandidatesCount = data.Count,             // ahora ya filtrado
+                WillSendCount = data.Count,               // coincide porque solo devuelves “send”
+                Items = data
+            });
+        }
+
+
+
+        [HttpPost]
+        [Authorize(Policy = "AdminPolicy")]
+        public async Task<IActionResult> SendReplyToSmokeTest(string to)
+        {
+            if (string.IsNullOrWhiteSpace(to))
+                return BadRequest("Parámetro 'to' requerido.");
+
+            string subject = "TRS Reply-To smoke test";
+            string body = @"
+        <p>Este es un email de prueba para verificar <strong>Reply-To</strong>.</p>
+        <p>Responde con “Responder” a este email y comprueba que el destinatario del reply es:
+        <code>" + (_reminderOptions.ReplyTo ?? "(no configurado)") + @"</code></p>";
+
+            // Si la implementación soporta adjuntos/Reply-To, úsala
+            if (_emailSender is IEmailSenderWithAttachments withAttach)
+            {
+                await withAttach.SendEmailAsync(
+                    to: to,
+                    subject: subject,
+                    htmlBody: body,
+                    attachments: Array.Empty<EmailAttachment>(),
+                    copyTo: null,
+                    replyTo: _reminderOptions.ReplyTo,
+                    fromDisplayName: _reminderOptions.FromDisplayName
+                );
+            }
+            else
+            {
+                // Fallback: envía sin Reply-To (si tu IEmailSender no tiene esa sobrecarga)
+                await _emailSender.SendEmailAsync(email: to, subject: subject, message: body);
+                _logger.LogWarning("Reply-To no aplicado: la implementación de IEmailSender no soporta Reply-To. Usa IEmailSenderWithAttachments.");
+            }
+
+            return Ok(new
+            {
+                SentTo = to,
+                ReplyToExpected = _reminderOptions.ReplyTo,
+                FromDisplayName = _reminderOptions.FromDisplayName
+            });
+        }
+
+
+        [HttpGet]
+        [Authorize(Policy = "AdminPolicy")]
+        public async Task<IActionResult> RemindersWeeklyDryRunView(int? year, int? month, string? q = null, bool onlySend = true)
+        {
+            var today = DateTime.Today;
+            int y = year ?? (today.Month == 1 ? today.Year - 1 : today.Year);
+            int m = month ?? (today.Month == 1 ? 12 : today.Month - 1);
+            var targetMonth = new DateTime(y, m, 1);
+
+            var data = await _reminderService.ComputeWeeklyReminderCandidatesAsync(targetMonth, onlySend);
+
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var ql = q.Trim().ToLowerInvariant();
+                data = data.Where(d =>
+                    (d.PersonName ?? "").ToLowerInvariant().Contains(ql) ||
+                    (d.Email ?? "").ToLowerInvariant().Contains(ql)
+                ).ToList();
+            }
+
+            ViewBag.TargetMonth = targetMonth.ToString("MMMM yyyy");
+            ViewBag.UseAssignmentCap = _reminderOptions.UseAssignmentCap;
+            ViewBag.ReplyTo = _reminderOptions.ReplyTo;
+            ViewBag.Query = q ?? "";
+            ViewBag.Year = y;
+            ViewBag.Month = m;
+
+            data = data
+                .OrderBy(r => r.PersonName)
+                .ToList();
+
+            return View("RemindersWeeklyDryRunView", data);
+        }
 
 
     }

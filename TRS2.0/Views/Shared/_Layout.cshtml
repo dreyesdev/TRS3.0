@@ -21,6 +21,11 @@
 
     <link rel="stylesheet" href="@Url.Content("~/lib/bootstrap-icons/bootstrap-icons.css")" />
 
+    <!-- SweetAlert2 -->
+    <link rel="stylesheet" href="~/lib/sweetalert2/sweetalert2.min.css" asp-append-version="true" />
+    
+
+
 
     <!-- 🔹 Agregar referencia a _Layout.cshtml.css -->
     <link rel="stylesheet" href="~/css/layout-styles.css" asp-append-version="true">
@@ -78,6 +83,11 @@
                                         <li>
                                             <a class="dropdown-item" asp-controller="Admin" asp-action="AjustarOverloadManual">
                                                 <i class="bi bi-exclamation-triangle"></i> Ajuste Overloads
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" asp-controller="Admin" asp-action="RemindersWeeklyDryRunView">
+                                                <i class="bi bi-exclamation-triangle"></i> Reminders
                                             </a>
                                         </li>
                                     </ul>
@@ -305,6 +315,7 @@
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src='~/js/index.global.min.js'></script>
     <script src='~/js/locales-all.global.min.js'></script>
+    <script src="~/lib/sweetalert2/sweetalert2.all.min.js" asp-append-version="true"></script>
 
     @await RenderSectionAsync("Scripts", required: false)
 </body>

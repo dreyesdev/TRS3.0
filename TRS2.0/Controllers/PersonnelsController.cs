@@ -1,11 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Threading.Tasks;
 using TRS2._0.Models.DataModels;
+using TRS2._0.Models.ViewModels;
 using TRS2._0.Services;
 
 namespace TRS2._0.Controllers
@@ -610,6 +612,93 @@ namespace TRS2._0.Controllers
             }
         }
 
+        public async Task<IActionResult> LoginLog(int? year)
+        {
+            int selectedYear = year ?? DateTime.Now.Year;
+
+            // Personas con contrato que toca el año
+            var personIdsWithContract = await _context.Dedications
+                .Where(d => d.Start != null && d.End != null
+                    && d.Start <= new DateTime(selectedYear, 12, 31)
+                    && d.End >= new DateTime(selectedYear, 1, 1))
+                .Select(d => d.PersId)
+                .Distinct()
+                .ToListAsync();
+
+            // Personas que además tienen algún effort en proyectos ABIERTO ese año
+            var personIdsWithOpenEffort = await _context.Persefforts
+                .Where(pe => pe.Month.Year == selectedYear)
+                .Include(pe => pe.WpxPersonNavigation)
+                    .ThenInclude(wpp => wpp.WpNavigation)
+                        .ThenInclude(wp => wp.Proj)
+                .Where(pe => pe.WpxPersonNavigation.WpNavigation.Proj != null
+                          && pe.WpxPersonNavigation.WpNavigation.Proj.St1 == "ABIERTO")
+                .Select(pe => pe.WpxPersonNavigation.Person)
+                .Distinct()
+                .ToListAsync();
+
+            // Intersección: contrato + effort en proyecto abierto
+            var eligibleIds = personIdsWithContract.Intersect(personIdsWithOpenEffort).ToList();
+
+            var persons = await _context.Personnel
+                .Where(p => eligibleIds.Contains(p.Id))
+                .Include(p => p.DepartmentNavigation)
+                .ToListAsync();
+
+            // Todos los logins del año seleccionado
+            var loginRows = await _context.UserLoginHistories
+                .Where(l => l.LoginTime.Year == selectedYear)
+                .Select(l => new { l.PersonId, l.LoginTime })
+                .ToListAsync();
+
+            // Primer login por persona/mes
+            var firstLoginByPersMonth = loginRows
+                .GroupBy(x => new { x.PersonId, Month = x.LoginTime.Month })
+                .ToDictionary(
+                    g => (g.Key.PersonId, g.Key.Month),
+                    g => g.Min(x => x.LoginTime)
+                );
+
+            var entries = new List<LoginLogEntry>();
+
+            foreach (var p in persons.OrderBy(p => p.Surname).ThenBy(p => p.Name))
+            {
+                var entry = new LoginLogEntry
+                {
+                    PersonName = $"{p.Surname}, {p.Name}",
+                    Department = p.DepartmentNavigation?.Name ?? "",
+                    Group = p.PersonnelGroup.HasValue
+                        ? _context.Personnelgroups.FirstOrDefault(pg => pg.Id == p.PersonnelGroup)?.GroupName ?? ""
+                        : "",
+                    Email = p.Email ?? "",
+                    MonthlyFirstLogin = new Dictionary<string, string>()
+                };
+
+                for (int m = 1; m <= 12; m++)
+                {
+                    var key = CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(m);
+                    if (firstLoginByPersMonth.TryGetValue((p.Id, m), out var dt))
+                    {
+                        // Formato compacto; cambia a "dd/MM/yyyy HH:mm" si quieres incluir hora
+                        entry.MonthlyFirstLogin[key] = dt.ToLocalTime().ToString("dd/MM/yyyy");
+                    }
+                    else
+                    {
+                        entry.MonthlyFirstLogin[key] = ""; // sin login
+                    }
+                }
+
+                entries.Add(entry);
+            }
+
+            var vm = new LoginLogViewModel
+            {
+                Year = selectedYear,
+                Entries = entries
+            };
+
+            return View("LoginLog", vm);
+        }
 
     }
 

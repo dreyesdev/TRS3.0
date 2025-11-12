@@ -146,7 +146,6 @@ namespace TRS2._0.Controllers
             if (!string.IsNullOrEmpty(pmsRaw))
             {
                 var s = pmsRaw.Trim().Replace(" ", "");
-                // Si tiene ambos separadores, toma el último como decimal y elimina el otro
                 int li = Math.Max(s.LastIndexOf(','), s.LastIndexOf('.'));
                 if (li >= 0)
                 {
@@ -164,6 +163,115 @@ namespace TRS2._0.Controllers
                     updatedWp.Pms = (float)pmsParsed;
             }
 
+            // --- Normalización a primer día de mes (comparación por MES) ---
+            DateTime OldStartM = new DateTime(existingWp.StartDate.Year, existingWp.StartDate.Month, 1);
+            DateTime OldEndM = new DateTime(existingWp.EndDate.Year, existingWp.EndDate.Month, 1);
+
+            DateTime NewStartM = new DateTime(updatedWp.StartDate.Year, updatedWp.StartDate.Month, 1);
+            DateTime NewEndM = new DateTime(updatedWp.EndDate.Year, updatedWp.EndDate.Month, 1);
+
+            // Acortamos?
+            bool shortensFront = NewStartM > OldStartM;
+            bool shortensBack = NewEndM < OldEndM;
+
+            // Si no hay acortamiento, no hay bloqueo por efforts fuera de rango
+            List<object> conflicts = new();
+
+            if (shortensFront || shortensBack)
+            {
+                var proj = await _context.Projects
+                    .Where(p => p.ProjId == existingWp.ProjId)
+                    .Select(p => new { p.ProjId, p.Acronim })
+                    .FirstOrDefaultAsync();
+
+                // Para que EF lo traduzca bien, trabajamos con año/mes como constantes
+                int oldStartY = OldStartM.Year, oldStartM = OldStartM.Month;
+                int oldEndY = OldEndM.Year, oldEndM = OldEndM.Month;
+                int newStartY = NewStartM.Year, newStartM = NewStartM.Month;
+                int newEndY = NewEndM.Year, newEndM = NewEndM.Month;
+
+                // Helper inline para comparar por mes en SQL:
+                // (y1, m1) < (y2, m2)  ->  y1 < y2 OR (y1==y2 AND m1<m2)
+                // (y1, m1) > (y2, m2)  ->  y1 > y2 OR (y1==y2 AND m1>m2)
+
+                var removedAll = await (
+                    from c in _context.Wpxpeople
+                    where c.Wp == existingWp.Id
+                    join e in _context.Persefforts on c.Id equals e.WpxPerson
+                    join per in _context.Personnel on c.Person equals per.Id
+                    where
+                        (
+                            (shortensFront && (
+                                // e.Month < NewStartM  AND e.Month >= OldStartM
+                                (e.Month.Year < newStartY ||
+                                 (e.Month.Year == newStartY && e.Month.Month < newStartM))
+                                &&
+                                (e.Month.Year > oldStartY ||
+                                 (e.Month.Year == oldStartY && e.Month.Month >= oldStartM))
+                            ))
+                            ||
+                            (shortensBack && (
+                                // e.Month > NewEndM AND e.Month <= OldEndM
+                                (e.Month.Year > newEndY ||
+                                 (e.Month.Year == newEndY && e.Month.Month > newEndM))
+                                &&
+                                (e.Month.Year < oldEndY ||
+                                 (e.Month.Year == oldEndY && e.Month.Month <= oldEndM))
+                            ))
+                        )
+                        && e.Value > 0m
+                    select new
+                    {
+                        e.Month,
+                        e.Value,
+                        PersonId = per.Id,
+                        FirstName = per.Name,
+                        LastName = per.Surname
+                    })
+                    .OrderBy(x => x.Month)
+                    .ThenBy(x => x.LastName)
+                    .ThenBy(x => x.FirstName)
+                    .ToListAsync();
+
+                if (removedAll.Any())
+                {
+                    foreach (var r in removedAll)
+                    {
+                        conflicts.Add(new
+                        {
+                            Project = proj?.Acronim,
+                            Wp = existingWp.Name,
+                            Month = new DateTime(r.Month.Year, r.Month.Month, 1).ToString("yyyy-MM-01"),
+                            PersonId = r.PersonId,
+                            Person = $"{r.FirstName} {r.LastName}",
+                            Value = r.Value
+                        });
+                    }
+
+                    var msg =
+                        "No puedes modificar este WP porque existen efforts que quedarían fuera del nuevo rango. " +
+                        "Retira o reubica primero estos efforts y vuelve a intentarlo.";
+
+                    return Json(new
+                    {
+                        success = false,
+                        message = msg,
+                        wp = new
+                        {
+                            Project = proj?.Acronim,
+                            Wp = existingWp.Name,
+                            OldStart = OldStartM.ToString("yyyy-MM-01"),
+                            OldEnd = OldEndM.ToString("yyyy-MM-01"),
+                            NewStart = NewStartM.ToString("yyyy-MM-01"),
+                            NewEnd = NewEndM.ToString("yyyy-MM-01")
+                        },
+                        conflicts
+                    });
+                }
+            }
+
+
+            // Si llegamos aquí, no hay conflictos => aplicar cambios
             existingWp.Name = updatedWp.Name;
             existingWp.Title = updatedWp.Title;
             existingWp.StartDate = updatedWp.StartDate;
@@ -172,8 +280,14 @@ namespace TRS2._0.Controllers
 
             _context.Update(existingWp);
             await _context.SaveChangesAsync();
+
             return Json(new { success = true, message = "WP actualizado con éxito." });
         }
+
+        // Helper
+        private static DateTime FirstDayOfMonth(DateTime dt)
+            => new DateTime(dt.Year, dt.Month, 1);
+
 
 
 

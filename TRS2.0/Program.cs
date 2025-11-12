@@ -90,9 +90,18 @@ builder.Services.AddScoped<WorkCalendarService>();
 builder.Services.AddScoped<ReminderService>();
 builder.Services.AddScoped<LoadDataService>();
 
-// Envio de Correos
+
+// Envío de Correos
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("Smtp"));
-builder.Services.AddTransient<IEmailSender, EmailSender>();
+
+// Opciones del sistema de recordatorios (Reply-To, DisplayName y flag del "cap")
+builder.Services.Configure<ReminderEmailOptions>(
+    builder.Configuration.GetSection("ReminderEmailOptions"));
+
+// EmailSender sirve tanto para simple como para adjuntos; mismo impl para ambas interfaces
+builder.Services.AddScoped<IEmailSender, EmailSender>();
+builder.Services.AddScoped<IEmailSenderWithAttachments, EmailSender>();
+
 
 // Configuración de Quartz para ejecutar `LoadDataService` diariamente a la 1:00 AM
 builder.Services.AddQuartz(q =>

@@ -1,124 +1,215 @@
-﻿@model TRS2._0.Models.ViewModels.LeaderGlobalEffortViewModel
+﻿@using System.Globalization
+@model TRS2._0.Models.ViewModels.LeaderGlobalEffortViewModel
 
 @{
     ViewData["Title"] = "Global Effort Summary";
+    var monthNames = Enumerable.Range(1, 12)
+        .Select(m => CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(m))
+        .ToList();
 }
 
-<div class="container-fluid px-4">
-    <h2 class="text-center mb-4">Global Effort Summary - @Model.Year</h2>
-</div>
+<div class="container-fluid mt-3">
+    <h2 class="text-center fw-bold">
+        Global Effort Summary — @Model.Year
+    </h2>
 
-<div class="d-flex justify-content-between align-items-center mb-3 px-4">
-    <form method="get" asp-action="GlobalEffortSummary" class="d-inline-flex">
-        <select name="year" onchange="this.form.submit()" class="form-select me-2">
-            @for (int y = DateTime.Now.Year - 5; y <= DateTime.Now.Year + 1; y++)
-            {
-                <option value="@y" selected="@(y == Model.Year)">@y</option>
-            }
-        </select>
-    </form>
-    <a class="btn btn-outline-primary" href="@Url.Action("ExportGlobalEffortToCsv", "Leader", new { year = Model.Year })">
-        <i class="bi bi-download"></i> Export to CSV
-    </a>
-    <div class="d-flex align-items-center w-75 gap-2">
-        <button id="toggleAllBtn" class="btn btn-outline-secondary" type="button">
-            <i class="bi bi-arrows-collapse"></i> Expandir/Contraer todo
+    <div class="d-flex justify-content-center align-items-center gap-3 mt-3 flex-wrap">
+        <form method="get" asp-action="GlobalEffortSummary" class="d-inline-flex align-items-center gap-2">
+            <label class="fw-semibold">Año</label>
+            <select name="year" onchange="this.form.submit()" class="form-select">
+                @for (int y = DateTime.Now.Year - 5; y <= DateTime.Now.Year + 1; y++)
+                {
+                    <option value="@y" selected="@(y == Model.Year)">@y</option>
+                }
+            </select>
+        </form>
+
+        <input type="text" id="searchByPerson" class="form-control bg-white text-dark"
+               placeholder="Buscar por apellido o nombre..." style="max-width: 280px;" />
+
+        <button class="btn btn-success" onclick="downloadCSV()">
+            <i class="bi bi-download"></i> Export CSV
         </button>
-
-        <input type="text" id="personSearch" class="form-control w-75" placeholder="Buscar persona por nombre o apellidos..." />
     </div>
-</div>
 
-<div class="container-fluid px-4">
-    @foreach (var person in Model.People)
-    {
-        var collapseId = $"collapse_{person.PersonId}";
-        <div class="card mb-2 person-card" data-person-name="@person.FullName.ToLower()">
-            <div class="card-header custom-blue text-white" style="cursor:pointer" onclick="toggleCollapse('@collapseId')">
-                @person.FullName
-            </div>
-            <div id="@collapseId" class="collapse">
-                <div class="card-body table-responsive">
-                    <table class="table table-bordered table-sm text-center">
-                        <thead class="table-secondary">
-                            <tr>
-                                <th>Mes</th>
-                                <th>Effort</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @for (int m = 1; m <= 12; m++)
-                            {
-                                var data = person.MonthlyEffort[m];
-                                string background = "";
-                                string color = "";
+    <div class="table-responsive scrollable-table-container mt-4">
+        <table class="table table-bordered table-hover table-sm global-effort-table">
+            <thead class="thead-dark">
+                <tr>
+                    <th>Person</th>
+                    @foreach (var m in monthNames)
+                    {
+                        <th>@m</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var person in Model.People)
+                {
+                    var surname = person.FullName.Split(',').FirstOrDefault()?.Trim().ToLower() ?? "";
+                    <tr data-personid="@person.PersonId"
+                        data-name="@person.FullName.ToLower()"
+                        data-surname="@surname">
+                        <td class="fw-bold sticky-person">@person.FullName</td>
 
-                                if (data.Assigned > data.Max)
-                                {
-                                    background = "#fffacd"; // amarillo claro
-                                    color = "#b8860b"; // amarillo oscuro
-                                }
-                                else if (data.Assigned == data.Max)
-                                {
-                                    background = "#e6ffe6"; // verde claro
-                                    color = "darkgreen"; // verde oscuro
-                                }
-                                else
-                                {
-                                    background = "#e6f3ff"; // azul muy claro
-                                    color = "#00008b"; // azul oscuro
-                                }
+                        @for (int m = 1; m <= 12; m++)
+                        {
+                            // Deconstrucción para evitar depender de nombres del ValueTuple
+                            var tuple = person.MonthlyEffort.ContainsKey(m)
+                            ? person.MonthlyEffort[m]
+                            : (0m, 0m);
 
-                                <tr>
-                                    <td>@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)</td>
-                                    <td style="background-color:@background; color:@color; font-weight:bold">
-                                        @data.Assigned.ToString("0.##") | @data.Max.ToString("0.##")
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    }
+                            var assigned = tuple.Item1; // era Registered
+                            var maximum = tuple.Item2; // Max, si el nombre se conserva
+
+                            string cssClass;
+                            if (assigned == maximum)
+                                cssClass = "effort-match";
+                            else if (assigned > maximum)
+                                cssClass = "effort-over";
+                            else
+                                cssClass = "effort-under";
+
+                            <td class="@cssClass">
+                                @assigned.ToString("0.##", CultureInfo.InvariantCulture) | @maximum.ToString("0.##", CultureInfo.InvariantCulture)
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 </div>
 
 @section Scripts {
     <script>
-        function toggleCollapse(id) {
-            const el = document.getElementById(id);
-            const bsCollapse = bootstrap.Collapse.getInstance(el) || new bootstrap.Collapse(el, { toggle: false });
-            bsCollapse.toggle();
+        // --- Buscador por apellido/nombre ---
+        document.getElementById('searchByPerson').addEventListener('input', function () {
+            const search = this.value.toLowerCase();
+            document.querySelectorAll('.global-effort-table tbody tr').forEach(row => {
+                const surname = row.getAttribute('data-surname') || '';
+                const fullname = row.getAttribute('data-name') || '';
+                const visible = surname.includes(search) || fullname.includes(search);
+                row.style.display = visible ? '' : 'none';
+            });
+        });
+
+        // --- Exportación CSV ---
+        function downloadCSV() {
+            let csvBody = "";
+            const headerRow = [];
+            document.querySelectorAll(".global-effort-table thead th")
+                .forEach((th) => headerRow.push(th.innerText.trim()));
+            csvBody += headerRow.join(";") + "\r\n";
+
+            document.querySelectorAll(".global-effort-table tbody tr")
+                .forEach(row => {
+                    if (row.style.display === 'none') return; // respetar filtro
+                    const cols = row.querySelectorAll("td");
+                    const rowData = [];
+                    cols.forEach((td, idx) => {
+                        let value = td.innerText.trim();
+                        if (idx > 0 && value.includes("|")) {
+                            const parts = value.split("|").map(p => p.trim());
+                            value = parts.map(v => v.replace(/\./g, ",")).join(" | ");
+                        }
+                        value = value.replace(/(\r\n|\n|\r)/gm, "");
+                        rowData.push(value);
+                    });
+                    csvBody += rowData.join(";") + "\r\n";
+                });
+
+            const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\uFEFF' + csvBody);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "Global_Effort_Summary.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
-
-        document.getElementById('personSearch').addEventListener('input', function () {
-            const searchValue = this.value.toLowerCase();
-            const cards = document.querySelectorAll('.person-card');
-            cards.forEach(card => {
-                const name = card.getAttribute('data-person-name');
-                card.style.display = name.includes(searchValue) ? '' : 'none';
-            });
-        });
-            document.getElementById('toggleAllBtn').addEventListener('click', function () {
-            const collapses = document.querySelectorAll('.collapse');
-            const allExpanded = [...collapses].every(c => c.classList.contains('show'));
-
-            collapses.forEach(el => {
-                const instance = bootstrap.Collapse.getInstance(el) || new bootstrap.Collapse(el, { toggle: false });
-                if (allExpanded) {
-                    instance.hide();
-                } else {
-                    instance.show();
-                }
-            });
-        });
     </script>
 
     <style>
-        .custom-blue {
-            background-color: #004085;
+        .scrollable-table-container {
+            overflow: auto;
+            max-height: 1000px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: #fff;
+        }
+
+        .global-effort-table th,
+        .global-effort-table td {
+            box-sizing: border-box;
+            border-right: 1px solid #dee2e6;
+            min-width: 100px;
+            text-align: center;
+            vertical-align: middle;
+            white-space: nowrap;
+            font-size: 0.95rem;
+        }
+
+        /* Cabecera fija */
+        .global-effort-table thead th {
+            position: sticky;
+            top: 0;
+            background-color: #003366;
             color: white;
+            z-index: 20;
+            text-align: center;
+            height: 55px;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        /* Primera columna fija (Persona) */
+        .global-effort-table td.sticky-person,
+        .global-effort-table th:first-child {
+            position: sticky;
+            left: 0;
+            background-color: #f8f9fa;
+            z-index: 25;
+            width: 320px; /* ← aumentado para nombres largos */
+            min-width: 320px;
+            max-width: 320px;
+            text-align: left;
+            padding-left: 14px;
+            white-space: normal; /* permite salto de línea */
+            word-wrap: break-word;
+        }
+
+        /* Cabecera de la primera columna igual que las demás */
+        .global-effort-table thead th:first-child {
+            background-color: #003366;
+            color: white;
+            text-align: left;
+            padding-left: 14px;
+            z-index: 30;
+        }
+
+        /* Alternancia de filas */
+        .global-effort-table tbody tr:nth-child(even) {
+            background-color: #f8f8f8;
+        }
+
+        /* Colores condicionales */
+        .global-effort-table td.effort-match {
+            background-color: #d4edda !important; /* verde claro */
+            color: #155724 !important;
+            font-weight: 600;
+        }
+
+        .global-effort-table td.effort-over {
+            background-color: #fff3cd !important; /* amarillo claro */
+            color: #856404 !important;
+            font-weight: 600;
+        }
+
+        .global-effort-table td.effort-under {
+            background-color: #d1ecf1 !important; /* azul claro */
+            color: #0c5460 !important;
+            font-weight: 600;
         }
     </style>
+
 }
