@@ -1,0 +1,68 @@
+﻿----- FILE (RAW): appsettings.json -----
+{
+  //"ConnectionStrings": {
+  //  "DefaultConnection": "data source = OPSTRS03.BSC.ES; initial catalog = TRSBDDTEST; user id = admin; password = seidor; Trusted_Connection = True;TrustServerCertificate=True;Integrated Security=False;"
+  //},
+
+  "ConnectionStrings": {
+    "DefaultConnection": "data source = OPSTRS03.BSC.ES; initial catalog = TRSBDD; user id = admin; password = seidor; Trusted_Connection = True;TrustServerCertificate=True;Integrated Security=False;"
+  },
+
+  "Smtp": {
+    "Host": "mail.bsc.es",
+    "Port": 587,
+    "Username": "trs",
+    "Password": "vjNPBW/dCL8yKx3ZIEeqDvTaBOwA4cBax/aWIt83UlI="
+  },
+
+
+  "Authentication": {
+    "CAS": {
+      "ServerUrlBase": "https://cas.bsc.es/cas",
+      "ProtocolVersion": 2
+    }
+  },
+
+  "ReminderEmailOptions": {
+    "ReplyTo": "financeprojects@bsc.es",
+    "FromDisplayName": "Finance Projects",
+    "UseAssignmentCap": true
+  },
+  
+
+
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.EntityFrameworkCore": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "AllowedHosts": "*",
+  "Kestrel": {
+    "Endpoints": {
+      "Https": {
+        "Url": "https://localhost:5001",
+        "Certificate": {
+          "Path": "C:\\Users\\dreyes\\Source\\Repos\\trs3.0\\TRS2.0\\Resources\\opstrs03.bsc.es.pfx",
+          //"Path": "C:\\Users\\dreyes\\Desktop\\Desarrollo\\TRS2.0\\TRS2.0\\Resources\\opstrs03.bsc.es.pfx", // Casa
+          //"Path": "C:\\Users\\premo\\source\\repos\\trs3.0nuevo\\TRS2.0\\opstrs03.bsc.es.pfx",//Colegio
+          "Password": "seidor"
+        }
+      }
+    }
+  }
+}
+
+----- FILE (SANITIZED): appsettings.Development.json -----
+{
+    "Logging":  {
+                    "LogLevel":  {
+                                     "Default":  "Information",
+                                     "Microsoft.AspNetCore":  "Warning"
+                                 }
+                }
+}
+
+

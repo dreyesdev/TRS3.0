@@ -1,0 +1,2277 @@
+﻿=== BUNDLE: Models (20251113_094855) ===
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\AffCodification.cs -----
+namespace TRS2._0.Models.DataModels
+{
+    public class AffCodification
+    {
+        public string Contract { get; set; }
+        public string Dist { get; set; }
+
+        public int Affiliation { get; set; }    
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\AffGlobalHours.cs -----
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace TRS2._0.Models.DataModels
+{
+    [Table("AffGlobalHours")]
+    public class AffGlobalHours
+    {
+        [Key]
+        public int Id { get; set; }
+
+        [ForeignKey("Affiliation")]
+        public int Aff { get; set; }
+
+        public int Year { get; set; }
+
+        public decimal Hours { get; set; }
+
+        public virtual Affiliation Affiliation { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\AffHours.cs -----
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace TRS2._0.Models.DataModels
+{
+    [Table("AffHours")]
+    public class AffHours
+    {
+        [Key]
+        public int Id { get; set; }
+
+        [ForeignKey("Affiliation")]
+        public int AffId { get; set; }
+
+        [Column(TypeName = "datetime2")]
+        public DateTime StartDate { get; set; }
+
+        [Column(TypeName = "datetime2")]
+        public DateTime EndDate { get; set; }
+
+        [Column(TypeName = "decimal(5, 2)")]
+        public decimal Hours { get; set; }
+
+        public virtual Affiliation Affiliation { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Affiliation.cs -----
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace TRS2._0.Models.DataModels
+{
+    [Table("Affiliations")] // Este atributo especifica el nombre de la tabla en la base de datos
+    public class Affiliation
+    {
+        [Key] // Indica que esta propiedad es la llave primaria de la tabla
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)] // Esto es para que el Id sea generado automáticamente por la base de datos
+        public int Id { get; set; }
+
+        [Required] // Indica que el campo es obligatorio
+        [StringLength(255)] // Define la longitud máxima del campo
+        public string Name { get; set; }
+
+        public virtual ICollection<AffGlobalHours> AffGlobalHours { get; set; }
+
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\AffxPerson.cs -----
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace TRS2._0.Models.DataModels
+{
+    public class AffxPerson
+    {
+        [Key]
+        public int Id { get; set; }
+
+        [ForeignKey("Personnel")]
+        public int PersonId { get; set; }
+        public virtual Personnel Personnel { get; set; }
+
+        [ForeignKey("Affiliation")]
+        public int AffId { get; set; }
+        public virtual Affiliation Affiliation { get; set; }
+
+        [DataType(DataType.Date)]
+        public DateTime Start { get; set; }
+
+        [DataType(DataType.Date)]
+        public DateTime End { get; set; }
+
+        public int LineId { get; set; }
+        public bool Exist { get; set; }
+
+        // NUEVO: responsable histórico del tramo
+        public int? ResponsibleId { get; set; }
+
+        [ForeignKey(nameof(ResponsibleId))]
+        public virtual Personnel? Responsible { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\AgreementEvent.cs -----
+using System.ComponentModel.DataAnnotations;
+
+namespace TRS2._0.Models.DataModels
+{
+    public class AgreementEvent
+    {
+        [Key]
+        public int AgreementEventId { get; set; }
+        public string Name { get; set; }
+
+        public int? Type { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\AgreementEventDto.cs -----
+namespace TRS2._0.Models.DataModels
+{
+    public class AgreementEventDto
+    {
+        public int AgreementEventId { get; set; }
+        public string Name { get; set; }
+        
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\ApplicationUser.cs -----
+using Microsoft.AspNetCore.Identity;
+
+namespace TRS2._0.Models.DataModels
+{
+    namespace TRS2._0.Models.DataModels
+    {
+        public class ApplicationUser : IdentityUser
+        {
+            public int? PersonnelId { get; set; }
+            public virtual Personnel Personnel { get; set; }
+        }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\CellColorState.cs -----
+namespace TRS2._0.Models.DataModels
+{
+    public class CellColorState
+    {
+        public string Color { get; set; }
+        public string Gradient { get; set; }
+        public bool IsOutOfContract { get; set; }
+        public bool IsOverloaded { get; set; }
+        public List<int> LeaveTypes { get; set; } = new List<int>();
+
+        public CellColorState()
+        {
+            Color = "white"; // Color por defecto
+            Gradient = string.Empty;
+            IsOutOfContract = false;
+            IsOverloaded = false;
+        }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\DailyPMValue.cs -----
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace TRS2._0.Models.DataModels
+{
+    [Table("DailyPMValues")]
+    public class DailyPMValue
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Required]
+        public int Year { get; set; }
+
+        [Required]
+        public int Month { get; set; }
+
+        [Required]
+        public int WorkableDays { get; set; }
+
+        [Required]
+        [Column(TypeName = "decimal(18,6)")]
+        public decimal PmPerDay { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Dedication.cs -----
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace TRS2._0.Models.DataModels;
+
+[Table("dedication")]
+public partial class Dedication
+{
+    [Key]
+    public int Id { get; set; } // Clave primaria autoincrementable
+    public int PersId { get; set; }
+    [Column(TypeName = "decimal(5, 4)")]
+    public decimal Reduc { get; set; }
+    [Column(TypeName = "date")]
+    public DateTime Start { get; set; }
+    [Column(TypeName = "date")]
+    public DateTime End { get; set; }
+    public int Type { get; set; }
+    [ForeignKey("PersId")]
+    public virtual Personnel Pers { get; set; } = null!;
+
+    public int? LineId { get; set; }
+    public bool Exist { get; set; }
+
+}
+
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Department.cs -----
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace TRS2._0.Models.DataModels;
+
+[Table("department")]
+public partial class Department
+{
+    [Key]
+    public int Id { get; set; }
+
+    [StringLength(50)]
+    public string? Name { get; set; }
+
+    [InverseProperty("DepartmentNavigation")]
+    public virtual ICollection<Personnel> Personnel { get; set; } = new List<Personnel>();
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\EffortUpdateModel.cs -----
+namespace TRS2._0.Models.DataModels
+{
+    public class EffortUpdateModel
+    {
+        public class EffortData
+        {
+            public int PersonId { get; set; }
+            public int WpId { get; set; }
+            public DateTime Month { get; set; }
+            public decimal Effort { get; set; }
+        }
+
+        public List<EffortData> Efforts { get; set; }        
+
+        public int ProjectId { get; set; }
+
+    }
+        
+
+}
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\EffortUpdateModelperPerson.cs -----
+namespace TRS2._0.Models.DataModels
+{
+    public class EffortUpdateModelperPerson
+    {
+        public class EffortData
+        {
+            public int PersonId { get; set; }
+            public int WpId { get; set; }
+            public DateTime Month { get; set; }
+            public decimal Effort { get; set; }
+        }
+        public List<EffortData> Efforts { get; set; }       
+
+        public int ProjectId { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Leader.cs -----
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace TRS2._0.Models.DataModels
+{
+    [Table("Leaders")]
+    public class Leader
+    {
+        [Key]
+        public int Id { get; set; }
+
+        [Required]
+        [MaxLength(1)]
+        [Column(TypeName = "char")]
+        public string Tipo { get; set; }
+
+        [Required]        
+        public int GrupoDepartamento { get; set; }
+
+        [Required]
+        public int LeaderId { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Leave.cs -----
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace TRS2._0.Models.DataModels
+{
+    [Table("Leave")]
+    public class Leave
+    {
+        [Key, Column(Order = 0)]
+        [ForeignKey("PersonNavigation")]
+        public int PersonId { get; set; }
+
+        [Key, Column("Day", Order = 1, TypeName = "date")]
+        public DateTime Day { get; set; }
+
+        public int Type { get; set; }
+
+        public bool Legacy { get; set; }
+
+        [Column(TypeName = "decimal(5, 2)")]
+        public decimal LeaveReduction { get; set; }
+
+        [Column(TypeName = "decimal(5, 2)")]
+        public decimal? Hours { get; set; }
+
+        public virtual Personnel PersonNavigation { get; set; }
+    }
+}
+
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Liqdayxproject.cs -----
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace TRS2._0.Models.DataModels
+{
+    [Table("Liqdayxproject")]
+    public class Liqdayxproject
+    {
+        [Key, Column(Order = 0)]
+        public string LiqId { get; set; }
+        
+        public int PersId { get; set; }
+
+        [Key, Column(Order = 1)]
+        public int ProjId { get; set; }
+
+        [Key]
+        [Column(Order = 2)]
+        [DataType(DataType.Date)]
+        public DateTime Day { get; set; }
+
+        [Column(TypeName = "decimal(5, 2)")]
+        public decimal Dedication { get; set; }
+
+        [Column(TypeName = "decimal(5, 4)")]
+        public decimal PMs { get; set; }
+
+        public string Status { get; set; }
+
+        [ForeignKey("PersId")]
+        public virtual Personnel Personnel { get; set; }
+
+        [ForeignKey("ProjId")]
+        public virtual Project Project { get; set; }
+
+        [ForeignKey("LiqId")]
+        public virtual Liquidation Liquidation { get; set; }
+
+        
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Liquidation.cs -----
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace TRS2._0.Models.DataModels
+{
+    [Table("Liquidations")]
+    public class Liquidation
+    {
+        [Key]
+        public string Id { get; set; }
+
+        
+        public int PersId { get; set; }
+
+        public string Project1 { get; set; }
+
+        [Column(TypeName = "decimal(5, 2)")]
+        public decimal Dedication1 { get; set; }
+
+        public string? Project2 { get; set; }
+
+        [Column(TypeName = "decimal(5, 2)")]
+        public decimal? Dedication2 { get; set; }
+
+        [Column(TypeName = "date")]
+        public DateTime Start { get; set; }
+
+        [Column(TypeName = "date")]
+        public DateTime End { get; set; }
+
+        public string Destiny { get; set; }
+
+        public string Reason { get; set; }
+
+        public string Status { get; set; }
+
+        [ForeignKey("PersId")]
+        public virtual Personnel Personnel { get; set; }
+
+        public virtual ICollection<Liqdayxproject> Liqdayxprojects { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\LockModel.cs -----
+namespace TRS2._0.Models.DataModels
+{
+    public class LockModel
+    {
+        public int PersonId { get; set; }
+        public int Year { get; set; }
+        public int Month { get; set; }
+        public int ProjectId { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\MonthStatus.cs -----
+namespace TRS2._0.Models.DataModels
+{
+    public class MonthStatus
+    {
+        public DateTime Month { get; set; }
+        public int Status { get; set; }
+        public List<int> AdditionalStatuses { get; set; }
+
+        public bool IsLocked { get; set; }
+        public string Gradient { get; set; }
+        // Nueva propiedad para incluir los detalles de los viajes y los proyectos asociados
+        public List<TravelDetails> TravelDetails { get; set; }
+
+        public List<int> UniqueProjIds { get; set; }
+    }
+
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\NationalHoliday.cs -----
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace TRS2._0.Models.DataModels
+{
+    [Table("NationalHolidays")]
+    public class NationalHoliday
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Required]
+        [Column(TypeName = "date")]
+        public DateTime Date { get; set; }
+
+        [StringLength(100)]
+        public string Description { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Perseffort.cs -----
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace TRS2._0.Models.DataModels;
+
+[Table("perseffort")]
+[Index("WpxPerson", Name = "X4")]
+public partial class Perseffort
+{
+    [Key]
+    public int Code { get; set; }
+
+    public int WpxPerson { get; set; }
+
+    [Column(TypeName = "date")]
+    public DateTime Month { get; set; }
+
+    [Column(TypeName = "decimal(3, 2)")]
+    public decimal Value { get; set; }
+
+    [ForeignKey("WpxPerson")]
+    [InverseProperty("Persefforts")]
+    public virtual Wpxperson WpxPersonNavigation { get; set; } = null!;
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\PersMonthEffort.cs -----
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace TRS2._0.Models.DataModels
+{
+    public class PersMonthEffort
+    {
+        [Key, Column(Order = 0)]
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
+        public int PersonId { get; set; }
+
+        [Key, Column(Order = 1, TypeName = "date")]
+        public DateTime Month { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal Value { get; set; }
+
+        [ForeignKey("PersonId")]
+        public virtual Personnel PersonNavigation { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Personnel.cs -----
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
+
+namespace TRS2._0.Models.DataModels
+{
+    [Table("personnel")]
+    [Index("Department", Name = "X1")]
+    [Index("Affiliation", Name = "X2")]
+    [Index("Id", "BscId", "Name", Name = "personnel$PersConstr", IsUnique = true)]
+    public partial class Personnel
+    {
+        [Key]
+        public int Id { get; set; }
+
+        [StringLength(50)]
+        public string? BscId { get; set; }
+
+        [StringLength(50)]
+        public string? Name { get; set; }
+
+        [StringLength(50)]
+        public string? Surname { get; set; }
+
+        public int? Department { get; set; }
+
+        public int? Affiliation { get; set; }
+
+        [Column(TypeName = "date")]
+        public DateTime? StartDate { get; set; }
+
+        [Column(TypeName = "date")]
+        public DateTime? EndDate { get; set; }
+
+        [StringLength(50)]
+        public string? Category { get; set; }
+
+        public int Resp { get; set; }
+
+        public int? PersonnelGroup { get; set; }
+
+        [Column("email")]
+        [StringLength(50)]
+        public string Email { get; set; } = null!;
+
+        [Column("A3Code")]
+        public int? A3code { get; set; }
+
+        [StringLength(50)]
+        public string Password { get; set; } = null!;
+
+        public string? PermissionLevel { get; set; }
+
+        public int? UserId { get; set; }
+
+        public virtual ApplicationUser ApplicationUser { get; set; }
+
+        [ForeignKey("Department")]
+        [InverseProperty("Personnel")]
+        public virtual Department? DepartmentNavigation { get; set; }
+
+        [InverseProperty("PersonNavigation")]
+        public virtual ICollection<Projectxperson> Projectxpeople { get; set; } = new List<Projectxperson>();
+
+        [InverseProperty("PersonNavigation")]
+        public virtual ICollection<Wpxperson> Wpxpeople { get; set; } = new List<Wpxperson>();
+
+        public virtual ICollection<Leave> Leaves { get; set; } = new List<Leave>();
+
+        public virtual ICollection<Liqdayxproject> Liqdayxprojects { get; set; } = new List<Liqdayxproject>();
+        public virtual ICollection<Liquidation> Liquidations { get; set; } = new List<Liquidation>();
+
+        [InverseProperty("Personnel")]
+        public virtual ICollection<AffxPerson> AffxPersons { get; set; } = new List<AffxPerson>();
+    }
+}
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Personnelgroup.cs -----
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace TRS2._0.Models.DataModels;
+
+[Table("personnelgroup")]
+public partial class Personnelgroup
+{
+    [Key]
+    public int Id { get; set; }
+
+    [StringLength(50)]
+    public string GroupName { get; set; } = null!;
+
+    public int? Leader { get; set; }
+
+    public int? Leader2 { get; set; }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\ProcessExecutionLog.cs -----
+namespace TRS2._0.Models.DataModels
+{
+    public class ProcessExecutionLog
+    {
+        public int Id { get; set; }
+        public string ProcessName { get; set; }
+        public DateTime ExecutionTime { get; set; }
+        public string Status { get; set; } // "Exitoso", "Advertencias", "Fallido"
+        public string LogMessage { get; set; } // Mensajes de warning o error
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Project.cs -----
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace TRS2._0.Models.DataModels;
+
+[Table("projects")]
+[Index("SapCode", Name = "projects$ProjConstr", IsUnique = true)]
+public partial class Project
+{
+    [Key]
+    [Column("ProjID")]
+    public int ProjId { get; set; }
+
+    [StringLength(50)]
+    public string? SapCode { get; set; }
+
+    [StringLength(50)]
+    public string? Acronim { get; set; }
+
+    [StringLength(250)]
+    public string? Title { get; set; }
+
+    [StringLength(50)]
+    public string? Contract { get; set; }
+
+    [Column(TypeName = "date")]
+    public DateTime? Start { get; set; }
+
+    [Column(TypeName = "date")]
+    public DateTime? End { get; set; }
+
+    [Column("TPsUPC")]
+    public short? TpsUpc { get; set; }
+
+    [Column("TPsICREA")]
+    public short? TpsIcrea { get; set; }
+
+    [Column("TPsCSIC")]
+    public short? TpsCsic { get; set; }
+
+    [Column("PI")]
+    public int? Pi { get; set; }
+
+    [Column("PM")]
+    public int? Pm { get; set; }
+
+    [Column("FM")]
+    public int? Fm { get; set; }
+
+    [StringLength(50)]
+    public string Type { get; set; } = null!;
+
+    [Column("sType")]
+    [StringLength(50)]
+    public string SType { get; set; } = null!;
+
+    [StringLength(50)]
+    public string St1 { get; set; } = null!;
+
+    [StringLength(50)]
+    public string St2 { get; set; } = null!;
+
+    [Column(TypeName = "date")]
+    public DateTime EndReportDate { get; set; }
+
+    public short Visible { get; set; }
+
+    [InverseProperty("Proj")]
+    public virtual ICollection<Projectxperson> Projectxpeople { get; set; } = new List<Projectxperson>();
+
+    [InverseProperty("Proj")]
+    public virtual ICollection<Wp> Wps { get; set; } = new List<Wp>();
+
+    [InverseProperty("Project")]
+    public virtual ICollection<Liqdayxproject> Liqdayxprojects { get; set; } = new List<Liqdayxproject>();
+
+    [InverseProperty("Project")]
+    public virtual ICollection<ReportPeriod> ReportPeriods { get; set; } = new List<ReportPeriod>();
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\ProjectMonthLock.cs -----
+namespace TRS2._0.Models.DataModels;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+[Table("ProjectMonthLocks")]
+public class ProjectMonthLock
+{
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public int Id { get; set; }
+
+    [Required]
+    public int ProjectId { get; set; }
+
+    [Required]
+    public int PersonId { get; set; }
+
+    [Required]
+    public int Year { get; set; }
+
+    [Required]
+    public int Month { get; set; }
+
+    [Required]
+    public bool IsLocked { get; set; } // 0 = Unlocked, 1 = Locked
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Projectxperson.cs -----
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace TRS2._0.Models.DataModels;
+
+[Table("projectxperson")]
+[Index("ProjId", Name = "pxp1")]
+[Index("Person", Name = "pxp2")]
+public partial class Projectxperson
+{
+    [Key]
+    public int Id { get; set; }
+
+    public int ProjId { get; set; }
+
+    public int Person { get; set; }
+
+    [ForeignKey("Person")]
+    [InverseProperty("Projectxpeople")]
+    public virtual Personnel PersonNavigation { get; set; } = null!;
+
+    [ForeignKey("ProjId")]
+    [InverseProperty("Projectxpeople")]
+    public virtual Project Proj { get; set; } = null!;
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Projeffort.cs -----
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace TRS2._0.Models.DataModels;
+
+[Table("projeffort")]
+[Index("Wp", Name = "X5")]
+public partial class Projeffort
+{
+
+    [Column("WP")]
+    public int Wp { get; set; }
+
+    [Column(TypeName = "date")]
+    public DateTime Month { get; set; }
+
+    [Column(TypeName = "decimal(10, 2)")]
+    public decimal Value { get; set; }
+
+    [ForeignKey("Wp")]
+    public virtual Wp WpNavigation { get; set; } = null!;
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\ReportPeriod.cs -----
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace TRS2._0.Models.DataModels
+{
+    [Table("ReportPeriods")]
+    public class ReportPeriod
+    {
+        [Key]
+        public int Id { get; set; }
+
+        [Column(TypeName = "date")]
+        public DateTime StartDate { get; set; }
+
+        [Column(TypeName = "date")]
+        public DateTime EndDate { get; set; }
+
+        // Clave foránea de Project
+        public int ProjId { get; set; }
+
+        // Propiedad de navegación
+        [ForeignKey("ProjId")]
+        public virtual Project Project { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Timesheet.cs -----
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
+namespace TRS2._0.Models.DataModels
+{
+    [Table("Timesheets")]
+    public class Timesheet
+    {
+        [Key, Column(Order = 0)]
+        public int WpxPersonId { get; set; }
+
+        [Key, Column(Order = 1)]
+        public DateTime Day { get; set; }
+
+        public decimal Hours { get; set; }
+
+        [ForeignKey("WpxPersonId")]
+        public virtual Wpxperson WpxPersonNavigation { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\TimesheetErrorLog.cs -----
+using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
+
+namespace TRS2._0.Models.DataModels
+{
+    public class TimesheetErrorLog
+    {
+        public int Id { get; set; }
+        public string FileName { get; set; }
+        public string PersonName { get; set; }
+        public string ProjectName { get; set; }
+        public string WorkPackageName { get; set; }
+        public string Month { get; set; }
+        public string ErrorMessage { get; set; }
+        public DateTime Timestamp { get; set; } = DateTime.Now; // Registra la fecha del error
+        public bool IsResolved { get; set; } = false; // Indica si el error fue corregido
+        public string? AuthorId { get; set; }
+        public ApplicationUser Author { get; set; } 
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\TimesheetUpdateModel.cs -----
+namespace TRS2._0.Models.DataModels
+{
+    public class TimesheetUpdateModel
+    {
+
+        public class TimesheetData
+        {
+            public int ProjectId { get; set; }
+            public int WpId { get; set; }
+            public int PersonId { get; set; }
+            public DateTime Day { get; set; }
+            public decimal Hours { get; set; }
+
+        }
+
+        public List<TimesheetData> TimesheetDataList { get; set; } = new List<TimesheetData>();
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\TokenData.cs -----
+namespace TRS2._0.Models.DataModels
+{
+    public class TokenData
+    {
+        public string AccessToken { get; set; }
+        public DateTime Expiration { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\TravelDetails.cs -----
+namespace TRS2._0.Models.DataModels
+{
+    public class TravelDetails
+    {
+        public string LiqId { get; set; }
+
+        public decimal Dedication { get; set; }
+
+        public DateTime StartDate { get; set; }
+
+        public DateTime EndDate { get; set; }
+        public DateTime Day { get; set; }
+        public int ProjId { get; set; }
+
+        public string ProjectAcronimo { get; set; }
+
+        public string ProjectSAPCode { get; set; }
+
+
+    }
+
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\TRSDBContext.cs -----
+using System;
+using System.Collections.Generic;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
+
+namespace TRS2._0.Models.DataModels;
+
+public partial class TRSDBContext : IdentityDbContext<ApplicationUser>
+{
+    public TRSDBContext()
+    {
+    }
+
+    public TRSDBContext(DbContextOptions<TRSDBContext> options)
+        : base(options)
+    {
+    }
+
+    public virtual DbSet<Dedication> Dedications { get; set; }
+
+    public virtual DbSet<Department> Departments { get; set; }
+
+    public virtual DbSet<Perseffort> Persefforts { get; set; }
+
+    public virtual DbSet<Personnel> Personnel { get; set; }
+
+    public virtual DbSet<Personnelgroup> Personnelgroups { get; set; }
+
+    public virtual DbSet<Project> Projects { get; set; }
+
+    public virtual DbSet<Projectxperson> Projectxpeople { get; set; }
+
+    public virtual DbSet<Projeffort> Projefforts { get; set; }
+
+    public virtual DbSet<Wp> Wps { get; set; }
+
+    public virtual DbSet<Wpxperson> Wpxpeople { get; set; }
+
+    public virtual DbSet<Leave> Leaves { get; set; }
+
+    public DbSet<NationalHoliday> NationalHolidays { get; set; }
+    public DbSet<DailyPMValue> DailyPMValues { get; set; }
+
+    public DbSet<PersMonthEffort> PersMonthEfforts { get; set; }
+
+    public DbSet<Liquidation> Liquidations { get; set; }
+
+    public DbSet<Liqdayxproject> liqdayxproject { get; set; }
+
+    public DbSet<Timesheet> Timesheets { get; set; }
+
+    public DbSet<Affiliation> Affiliations { get; set; }
+
+    public DbSet<AffxPerson> AffxPersons { get; set; }
+
+    public DbSet<AffHours> AffHours { get; set; }
+
+    public DbSet<ReportPeriod> ReportPeriods { get; set; }
+
+    public DbSet<ProjectMonthLock> ProjectMonthLocks { get; set; }
+
+    public DbSet<AffCodification> AffCodifications { get; set; }
+
+    public DbSet<Leader> Leaders { get; set; }
+
+    public DbSet<AgreementEvent> AgreementEvents { get; set; }
+
+    public DbSet<AffGlobalHours> AffGlobalHours { get; set; }
+
+    public DbSet<TimesheetErrorLog> TimesheetErrorLogs { get; set; }
+
+    public DbSet<ProcessExecutionLog> ProcessExecutionLogs { get; set; }
+
+    public DbSet<UserLoginHistory> UserLoginHistories { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            optionsBuilder.UseSqlServer("data source = OPSTRS03.BSC.ES; initial catalog = TRSBDD; user id = admin; password = seidor; Trusted_Connection = True;TrustServerCertificate=True;Integrated Security=False;");
+        }
+    }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<Dedication>(entity =>
+        {
+            entity.HasOne(d => d.Pers).WithMany().HasConstraintName("dedication$deidcationx1");
+        });
+
+        modelBuilder.Entity<Department>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_department_Id");
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+        });
+
+        modelBuilder.Entity<Perseffort>(entity =>
+        {
+            entity.HasKey(e => e.Code).HasName("PK_perseffort_Code");
+
+            entity.HasOne(d => d.WpxPersonNavigation).WithMany(p => p.Persefforts).HasConstraintName("perseffort$X4");
+        });
+
+        modelBuilder.Entity<Personnel>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_personnel_Id");
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+
+            entity.HasOne(d => d.DepartmentNavigation).WithMany(p => p.Personnel)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("personnel$X1");
+            entity.Property(e => e.Password).HasMaxLength(255).IsRequired(false);
+            entity.Property(e => e.PermissionLevel).HasMaxLength(50).IsRequired(false).HasDefaultValue("User");
+        });
+
+        modelBuilder.Entity<Personnelgroup>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_personnelgroup_Id");
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+        });
+
+        modelBuilder.Entity<Project>(entity =>
+        {
+            entity.HasKey(e => e.ProjId).HasName("PK_projects_ProjID");
+        });
+
+        modelBuilder.Entity<Projectxperson>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_projectxperson_Id");
+
+            entity.HasOne(d => d.PersonNavigation).WithMany(p => p.Projectxpeople).HasConstraintName("projectxperson$pxp2");
+
+            entity.HasOne(d => d.Proj).WithMany(p => p.Projectxpeople).HasConstraintName("projectxperson$pxp1");
+        });
+
+        modelBuilder.Entity<Projeffort>(entity =>
+        {
+            entity.HasOne(d => d.WpNavigation).WithMany().HasConstraintName("projeffort$X5");
+        });
+
+        modelBuilder.Entity<Wp>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_wp_Id");
+
+            entity.HasOne(d => d.Proj).WithMany(p => p.Wps).HasConstraintName("wp$wp_ibfk_1");
+        });
+
+        modelBuilder.Entity<Wpxperson>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_wpxperson_Id");
+
+            entity.HasOne(d => d.PersonNavigation).WithMany(p => p.Wpxpeople).HasConstraintName("wpxperson$wxp2");
+
+            entity.HasOne(d => d.WpNavigation).WithMany(p => p.Wpxpeople).HasConstraintName("wpxperson$wxp1");
+        });
+
+        modelBuilder.Entity<Leave>(entity =>
+        {
+            // Definir la clave primaria compuesta
+            entity.HasKey(e => new { e.PersonId, e.Day });
+
+            // Configurar la relación con Personnel
+            entity.HasOne(d => d.PersonNavigation)
+                  .WithMany(p => p.Leaves) // Asegúrate de que Personnel tiene una propiedad ICollection<Leave> Leaves
+                  .HasForeignKey(d => d.PersonId)
+                  .HasConstraintName("FK_Leave_Personnel");
+        });
+
+        // Configurar clave compuesta para Projeffort
+        modelBuilder.Entity<Projeffort>()
+            .HasKey(e => new { e.Wp, e.Month });
+
+        modelBuilder.Entity<Dedication>(entity =>
+        {
+            entity.HasKey(e => e.Id); // Establece Id como clave primaria
+            entity.HasOne(d => d.Pers).WithMany().HasForeignKey(d => d.PersId).HasConstraintName("dedication$deidcationx1");
+        });
+
+        modelBuilder.Entity<Liquidation>()
+    .HasOne(l => l.Personnel)
+    .WithMany(p => p.Liquidations) // Asume que Personnel tiene una propiedad ICollection<Liquidation> Liquidations
+    .HasForeignKey(l => l.PersId);
+
+
+        modelBuilder.Entity<PersMonthEffort>()
+            .HasKey(e => new { e.PersonId, e.Month });
+
+        modelBuilder.Entity<Liqdayxproject>().HasKey(l => new { l.LiqId, l.ProjId, l.Day });
+
+        // Configurar la relación y especificar NO ACTION para las operaciones de DELETE
+        modelBuilder.Entity<Liqdayxproject>()
+            .HasOne(l => l.Personnel)
+            .WithMany(l => l.Liqdayxprojects) // Si Personnel tiene una propiedad de navegación hacia Liqdayxprojects, especifícala aquí
+            .HasForeignKey(l => l.PersId)
+            .OnDelete(DeleteBehavior.NoAction); // Esto previene la eliminación en cascada
+
+        modelBuilder.Entity<Liqdayxproject>()
+            .HasOne(l => l.Project)
+            .WithMany(l => l.Liqdayxprojects) // Si Project tiene una propiedad de navegación hacia Liqdayxprojects, especifícala aquí
+            .HasForeignKey(l => l.ProjId)
+            .OnDelete(DeleteBehavior.NoAction); // Esto previene la eliminación en cascada
+
+        modelBuilder.Entity<Liqdayxproject>()
+            .HasOne(l => l.Liquidation)
+            .WithMany(l => l.Liqdayxprojects) // Asume que Liquidation tiene una propiedad de navegación hacia Liqdayxprojects, especifícala aquí
+            .HasForeignKey(l => l.LiqId)
+            .OnDelete(DeleteBehavior.NoAction); // Esto previene la eliminación en cascada
+
+        // Configuración para Timesheet
+        modelBuilder.Entity<Timesheet>().HasKey(t => new { t.WpxPersonId, t.Day }); // Clave compuesta
+       
+
+
+        modelBuilder.Entity<Timesheet>()
+            .HasOne(t => t.WpxPersonNavigation)
+            .WithMany(p => p.Timesheets) 
+            .HasForeignKey(t => t.WpxPersonId);
+
+        
+        modelBuilder.Entity<Affiliation>().HasKey(a => a.Id); // Clave primaria
+        // Configura la relación uno-a-muchos entre Personnel y AffxPerson
+        modelBuilder.Entity<AffxPerson>()
+            .HasOne(p => p.Personnel) // Un AffxPerson tiene un Personnel
+            .WithMany(b => b.AffxPersons) // Un Personnel tiene muchos AffxPersons
+            .HasForeignKey(p => p.PersonId); // La clave foránea en AffxPerson que apunta a Personnel
+
+        // Configura la relación uno-a-muchos entre Affiliation y AffxPerson
+        modelBuilder.Entity<AffxPerson>()
+            .HasOne(a => a.Affiliation) // Un AffxPerson tiene una Affiliation
+            .WithMany() // Una Affiliation tiene muchos AffxPersons, si no tienes una propiedad de navegación en Affiliation, puedes dejar este lado sin especificar.
+            .HasForeignKey(a => a.AffId); // La clave foránea en AffxPerson que apunta a Affiliation
+
+        modelBuilder.Entity<AffxPerson>()
+    .HasIndex(a => new { a.PersonId, a.Start, a.End });
+
+        modelBuilder.Entity<AffxPerson>()
+            .HasIndex(a => a.ResponsibleId);
+
+        modelBuilder.Entity<AffxPerson>()
+            .HasOne(a => a.Responsible)
+            .WithMany()
+            .HasForeignKey(a => a.ResponsibleId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        // Configura la entidad AffHours
+        modelBuilder.Entity<AffHours>(entity =>
+        {
+            entity.HasKey(e => e.Id); // Clave primaria
+
+            entity.Property(e => e.Hours)
+                .HasColumnType("decimal(5, 2)"); // Configura la precisión y escala de Hours
+
+            // Configura la relación uno-a-muchos entre Affiliation y AffHours
+            entity.HasOne(d => d.Affiliation) // Un AffHours tiene una Affiliation
+                .WithMany() // Una Affiliation tiene muchos AffHours, si no tienes una propiedad de navegación en Affiliation, puedes dejar este lado sin especificar.
+                .HasForeignKey(d => d.AffId) // La clave foránea en AffHours que apunta a Affiliation
+                .OnDelete(DeleteBehavior.ClientSetNull); // Configura el comportamiento en caso de eliminación
+        });
+        OnModelCreatingPartial(modelBuilder);
+
+        modelBuilder.Entity<AffCodification>()
+            .HasKey(c => new { c.Contract, c.Dist });
+
+        modelBuilder.Entity<Personnel>()
+                .HasOne(p => p.ApplicationUser)
+                .WithOne(u => u.Personnel)
+                .HasForeignKey<ApplicationUser>(u => u.PersonnelId);
+
+        modelBuilder.Entity<AgreementEvent>()
+        .ToTable("AgreementEvents") // Asegúrate de que el nombre coincida exactamente
+        .Property(a => a.AgreementEventId);
+        
+        modelBuilder.Entity<UserLoginHistory>()
+            .HasOne(ulh => ulh.Personnel)
+            .WithMany()            
+            .HasForeignKey(ulh => ulh.PersonId)
+            .OnDelete(DeleteBehavior.NoAction); // Esto previene la eliminación en cascada
+    }
+
+    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\UserLoginHistory.cs -----
+using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
+using TRS2._0.Models.DataModels;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace TRS2._0.Models
+{
+    public class UserLoginHistory
+    {
+        [Key]
+        public int Id { get; set; }        
+
+        [Required]
+        public int PersonId { get; set; } // Nuevo campo para almacenar el ID del personal
+
+        public DateTime LoginTime { get; set; }        
+
+        [ForeignKey("PersonId")]
+        public virtual Personnel Personnel { get; set; } // Relación con la tabla de personal
+    }
+}
+
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\WoffuUser.cs -----
+namespace TRS2._0.Models.DataModels
+{
+    public class WoffuUser
+    {
+
+        public int UserId { get; set; }
+        public string Email { get; set; }
+
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Wp.cs -----
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace TRS2._0.Models.DataModels;
+
+[Table("wp")]
+[Index("ProjId", "Name", Name = "wp$ProjId", IsUnique = true)]
+public partial class Wp
+{
+    [Key]
+    public int Id { get; set; }
+
+    public int ProjId { get; set; }
+
+    [StringLength(100)]
+    public string Name { get; set; } = null!;
+
+    [StringLength(250)]
+    public string? Title { get; set; }
+
+    [Column(TypeName = "date")]
+    public DateTime StartDate { get; set; }
+
+    [Column(TypeName = "date")]
+    public DateTime EndDate { get; set; }
+
+    [Column("PMs")]
+    public float Pms { get; set; }
+
+    [ForeignKey("ProjId")]
+    [InverseProperty("Wps")]
+    public virtual Project? Proj { get; set; } = null!;
+
+    [InverseProperty("WpNavigation")]
+    public virtual ICollection<Wpxperson> Wpxpeople { get; set; } = new List<Wpxperson>();
+}
+
+public class data
+{
+    public int wpId { get; set; }
+    public Dictionary<string, string> efforts { get; set; }
+}
+
+
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\WpPersonChange.cs -----
+namespace TRS2._0.Models.DataModels
+{
+    public class WpPersonChange
+    {
+        public int WpId { get; set; }
+        public int PersonId { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\DataModels\Wpxperson.cs -----
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
+namespace TRS2._0.Models.DataModels;
+
+[Table("wpxperson")]
+[Index("Wp", Name = "wxp1")]
+[Index("Person", Name = "wxp2")]
+public partial class Wpxperson
+{
+    [Key]
+    public int Id { get; set; }
+
+    public int Wp { get; set; }
+
+    public int Person { get; set; }
+
+    [InverseProperty("WpxPersonNavigation")]
+    public virtual ICollection<Perseffort> Persefforts { get; set; } = new List<Perseffort>();
+
+    [ForeignKey("Person")]
+    [InverseProperty("Wpxpeople")]
+    public virtual Personnel PersonNavigation { get; set; } = null!;
+
+    [ForeignKey("Wp")]
+    [InverseProperty("Wpxpeople")]
+    public virtual Wp WpNavigation { get; set; } = null!;
+
+    [InverseProperty("WpxPersonNavigation")]
+    public virtual ICollection<Timesheet> Timesheets { get; set; } = new List<Timesheet>();
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ErrorViewModel.cs -----
+namespace TRS2._0.Models
+{
+    public class ErrorViewModel
+    {
+        public string? RequestId { get; set; }
+
+        public bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+    }
+}
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ProjectEffortUpdateModel.cs -----
+namespace TRS2._0.Models
+{
+    public class ProjectEffortUpdateModel
+    {
+        public class ProjeffortUpdateData
+        {
+            public int WpId { get; set; }
+            public string Month { get; set; }
+
+            public decimal Value { get; set; }
+        }
+        
+            public List<ProjeffortUpdateData> Efforts { get; set; }
+        
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\AdminIndexViewModel.cs -----
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Collections.Generic;
+using TRS2._0.Models.DataModels;
+
+namespace TRS2._0.Models.ViewModels
+{
+    public class AdminIndexViewModel
+    {
+        public List<DailyPMValue> DailyPMValues { get; set; }
+        public List<SelectListItem> People { get; set; }
+        public List<SelectListItem> Users { get; set; }
+        public List<SelectListItem> Roles { get; set; }
+
+        public List<ProcessExecutionLog> ProcessLogs { get; set; }
+    }
+}
+
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\EffortPlanViewModel.cs -----
+using TRS2._0.Models.DataModels;
+using TRS2._0.Services;
+
+namespace TRS2._0.Models.ViewModels
+{
+    public class EffortPlanViewModel
+    {
+        public int ProjId { get; set; }
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public List<WorkPackageEffort> WorkPackages { get; set; }   
+        public EffortPlanViewModel()
+        {
+            WorkPackages = new List<WorkPackageEffort>();
+        }
+
+        // Método para obtener la lista de meses en el rango
+        public List<DateTime> GetMonthsInRange()
+        {
+            var months = new List<DateTime>();
+            DateTime month = new DateTime(StartDate.Year, StartDate.Month, 1);
+
+            while (month <= EndDate)
+            {
+                months.Add(month);
+                month = month.AddMonths(1);
+            }
+
+            return months;
+        }
+    }
+
+
+
+    public class WorkPackageEffort
+    {
+        public string WpName { get; set; } // Nombre del WP
+        public int WpId { get; set; } // ID del WP, útil para guardar los cambios
+        public Dictionary<DateTime, float> MonthlyEfforts { get; set; } // Esfuerzos por mes para este WP
+        public float TotalEffort { get; set; } // Total acumulado de esfuerzos para este WP
+
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+
+
+        public WorkPackageEffort()
+        {
+            MonthlyEfforts = new Dictionary<DateTime, float>();
+        }
+
+
+        public bool IsValidMonth(DateTime month)
+        {
+            // Aquí se asume que 'month' es el primer día del mes en cuestión y 
+            // 'StartDate' y 'EndDate' son las fechas de inicio y fin del WP.
+            // Ajusta el método 'AddMonths' y 'AddDays' según la lógica de tu aplicación.
+            DateTime monthStart = new DateTime(month.Year, month.Month, 1);
+            DateTime monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
+            return StartDate <= monthEnd && EndDate >= monthStart;
+        }
+
+        public float getPMs(int WpId)
+        {   
+                    float PMs = 0;
+                   using (var context = new TRSDBContext())
+            {
+                var wp = context.Wps.FirstOrDefault(w => w.Id == WpId);
+                PMs = wp.Pms;
+            }
+            return PMs;
+        }
+
+    }
+
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\General.cs -----
+using System.ComponentModel.DataAnnotations;
+
+namespace TRS2._0.Models.ViewModels
+{
+    
+        public class LoginViewModel
+        {
+            public string BSCID { get; set; }
+            public string Password { get; set; }
+            public bool RememberMe { get; set; }
+        }
+
+    public class RegisterViewModel
+    {
+        [Required]
+        [Display(Name = "BSCID")]
+        public string BSCID { get; set; }
+    }
+
+    public class ForgotPasswordViewModel
+    {
+        [Required]
+        [EmailAddress]
+        [Display(Name = "Email")]
+        public string Email { get; set; }
+    }
+
+    public class ResetPasswordViewModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; }
+
+        [Required]
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string Password { get; set; }
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; }
+
+        public string Code { get; set; }
+    }
+
+    public class ChangePasswordViewModel
+    {
+        [Required]
+        [DataType(DataType.Password)]
+        [Display(Name = "Current password")]
+        public string OldPassword { get; set; }
+
+        [Required]
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [DataType(DataType.Password)]
+        [Display(Name = "New password")]
+        public string NewPassword { get; set; }
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm new password")]
+        [Compare("NewPassword", ErrorMessage = "The new password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; }
+    }
+
+
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\GlobalHoursViewModel.cs -----
+namespace TRS2._0.Models.ViewModels
+{
+    public class GlobalHoursViewModel
+    {
+        public List<GlobalHoursEntry> Entries { get; set; }
+        
+
+        public class GlobalHoursEntry
+        {
+            public string PersonName { get; set; }
+            public string Department { get; set; }
+            public string Group { get; set; }
+            public Dictionary<string, decimal> MonthlyHours { get; set; }
+        }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\GlovalEffortViewModel.cs -----
+namespace TRS2._0.Models.ViewModels
+{
+    public class GlobalEffortEntry
+    {
+        public int PersonId { get; set; }
+        public string PersonName { get; set; }
+        public string Department { get; set; }
+        public string Group { get; set; }
+        public Dictionary<string, string> MonthlyEffortSummary { get; set; } // "asignado | máximo"
+    }
+
+    public class GlobalEffortViewModel
+    {
+        public List<GlobalEffortEntry> Entries { get; set; }
+    }
+
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\LeaderEffortViewModel.cs -----
+using System;
+using System.Collections.Generic;
+
+namespace TRS2._0.Models.ViewModels
+{
+    public class LeaderEffortViewModel
+    {
+        public int Year { get; set; }
+        public List<LeaderEffortPersonViewModel> People { get; set; }
+    }
+
+    public class LeaderEffortPersonViewModel
+    {
+        public int PersonId { get; set; }
+        public string FullName { get; set; }
+        public bool HasMultipleProjectsOrWPs { get; set; }
+        public List<LeaderEffortDetail> Efforts { get; set; } = new();
+    }
+
+    public class LeaderEffortDetail
+    {
+        public string Project { get; set; }
+        public string WP { get; set; } // si es sub-WP, este campo se usa
+        public Dictionary<int, decimal> MonthlyEffort { get; set; }
+        public List<LeaderEffortDetail> SubEfforts { get; set; } // si es nivel proyecto, sub-WPs
+    }
+
+}
+
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\LeaderGlobalEffortViewModel.cs -----
+namespace TRS2._0.Models.ViewModels
+{
+    public class LeaderGlobalEffortViewModel
+    {
+        public int Year { get; set; }
+        public List<LeaderGlobalEffortPersonViewModel> People { get; set; } = new();
+    }
+
+    public class LeaderGlobalEffortPersonViewModel
+    {
+        public int PersonId { get; set; }
+        public string FullName { get; set; }
+
+        // Clave = mes (1 a 12), valor = (asignado, máximo permitido)
+        public Dictionary<int, (decimal Assigned, decimal Max)> MonthlyEffort { get; set; } = new();
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\LeaderTimesheetOverviewViewModel.cs -----
+namespace TRS2._0.Models.ViewModels
+{
+    public class LeaderTimesheetOverviewViewModel
+    {
+        public int Year { get; set; }
+        public List<LeaderTimesheetPersonViewModel> People { get; set; } = new();
+    }
+
+    public class LeaderTimesheetPersonViewModel
+    {
+        public int PersonId { get; set; }
+        public string FullName { get; set; }
+        public Dictionary<int, (decimal Registered, decimal Max)> MonthlyHours { get; set; } = new(); // Key: mes 1-12
+    }
+
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\LoginLogViewModel.cs -----
+namespace TRS2._0.Models.ViewModels
+{
+    public class LoginLogViewModel
+    {
+        public int Year { get; set; }
+        public List<LoginLogEntry> Entries { get; set; } = new();
+    }
+
+    public class LoginLogEntry
+    {
+        public string PersonName { get; set; } = "";
+        public string Department { get; set; } = "";
+        public string Group { get; set; } = "";
+        public string Email { get; set; } = "";
+        // Clave = "Jan", "Feb", ... como en GlobalHours/Effort
+        public Dictionary<string, string> MonthlyFirstLogin { get; set; } = new();
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\ManageRolesViewModel.cs -----
+using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Collections.Generic;
+
+namespace TRS2._0.Models.ViewModels
+{
+    public class ManageRolesViewModel
+    {
+        public List<SelectListItem> Users { get; set; }
+        public List<SelectListItem> Roles { get; set; }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\PeriodDetailsViewModel.cs -----
+using System.Globalization;
+using TRS2._0.Models.DataModels;
+
+namespace TRS2._0.Models.ViewModels
+{
+    public class PeriodDetailsViewModel
+    {
+        public ReportPeriod ReportPeriod { get; set; }
+        public List<Wp> WorkPackages { get; set; }
+        public List<PersonnelDetails> Persons { get; set; }
+        public Dictionary<string, string> MonthDetails { get; set; } = new Dictionary<string, string>();
+
+        public void CalculateMonths(DateTime startDate, DateTime endDate)
+        {
+            int totalMonths = ((endDate.Year - startDate.Year) * 12) + endDate.Month - startDate.Month + 1;
+            for (int i = 0; i < totalMonths; i++)
+            {
+                var monthDate = startDate.AddMonths(i);
+                string monthIndex = $"M{i + 1}";
+                string monthName = monthDate.ToString("MMM yyyy", CultureInfo.InvariantCulture); // Formato del nombre del mes y año
+
+                MonthDetails.Add(monthIndex, monthName); // Añade el par clave-valor al diccionario
+            }
+        }
+
+        public class PersonnelDetails
+        {
+            public Personnel Personnel { get; set; }
+            
+            public Dictionary<DateTime, decimal> TotalEffortinProyect { get; set; }
+
+            public Dictionary<DateTime, decimal> DeclaredHours { get; set; }
+
+            public Dictionary<DateTime, decimal> HoursinProyect { get; set; }
+
+            public Dictionary<DateTime, decimal> TotalHours { get; set; }
+
+            // Diccionario que mapea ID de persona a un diccionario de año-mes a un par de bools (Out of Contract, Overloaded)
+            public Dictionary<string, (bool OutOfContract, bool Overloaded)> PersonStatusByMonth {get; set;}
+
+            public Dictionary<string, bool> LockStatusByMonth { get; set; }
+
+            public Dictionary<DateTime, decimal> CompletionPercentage { get; set; }
+
+            public Dictionary<DateTime, (string InvestigatorDate, string ResponsibleDate)> LoginStatusByMonth { get; set; }
+
+
+        }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\PersonEffortBreakdownDto.cs -----
+using System;
+using System.Collections.Generic;
+
+namespace TRS2._0.Models.ViewModels
+{
+    public class MonthEffortItem
+    {
+        public string ProjectAcronym { get; set; } = "";
+        public string WpName { get; set; } = "";
+        public decimal Value { get; set; }
+    }
+
+    public class PersonEffortBreakdownDto
+    {
+        public int PersonId { get; set; }
+        public int Year { get; set; }
+        // Clave = 1..12, Valor = lista de efforts en ese mes
+        public Dictionary<int, List<MonthEffortItem>> ByMonth { get; set; } = new();
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\PersonnelEffortPlanViewModel.cs -----
+using TRS2._0.Models.DataModels;
+using TRS2._0.Services;
+
+namespace TRS2._0.Models.ViewModels
+{
+    public class PersonnelEffortPlanViewModel
+    {
+        public Perseffort Perseffort { get; set; } = null!;
+        public Project Project { get; set; } = null!;
+        public DateTime ProjectStartDate { get; set; }
+        public DateTime ProjectEndDate { get; set; }
+        public List<WorkPackageInfo> WorkPackages { get; set; } = new List<WorkPackageInfo>();
+
+        public WorkCalendarService WorkCalendarService { get; set; } = null!;
+        public List<DateTime> UniqueMonths => GetUniqueMonths();
+        public List<DateTime> UniqueMonthsforPerson => GetUniqueMonthsforPerson();
+
+        public List<DateTime> GetUniqueMonths()
+        {
+            if (Project == null || !Project.Start.HasValue)
+                return new List<DateTime>();
+
+            var start = new DateTime(Project.Start.Value.Year, Project.Start.Value.Month, 1);
+            var end = new DateTime(Project.EndReportDate.Year, Project.EndReportDate.Month, 1);
+
+            var months = new List<DateTime>();
+            for (var date = start; date <= end; date = date.AddMonths(1))
+            {
+                months.Add(date);
+            }
+
+            return months;
+        }
+
+
+        public List<DateTime> GetMonthsForProject()
+        {
+            var months = new List<DateTime>();
+
+            // Si son no-nullable, necesitamos decidir si "traen valor" comparando con default(DateTime)
+            bool hasStartOverride = ProjectStartDate != default(DateTime);
+            bool hasEndOverride = ProjectEndDate != default(DateTime);
+
+            DateTime startDate = hasStartOverride
+                ? ProjectStartDate
+                : (Project.Start ?? DateTime.MinValue);
+
+            DateTime endDate = hasEndOverride
+                ? ProjectEndDate
+                : Project.EndReportDate;
+
+            // Normaliza a inicio/fin de mes
+            startDate = new DateTime(startDate.Year, startDate.Month, 1);
+            endDate = new DateTime(endDate.Year, endDate.Month, DateTime.DaysInMonth(endDate.Year, endDate.Month));
+
+            for (var dt = startDate; dt <= endDate; dt = dt.AddMonths(1))
+                months.Add(dt);
+
+            return months;
+        }
+
+
+
+        public List<DateTime> GetUniqueMonthsforPerson()
+        {
+            var uniqueMonths = new HashSet<DateTime>();
+            foreach (var projectEffort in ProjectsPersonnelEfforts)
+            {
+                foreach (var wpInfo in projectEffort.WorkPackages)
+                {
+                    for (var date = wpInfo.StartDate; date <= wpInfo.EndDate; date = date.AddMonths(1))
+                    {
+                        uniqueMonths.Add(new DateTime(date.Year, date.Month, 1));
+                    }
+                }
+            }
+            return uniqueMonths.OrderBy(d => d).ToList();
+        }
+
+        public List<DateTime> GetUniqueMonthsforPersononProject()
+        {
+            var start = ProjectStartDate;
+            var end = ProjectEndDate;
+            var uniqueMonths = new List<DateTime>();
+
+            for (var dt = new DateTime(start.Year, start.Month, 1); dt <= end; dt = dt.AddMonths(1))
+            {
+                uniqueMonths.Add(dt);
+            }
+
+            return uniqueMonths;
+        }
+
+        public int GetMonthIndex(DateTime month)
+        {
+            return UniqueMonths.IndexOf(month) + 1;
+        }
+
+        public List<ProjectPersonnelEffort> ProjectsPersonnelEfforts { get; set; } = new List<ProjectPersonnelEffort>();
+
+        public class ProjectPersonnelEffort
+        {
+            public int ProjectId { get; set; }
+            public string ProjectName { get; set; }
+            public List<WorkPackageInfo> WorkPackages { get; set; } = new List<WorkPackageInfo>();
+        }
+        public class WorkPackageInfo
+        {
+            public int WpId { get; set; }
+            public string WpName { get; set; }
+            public DateTime StartDate { get; set; }
+            public DateTime EndDate { get; set; }
+            public List<PersonnelEffort> PersonnelEfforts { get; set; } = new List<PersonnelEffort>();
+
+            public List<DateTime> ActiveMonths => GetActiveMonths();
+
+            private List<DateTime> GetActiveMonths()
+            {
+                var months = new List<DateTime>();
+                var start = new DateTime(StartDate.Year, StartDate.Month, 1);
+                var end = new DateTime(EndDate.Year, EndDate.Month, 1);
+
+                for (var date = start; date <= end; date = date.AddMonths(1))
+                {
+                    months.Add(date);
+                }
+                return months;
+            }
+
+        }
+
+        public class PersonnelEffort
+        {
+            public int EffortId { get; set; }
+            public int PersonId { get; set; }
+            public string PersonName { get; set; }
+
+            public Dictionary<DateTime, decimal> Efforts { get; set; } = new Dictionary<DateTime, decimal>();
+            
+        }
+
+        public class PersonnelInfo
+        {
+            public int PersonId { get; set; }
+            public string PersonName { get; set; }
+
+            public Dictionary<DateTime, decimal> TotalEffortMonth { get; set; } = new Dictionary<DateTime, decimal>();
+
+            public Dictionary<DateTime, decimal> MaxEffortMonth { get; set; } = new Dictionary<DateTime, decimal>();
+            public List<MonthStatus> MonthlyStatuses { get; set; } = new List<MonthStatus>();
+        }
+        
+
+    }
+
+}
+
+
+
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\ProjectManagerViewModel.cs -----
+using System;
+using System.Collections.Generic;
+using TRS2._0.Models.DataModels;
+
+namespace TRS2._0.Models.ViewModels.ProjectManager
+{
+    public class ProjectManagerViewModel
+    {
+        public List<ProcessedEntry> ProcessedEntries { get; set; } = new List<ProcessedEntry>();
+        
+        public List<TimesheetErrorLog> Errors { get; set; } = new List<TimesheetErrorLog>(); // Errores previos
+    }
+
+    public class ProcessedEntry
+    {
+        public string FileName { get; set; } // Nombre del archivo procesado
+        public string PersonName { get; set; } // Persona asociada
+        public string ProjectName { get; set; } // Proyecto asociado
+        public string WorkPackageName { get; set; } // Paquete de trabajo
+        public string Month { get; set; } // Mes procesado
+        public decimal TotalHours { get; set; } // Horas totales registradas
+    }
+
+    
+}
+
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\ProjectPersonnelViewModel.cs -----
+using TRS2._0.Models.DataModels;
+
+namespace TRS2._0.Models.ViewModels
+{
+    public class ProjectPersonnelViewModel
+    {
+
+        public Project ProjectDetails { get; set; }
+        public IEnumerable<Personnel> AllPersonnel { get; set; }
+
+        public IEnumerable<Wp> WorkPackages { get; set; }
+        public IEnumerable<Projectxperson> ProjectPersonnel { get; set; }
+        public IEnumerable<Wpxperson> WorkPackagePersonnel { get; set; }
+    }
+
+
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\ReportErrorViewModel.cs -----
+using Microsoft.AspNetCore.Http;
+using System.ComponentModel.DataAnnotations;
+
+namespace TRS2._0.Models.ViewModels
+{
+    public class ReportErrorViewModel
+    {
+        [Required(ErrorMessage = "El título es obligatorio.")]
+        [Display(Name = "Título del Error")]
+        public string Title { get; set; }
+
+        [Required(ErrorMessage = "La descripción es obligatoria.")]
+        [Display(Name = "Descripción del Error")]
+        [DataType(DataType.MultilineText)]
+        public string Description { get; set; }
+
+        [Display(Name = "Adjuntar Archivo")]
+        public IFormFile? Attachment { get; set; } // ✅ Permitir nulo para evitar que IsValid falle
+    }
+}
+
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\ReportPeriodViewModel.cs -----
+using TRS2._0.Models.DataModels;
+using TRS2._0.Services;
+
+
+
+namespace TRS2._0.Models.ViewModels
+{
+    public class ReportPeriodViewModel
+    {
+        public Project Project { get; set; }
+
+        public List<ReportPeriod>? ReportPeriods { get; set; } = new List<ReportPeriod>();
+
+        public List<Projectxperson> ProjectPersonnel { get; set; } = new List<Projectxperson>();
+
+        public List<Wp> WorkPackages { get; set; } = new List<Wp>();
+
+        // Añade la propiedad MonthsList
+        public List<string> MonthsList { get; set; } = new List<string>();
+
+        // Método para calcular MonthsList basado en las fechas de inicio y fin del proyecto
+        public void CalculateMonthsList()
+        {
+            if (Project != null && Project.Start.HasValue)
+            {
+                // Ahora que sabemos que startProject y endProject tienen valores, procedemos con el cálculo
+                DateTime startProject = Project.Start.Value;
+                DateTime endProject = Project.EndReportDate;
+
+
+
+                int monthsCount = ((endProject.Year - startProject.Year) * 12) + endProject.Month - startProject.Month + 1;
+
+                for (int i = 0; i < monthsCount; i++)
+                {
+                    string monthName = startProject.AddMonths(i).ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+                    MonthsList.Add($"M{i + 1} ({monthName})");
+                }
+            }
+        }
+    }
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\TimesheetViewModel.cs -----
+using TRS2._0.Models.DataModels;
+using TRS2._0.Services;
+using static TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel;
+
+namespace TRS2._0.Models.ViewModels
+{
+    public class TimesheetViewModel
+    {
+        public Personnel Person { get; set; }   
+        
+        public Project ProjectData { get; set; }
+        
+        public List<WorkPackageInfoTS> WorkPackages { get; set; } = new List<WorkPackageInfoTS>();
+
+        public WorkCalendarService WorkCalendarService { get; set; } = null!;
+
+        public List<Leave> LeavesthisMonth { get; set; } = new List<Leave>();
+
+        public List<TravelDetails> TravelsthisMonth { get; set; } = new List<TravelDetails>();
+
+        public List<DateTime> MonthDays { get; set; } = new List<DateTime>();
+
+        public int CurrentYear { get; set; }
+
+        public int CurrentMonth { get; set; }
+
+        public Dictionary<DateTime, decimal> HoursPerDay { get; set; } = new Dictionary<DateTime, decimal>();
+        
+        public Dictionary<DateTime, decimal> HoursPerDayWithDedication { get; set; } = new Dictionary<DateTime, decimal>();
+
+        public decimal TotalHours { get; set; }
+
+        public Dictionary<DateTime, decimal> TotalHoursWithDedication { get; set; } = new Dictionary<DateTime, decimal>();
+
+        public decimal HoursUsed { get; set; }
+
+        public List<DateTime> Holidays { get; set; } = new List<DateTime>();
+
+        public decimal AffiliationHours { get; set; }
+
+        public string Responsible { get; set; }
+
+        public Dictionary<DateTime, decimal> HoursForOtherProjects { get; set; }
+        public decimal TotalHoursForOtherProjects { get; set; } // Nueva propiedad
+
+
+    }
+
+    public class WorkPackageInfoTS
+    {
+        public int WpId { get; set; }
+        public string WpName { get; set; }
+        public string WpTitle { get; set; }
+        public string ProjectName { get; set; }
+        public string ProjectSAPCode { get; set; }
+
+        public int ProjectId { get; set; }
+        public decimal Effort { get; set; }
+
+        public bool IsLocked { get; set; }
+        public decimal EstimatedHours { get; set; } // Nueva propiedad para las horas estimadas
+
+        public List<Timesheet> Timesheets { get; set; } = new List<Timesheet>();
+
+    }
+        
+}
+
+
+
+----- FILE: C:\Users\premo\source\repos\trs3.0nuevo\TRS2.0\Models\ViewModels\ToolsViewModel.cs -----
+namespace TRS2._0.Models.ViewModels
+{
+    public class ToolsViewModel
+    {
+        public int Year { get; set; }
+        public GlobalHoursViewModel GlobalHours { get; set; }
+
+        public GlobalEffortViewModel GlobalEffort { get; set; }
+
+    }
+}
+
+
+

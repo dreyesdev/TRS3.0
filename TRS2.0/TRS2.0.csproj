@@ -51,6 +51,7 @@
 
   <ItemGroup>
     <Folder Include="Logs\" />
+    <Folder Include="docs\" />
     <Folder Include="wwwroot\docs\" />
     <Folder Include="wwwroot\lib\sweetalert2\" />
   </ItemGroup>
