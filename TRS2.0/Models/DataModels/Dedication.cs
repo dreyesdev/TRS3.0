@@ -25,5 +25,9 @@ public partial class Dedication
     public int? LineId { get; set; }
     public bool Exist { get; set; }
 
+    // Coste anual de esa dedicación (venido del fichero DEDICACIO3)
+    [Column(TypeName = "decimal(18, 4)")]
+    public decimal AnnualCost { get; set; } 
+
 }
 

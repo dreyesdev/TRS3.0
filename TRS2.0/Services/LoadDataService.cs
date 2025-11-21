@@ -940,6 +940,21 @@ namespace TRS2._0.Services
                     // Asegurando que Dist se maneje correctamente como cadena vacía si no existe
                     string dist = fields.Length > 6 ? fields[6] : string.Empty;
 
+                    // El penúltimo campo del fichero es el coste anual (ej: 42661.61200000)                    
+                    decimal annualCost = 0m;
+
+                    int annualCostIndex = fields.Length - 2;
+                    if (annualCostIndex >= 0 &&
+                        decimal.TryParse(fields[annualCostIndex], NumberStyles.Any, CultureInfo.InvariantCulture, out var parsedAnnualCost))
+                    {
+                        annualCost = parsedAnnualCost;
+                    }
+                    else
+                    {
+                        logger.Warning("No se pudo parsear el coste anual en la línea: {Line}", line);
+                    }
+
+
                     logger.Debug("Buscando codificación para Contract: {Contract} y Dist: {Dist}", contract, dist);
                     var affCodification = await _context.AffCodifications
                         .Where(ac => ac.Contract == contract && (dist.StartsWith(ac.Dist) || ac.Dist == string.Empty))
@@ -1065,19 +1080,25 @@ namespace TRS2._0.Services
                             End = endDate,
                             LineId = lineId,
                             Type = 0,
-                            Exist = true // Marcamos como existente al crear
+                            Exist = true,
+                            AnnualCost = annualCost          // <-- NUEVO
                         };
                         _context.Dedications.Add(dedicationRecord);
-                        logger.Information("Creando nueva entidad Dedication con PersId: {PersId}, Reduc: {Reduc}, Start: {Start}, End: {End}, LineId: {LineId}, Type: {Type}, Exist: {Exist}", personId, dedication, startDate, endDate, lineId, dedicationRecord.Type, dedicationRecord.Exist);
+                        logger.Information("Creando nueva entidad Dedication con PersId: {PersId}, Reduc: {Reduc}, Start: {Start}, End: {End}, LineId: {LineId}, Type: {Type}, Exist: {Exist}, AnnualCost: {AnnualCost}",
+                            personId, dedication, startDate, endDate, lineId, dedicationRecord.Type, dedicationRecord.Exist, annualCost);
                     }
                     else
                     {
                         dedicationRecord.Reduc = dedication;
                         dedicationRecord.Start = startDate;
                         dedicationRecord.End = endDate;
-                        dedicationRecord.Exist = true; // Marcamos como existente al actualizar
-                        logger.Information("Actualizando entidad Dedication existente con PersId: {PersId}, Reduc: {Reduc}, Start: {Start}, End: {End}, LineId: {LineId}, Exist: {Exist}", personId, dedication, startDate, endDate, lineId, dedicationRecord.Exist);
+                        dedicationRecord.Exist = true;
+                        dedicationRecord.AnnualCost = annualCost;   // <-- NUEVO
+
+                        logger.Information("Actualizando entidad Dedication existente con PersId: {PersId}, Reduc: {Reduc}, Start: {Start}, End: {End}, LineId: {LineId}, Exist: {Exist}, AnnualCost: {AnnualCost}",
+                            personId, dedication, startDate, endDate, lineId, dedicationRecord.Exist, annualCost);
                     }
+
                 }
 
                 // Asegurar que las dedicaciones con Type > 1 se mantengan con Exist = 1
@@ -2767,6 +2788,234 @@ namespace TRS2._0.Services
         }
 
 
+        // Este método genera los registros de la tabla PersonRates
+        // calculando el coste por hora de cada persona en función de:
+        // - Coste anual (Dedication.AnnualCost)
+        // - Reducción de jornada (Dedication.Reduc)
+        // - Horas anuales teóricas de la afiliación (AffHours.Hours * días laborables Año)
+        public async Task GeneratePersonRatesAsync()
+        {
+            var logPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "GeneratePersonRates.txt");
+
+            var logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
+            logger.Information("=== Inicio de generación de tabla PersonRates ===");
+
+            try
+            {
+                DateTime today = DateTime.Today;
+                DateTime windowStart = today.AddYears(-5);
+                DateTime windowEnd = today.AddYears(5);
+
+                logger.Information("Ventana de cálculo: {Start} - {End}", windowStart, windowEnd);
+
+                // Limpiamos los PersonRates que caen dentro de la ventana antes de recalcular
+                var existingRates = _context.PersonRates
+                    .Where(r => r.EndDate >= windowStart && r.StartDate <= windowEnd);
+
+                int removedCount = await existingRates.CountAsync();
+                _context.PersonRates.RemoveRange(existingRates);
+                await _context.SaveChangesAsync();
+
+                logger.Information("Se han eliminado {Count} registros previos de PersonRates dentro de la ventana.", removedCount);
+
+                // Cache sencilla para no recalcular los días laborables de un año 40 veces
+                var workingDaysByYear = new Dictionary<int, int>();
+
+                // Función local para obtener días laborables de todo un año
+                async Task<int> GetWorkingDaysInYearAsync(int year)
+                {
+                    if (workingDaysByYear.TryGetValue(year, out int cached))
+                        return cached;
+
+                    int total = 0;
+                    for (int month = 1; month <= 12; month++)
+                    {
+                        // Reutilizamos la misma lógica que ya usas para calcular días laborables
+                        total += await _workCalendarService.CalculateWorkingDays(year, month);
+                    }
+
+                    workingDaysByYear[year] = total;
+                    return total;
+                }
+
+                // Dedicaciones a procesar: las que existen, tipo 0 ó 1, y se solapan con la ventana
+                var dedications = await _context.Dedications
+                    .Where(d => d.End >= windowStart &&
+                                d.Start <= windowEnd &&
+                                d.Exist &&
+                                d.Type <= 1)
+                    .ToListAsync();
+
+                logger.Information("Dedicaciones a procesar: {Count}", dedications.Count);
+
+                // Cargamos afiliaciones y horas de afiliación completas para cruzarlas después en memoria
+                var affxPersons = await _context.AffxPersons
+                    .Include(a => a.Affiliation)
+                    .ToListAsync();
+
+                var affHoursList = await _context.AffHours
+                    .Include(ah => ah.Affiliation)
+                    .ToListAsync();
+
+                int createdRates = 0;
+
+                foreach (var ded in dedications)
+                {
+                    int personId = ded.PersId;
+
+                    // Reduc es la reducción de jornada (0.00 = 100%, 0.20 = 80%, etc.)
+                    decimal reduction = ded.Reduc;
+
+                    if (reduction < 0m || reduction > 1m)
+                    {
+                        logger.Warning("Valor Reduc fuera de rango ({Reduc}) para Dedication Id {DedId}, Persona {PersonId}. Se omite.",
+                            reduction, ded.Id, personId);
+                        continue;
+                    }
+
+                    // Dedicación real según el documento: 1 - Reduc
+                    decimal dedicationFraction = 1m - reduction;
+
+                    if (dedicationFraction <= 0m)
+                    {
+                        logger.Warning("Dedicación resultante <= 0 para Dedication Id {DedId}, Persona {PersonId}. Reduc: {Reduc}. Se omite.",
+                            ded.Id, personId, reduction);
+                        continue;
+                    }
+
+                    decimal annualCost = ded.AnnualCost;
+
+                    if (annualCost <= 0m)
+                    {
+                        logger.Warning("Coste anual <= 0 para Dedication Id {DedId}, Persona {PersonId}. Se omite.",
+                            ded.Id, personId);
+                        continue;
+                    }
+
+                    // Rango de la dedicación recortado a la ventana global
+                    DateTime dedStart = ded.Start < windowStart ? windowStart : ded.Start;
+                    DateTime dedEnd = ded.End > windowEnd ? windowEnd : ded.End;
+
+                    // Afiliaciones de esta persona que se solapan con la dedicación
+                    var personAffSegments = affxPersons
+                        .Where(a => a.PersonId == personId &&
+                                    a.End >= dedStart &&
+                                    a.Start <= dedEnd)
+                        .ToList();
+
+                    if (!personAffSegments.Any())
+                    {
+                        logger.Warning("Sin afiliaciones para Persona {PersonId} en el periodo {Start} - {End}.",
+                            personId, dedStart, dedEnd);
+                        continue;
+                    }
+
+                    foreach (var affSeg in personAffSegments)
+                    {
+                        int affId = affSeg.AffId;
+
+                        // Intersección dedicación-afiliación
+                        DateTime segStart = dedStart > affSeg.Start ? dedStart : affSeg.Start;
+                        DateTime segEnd = dedEnd < affSeg.End ? dedEnd : affSeg.End;
+
+                        if (segStart > segEnd)
+                            continue;
+
+                        // Tramos de AffHours que se solapan con este segmento
+                        var affHoursForAff = affHoursList
+                            .Where(ah => ah.AffId == affId &&
+                                         ah.EndDate >= segStart &&
+                                         ah.StartDate <= segEnd)
+                            .ToList();
+
+                        if (!affHoursForAff.Any())
+                        {
+                            logger.Warning("Sin AffHours para AffId {AffId} en el periodo {Start} - {End}.",
+                                affId, segStart, segEnd);
+                            continue;
+                        }
+
+                        foreach (var ah in affHoursForAff)
+                        {
+                            // Intersección segmentada entre la afiliación+dedicación y el tramo de AffHours
+                            DateTime rateStart = segStart > ah.StartDate ? segStart : ah.StartDate;
+                            DateTime rateEnd = segEnd < ah.EndDate ? segEnd : ah.EndDate;
+
+                            if (rateStart > rateEnd)
+                                continue;
+
+                            // Horas/día a jornada completa según AffHours
+                            decimal dailyHours = ah.Hours;
+
+                            if (dailyHours <= 0m)
+                            {
+                                logger.Warning("Horas/día <= 0 para AffHours Id {AffHoursId}, AffId {AffId}. Se omite.",
+                                    ah.Id, affId);
+                                continue;
+                            }
+
+                            // Para calcular las horas anuales usamos:
+                            // Horas anuales = horas/día * días laborables del año de rateStart
+                            int workingDaysYear = await GetWorkingDaysInYearAsync(rateStart.Year);
+                            decimal annualHours = dailyHours * workingDaysYear;
+
+                            if (annualHours <= 0m)
+                            {
+                                logger.Warning("Horas anuales calculadas <= 0 para AffId {AffId}, Año {Year}. Se omite.",
+                                    affId, rateStart.Year);
+                                continue;
+                            }
+
+                            // Fórmula del documento:
+                            // Coste por hora = Coste / (Dedicación * Horas anuales)
+                            decimal hourlyRate = annualCost / (dedicationFraction * annualHours);
+
+                            var personRate = new PersonRate
+                            {
+                                PersonId = personId,
+                                AffId = affId,
+                                StartDate = rateStart.Date,
+                                EndDate = rateEnd.Date,
+                                AnnualCost = annualCost,
+                                Dedication = dedicationFraction,
+                                AnnualHours = Math.Round(annualHours, 2),
+                                HourlyRate = Math.Round(hourlyRate, 4)
+                            };
+
+                            _context.PersonRates.Add(personRate);
+                            createdRates++;
+
+                            if (createdRates % 500 == 0)
+                            {
+                                await _context.SaveChangesAsync();
+                                logger.Information("Rates generados hasta ahora: {Count}", createdRates);
+                            }
+                        }
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                logger.Information("=== Fin de generación de PersonRates. Total creados: {Count} ===", createdRates);
+            }
+            catch (Exception ex)
+            {
+                var errorLogger = new LoggerConfiguration()
+                    .MinimumLevel.Debug()
+                    .WriteTo.File(Path.Combine(Directory.GetCurrentDirectory(), "Logs", "GeneratePersonRates_Error.txt"), rollingInterval: RollingInterval.Day)
+                    .CreateLogger();
+
+                errorLogger.Error(ex, "Error en GeneratePersonRatesAsync");
+                throw;
+            }
+        }
+
+
+
+
         public async Task RunScheduledJobs()
         {
             var dataLoadPath = Path.Combine(Directory.GetCurrentDirectory(), "Dataload");
@@ -2796,7 +3045,8 @@ namespace TRS2._0.Services
                                 ("Procesamiento Avanzado de Liquidaciones", () => ProcessAdvancedLiquidationsAsync()),
                                 ("Actualización de Tabla de Ausencias", () => UpdateLeaveTableAsync()),
                                 ("Carga de Esfuerzo Mensual", () => UpdateMonthlyPMs()),
-                                ("Corrección de Overloads", () => AdjustOverloadsFromDateAsync(new DateTime(2025, 1, 1)))
+                                ("Corrección de Overloads", () => AdjustOverloadsFromDateAsync(new DateTime(2025, 1, 1))),
+                                ("Generación de tabla de Rates", () => GeneratePersonRatesAsync())
                             };
 
             foreach (var (processName, process) in processes)
@@ -2942,6 +3192,10 @@ namespace TRS2._0.Services
                     case "AdjustEffortOverloads":
                         var cutoffDate = new DateTime(2025, 1, 1); // ⚠️ Fecha pendiente de acordar con Finanzas
                         await AdjustOverloadsFromDateAsync(cutoffDate);
+                        break;
+
+                    case "GeneratePersonRates":
+                        await GeneratePersonRatesAsync();
                         break;
 
                     default:

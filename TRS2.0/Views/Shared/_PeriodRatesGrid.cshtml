@@ -1,0 +1,176 @@
+﻿@model TRS2._0.Models.ViewModels.PeriodRatesGridViewModel
+
+@{
+    var title = Model.Mode.Equals("Timesheet", StringComparison.OrdinalIgnoreCase)
+        ? "Rates sobre Timesheet"
+        : "Rates Futuro (Estimado)";
+}
+
+<style>
+    /* Contenedor scrollable para mantener visibles scrollbars en todo momento */
+    .rates-table-wrapper {
+        max-height: 420px; /* altura limitada para que el scroll horizontal quede a la vista */
+        overflow: auto;
+        position: relative;
+        border: 1px solid #dee2e6;
+    }
+
+    .rates-table {
+        margin-bottom: 0;
+    }
+
+        .rates-table th,
+        .rates-table td {
+            white-space: nowrap;
+            font-size: 0.85rem;
+        }
+
+    /* Cabecera fija arriba */
+    .rates-header {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background-color: #000;
+        color: #fff;
+    }
+
+    /* Primera columna fija a la izquierda (cabecera + cuerpo + totales) */
+    .rates-first-col-header {
+        position: sticky;
+        left: 0;
+        z-index: 6;
+        background-color: #000 !important;
+        color: #fff !important;
+    }
+
+    .rates-first-col-cell {
+        position: sticky;
+        left: 0;
+        z-index: 4;
+        background-color: #f8f9fa;
+    }
+
+    .rates-first-col-total {
+        position: sticky;
+        left: 0;
+        z-index: 7;
+        background-color: #e9ecef !important;
+    }
+
+    /* Última columna (Total) fija a la derecha */
+    .rates-total-col-header {
+        position: sticky;
+        right: 0;
+        z-index: 6;
+        background-color: #000 !important;
+        color: #fff !important;
+    }
+
+    .rates-total-col-cell {
+        position: sticky;
+        right: 0;
+        z-index: 4;
+        background-color: #f8f9fa;
+    }
+
+    .rates-total-col-total {
+        position: sticky;
+        right: 0;
+        z-index: 7;
+        background-color: #e9ecef !important;
+    }
+
+    /* Fila de totales fija abajo */
+    .rates-total-row td {
+        position: sticky;
+        bottom: 0;
+        background-color: #e9ecef;
+        z-index: 3;
+    }
+
+        .rates-total-row td.text-right {
+            font-weight: bold;
+        }
+</style>
+
+<div class="rates-table-wrapper">
+    <table class="table table-bordered table-sm rates-table">
+        <thead>
+            <tr>
+                <th class="rates-header rates-first-col-header">
+                    Nombre
+                </th>
+                @foreach (var month in Model.Months)
+                {
+                    <th class="rates-header text-center">
+                        @month.ToString("MMM yyyy")
+                    </th>
+                }
+                <th class="rates-header text-center rates-total-col-header">
+                    Total
+                </th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var person in Model.Persons)
+            {
+                <tr>
+                    <td class="rates-first-col-cell">
+                        @person.Surname, @person.Name
+                    </td>
+
+                    @foreach (var month in Model.Months)
+                    {
+                        decimal value = 0m;
+                        if (Model.MonthlyCostsByPerson.TryGetValue(person.Id, out var personDict) &&
+                        personDict.TryGetValue(month, out var cost))
+                        {
+                            value = cost;
+                        }
+
+                        <td class="text-right">
+                            @value.ToString("N2")
+                        </td>
+                    }
+
+                    @{
+                        decimal rowTotal = 0m;
+                        if (Model.TotalByPerson.TryGetValue(person.Id, out var t))
+                        {
+                            rowTotal = t;
+                        }
+                    }
+                    <td class="text-right rates-total-col-cell">
+                        @rowTotal.ToString("N2")
+                    </td>
+                </tr>
+            }
+        </tbody>
+
+        <tfoot>
+            <tr class="rates-total-row">
+                <td class="rates-first-col-total">
+                    Total
+                </td>
+
+                @foreach (var month in Model.Months)
+                {
+                    decimal colTotal = 0m;
+                    if (Model.TotalByMonth.TryGetValue(month, out var t))
+                    {
+                        colTotal = t;
+                    }
+
+                    <td class="text-right">
+                        @colTotal.ToString("N2")
+                    </td>
+                }
+
+                <td class="text-right rates-total-col-total">
+                    @Model.GrandTotal.ToString("N2")
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+</div>

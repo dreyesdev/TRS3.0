@@ -944,6 +944,44 @@ namespace TRS2._0.Controllers
             return View("RemindersWeeklyDryRunView", data);
         }
 
+        [HttpPost]
+        public async Task<IActionResult> GeneratePersonRates()
+        {
+            try
+            {
+                await _loadDataService.GeneratePersonRatesAsync();
+
+                // Registramos en la tabla de logs de procesos, igual que el resto
+                var log = new ProcessExecutionLog
+                {
+                    ProcessName = "Generación de tabla de Rates (manual)",
+                    ExecutionTime = DateTime.UtcNow,
+                    Status = "Exitoso",
+                    LogMessage = "Proceso ejecutado manualmente desde Admin."
+                };
+
+                _context.ProcessExecutionLogs.Add(log);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Tabla PersonRates generada correctamente." });
+            }
+            catch (Exception ex)
+            {
+                var log = new ProcessExecutionLog
+                {
+                    ProcessName = "Generación de tabla de Rates (manual)",
+                    ExecutionTime = DateTime.UtcNow,
+                    Status = "Fallido",
+                    LogMessage = ex.Message
+                };
+
+                _context.ProcessExecutionLogs.Add(log);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = false, message = $"Error generando PersonRates: {ex.Message}" });
+            }
+        }
+
 
     }
 

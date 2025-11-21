@@ -528,6 +528,38 @@ namespace TRS2._0.Controllers
             }
         }
 
+        [HttpGet("/GenerarRates")]
+        public async Task<IActionResult> TriggerGeneratePersonRatesJob()
+        {
+            try
+            {
+                var scheduler = await _schedulerFactory.GetScheduler();
+                var jobKey = new JobKey("LoadDataServiceJob");
+
+                // Acción específica para generación de PersonRates
+                var jobDataMap = new JobDataMap
+        {
+            { "Action", "GeneratePersonRates" }
+        };
+
+                // Verifica si el trabajo existe y lo lanza con la acción especificada
+                if (await scheduler.CheckExists(jobKey))
+                {
+                    await scheduler.TriggerJob(jobKey, jobDataMap);
+                    return Ok("El trabajo de generación de Rates se ha iniciado.");
+                }
+                else
+                {
+                    return NotFound("El trabajo de carga de datos no se encontró.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Devolvemos un 500 con el mensaje de error para poder diagnosticar rápido
+                return StatusCode(500, $"Error al iniciar el trabajo de generación de Rates: {ex.Message}");
+            }
+        }
+
 
     }
 }

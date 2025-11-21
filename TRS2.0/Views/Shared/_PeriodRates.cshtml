@@ -1,0 +1,129 @@
+﻿@model TRS2._0.Models.ViewModels.PeriodRatesWrapperViewModel
+
+<div class="card mt-3">
+    <div class="card-header bg-dark text-white text-center">
+        <strong>
+            Rates - Period
+            (@Model.ReportPeriod.StartDate.ToString("dd/MM/yyyy")
+            -
+            @Model.ReportPeriod.EndDate.ToString("dd/MM/yyyy"))
+        </strong>
+    </div>
+
+    <div class="card-body">
+
+        <!-- Fila de botones: tabs centrados + export a la derecha -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="flex-grow-1 d-flex justify-content-center">
+                <div class="btn-group" role="group" aria-label="Rates modes">
+                    <button type="button"
+                            class="btn btn-primary px-4"
+                            id="btnRatesEstimated"
+                            onclick="loadRatesGrid('@Model.ReportPeriod.Id', '@Model.ProjectId', 'Estimated')">
+                        Rate Futuro (Estimado)
+                    </button>
+                    <button type="button"
+                            class="btn btn-outline-secondary px-4"
+                            id="btnRatesTimesheet"
+                            onclick="loadRatesGrid('@Model.ReportPeriod.Id', '@Model.ProjectId', 'Timesheet')">
+                        Rate sobre Timesheet
+                    </button>
+                </div>
+            </div>
+
+            <div class="ml-3">
+                <button type="button"
+                        class="btn btn-success btn-sm"
+                        id="exportRatesEstimatedBtn"
+                        style="display:none;"
+                        onclick="exportRatesToCsv();">
+                    Export Estimated Rates
+                </button>
+                <button type="button"
+                        class="btn btn-success btn-sm"
+                        id="exportRatesTimesheetBtn"
+                        style="display:none;"
+                        onclick="exportRatesToCsv();">
+                    Export Timesheet Rates
+                </button>
+            </div>
+        </div>
+
+        <div id="ratesGridContainer" class="table-container-period">
+            <!-- Aquí se cargará por AJAX la malla de rates -->
+        </div>
+    </div>
+</div>
+
+<script>
+    var currentRatesMode = null;
+
+    function loadRatesGrid(periodId, projectId, mode) {
+
+        currentRatesMode = mode;
+
+        $.ajax({
+            url: '@Url.Action("PeriodRatesGrid", "Projects")',
+            data: {
+                id: periodId,
+                projectId: projectId,
+                mode: mode
+            },
+            success: function (html) {
+                $('#ratesGridContainer').html(html);
+
+                if (mode === 'Estimated') {
+                    $('#btnRatesEstimated')
+                        .removeClass('btn-outline-primary').addClass('btn-primary');
+                    $('#btnRatesTimesheet')
+                        .removeClass('btn-secondary').addClass('btn-outline-secondary');
+
+                    $('#exportRatesEstimatedBtn').show();
+                    $('#exportRatesTimesheetBtn').hide();
+                } else {
+                    $('#btnRatesEstimated')
+                        .removeClass('btn-primary').addClass('btn-outline-primary');
+                    $('#btnRatesTimesheet')
+                        .removeClass('btn-outline-secondary').addClass('btn-secondary');
+
+                    $('#exportRatesEstimatedBtn').hide();
+                    $('#exportRatesTimesheetBtn').show();
+                }
+            },
+            error: function () {
+                alert('Error loading rates grid.');
+            }
+        });
+    }
+
+    function exportRatesToCsv() {
+        var table = $('#ratesGridContainer table').get(0);
+        if (!table) {
+            alert('No data to export.');
+            return;
+        }
+
+        var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+
+        $('#ratesGridContainer table tr').each(function () {
+            var rowData = [];
+            $(this).find('th, td').each(function () {
+                var text = $(this).text().trim().replace(/"/g, '""');
+                rowData.push('"' + text + '"');
+            });
+            csvContent += rowData.join(';') + "\r\n";
+        });
+
+        var fileName = currentRatesMode === 'Timesheet'
+            ? 'rates_timesheet.csv'
+            : 'rates_estimated.csv';
+
+        var encodedUri = encodeURI(csvContent);
+        var link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>

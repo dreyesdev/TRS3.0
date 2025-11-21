@@ -74,6 +74,9 @@ public partial class TRSDBContext : IdentityDbContext<ApplicationUser>
 
     public DbSet<UserLoginHistory> UserLoginHistories { get; set; }
 
+    public DbSet<PersonRate> PersonRates { get; set; }
+
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         if (!optionsBuilder.IsConfigured)

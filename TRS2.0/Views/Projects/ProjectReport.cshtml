@@ -214,6 +214,11 @@
                             <td style="text-align: center;">M @startMonth / M @endMonth</td>
                             <td style="text-align: center;">
                                 <button type="button" class="btn btn-danger" onclick="deleteReportPeriod(@reportPeriod.Id)">Delete</button>
+                                    <button type="button"
+                                            class="btn btn-secondary btn-block"
+                                            onclick="loadPeriodRates(@reportPeriod.Id, @ViewBag.projId)">
+                                        Rates
+                                    </button>
                             </td>
                         </tr>
                         index++;
@@ -698,6 +703,32 @@
         })
         .catch(error => console.error('Error exporting Estimated Worked Days:', error));
     }
+
+        function loadPeriodRates(periodId, projectId) {
+        $.ajax({
+            url: '@Url.Action("PeriodRates", "Projects")',
+            data: {
+                id: periodId,
+                projectId: projectId
+            },
+            success: function (data) {
+                // Cargamos la parcial _PeriodRates en el mismo contenedor
+                $('#detallesPeriodoContainer').html(data);
+                $('#detallesPeriodoContainer').show();
+
+                // Si quieres, aquí puedes ocultar los botones de export asociados al grid antiguo:
+                // $('#exportPMsBtn').hide();
+                // $('#exportDeclaredHoursBtn').hide();
+                // $('#exportEstimatedHoursBtn').hide();
+                // $('#exportPMSforWPToCSV').hide();
+                // etc...
+            },
+            error: function (xhr, status, error) {
+                alert('Error loading rates view: ' + error);
+            }
+        });
+    }
+
 
 
 </script>
