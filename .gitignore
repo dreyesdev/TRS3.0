@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/TRS2.0/Dataload/DEDICACIO3.txt
+/TRS2.0/Dataload/GRUPS.txt
+/TRS2.0/Dataload/Leaders.txt
+/TRS2.0/Dataload/Liquid.txt
+/TRS2.0/Dataload/PERSONAL.txt
+/TRS2.0/Dataload/PROJECTES.txt
