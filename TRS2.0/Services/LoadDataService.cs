@@ -1,20 +1,21 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using DotNetCasClient.Validation.Schema.SoapEnvelope;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using OfficeOpenXml;
+using Quartz;
+using Serilog;
+using System.Composition;
+using System.Globalization;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+using System.Timers;
 using TRS2._0.Data;
 using TRS2._0.Models.DataModels;
-using Quartz;
-using System.Threading.Tasks;
-using System.Globalization;
-using Serilog;
-using Newtonsoft.Json;
-using System.Net.Http.Headers;
 using static TRS2._0.Services.WorkCalendarService;
-using System.Text;
-using System.Timers;
-using Newtonsoft.Json.Linq;
-using System.Text.Json;
-using Microsoft.AspNetCore.Mvc;
-using OfficeOpenXml;
-using System.Composition;
 using ILogger = Serilog.ILogger;
 
 
@@ -1676,17 +1677,26 @@ namespace TRS2._0.Services
 
                 foreach (var user in users)
                 {
+                    // Antes de parsear el UserKey, obtenemos algunos datos para log
+                    string firstName = user["FirstName"]?.ToString() ?? "Unknown";
+                    string lastName = user["LastName"]?.ToString() ?? "Unknown";
+                    string email = user["Email"]?.ToString() ?? "Unknown";
+
                     if (user["UserKey"] == null || string.IsNullOrEmpty(user["UserKey"].ToString()))
                     {
-                        string firstName = user["FirstName"]?.ToString() ?? "Unknown";
-                        string lastName = user["LastName"]?.ToString() ?? "Unknown";
-                        string email = user["Email"]?.ToString() ?? "Unknown";
                         logger.Warning($"Missing UserKey for user {firstName} {lastName} ({email}). This record needs manual correction.");
                         continue;
                     }
 
-                    int userId = user["UserId"].Value<int>();
-                    int userKey = user["UserKey"].Value<int>();
+                    int userId = user["UserId"].Value<int>();                  
+
+                    var userKeyString = user["UserKey"].ToString();
+                    if (!int.TryParse(userKeyString, out int userKey))
+                    {
+                        logger.Warning($"Non-numeric UserKey '{userKeyString}' for user {firstName} {lastName} ({email}). Skipping this user in leave sync.");
+                        continue;
+                    }
+
                     logger.Information($"Updating absences for user: {userKey}, WoffuId: {userId}");
 
                     int personId = _context.Personnel.FirstOrDefault(p => p.Id == userKey)?.Id ?? 0;
@@ -1694,6 +1704,7 @@ namespace TRS2._0.Services
                     {
                         continue;
                     }
+
 
                     // Cargar existentes SIN tracking y clave por Day.Date
                     var existingLeavesList = await _context.Leaves
