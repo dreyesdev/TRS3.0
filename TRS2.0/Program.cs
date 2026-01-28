@@ -20,18 +20,23 @@ Log.Logger = new LoggerConfiguration()
 
 
 
-// Configuración de Kestrel para usar HTTPS
-builder.WebHost.ConfigureKestrel(serverOptions =>
+// Configuración de Kestrel:
+// - Development: habilitamos HTTP/HTTPS para pruebas locales con certificado.
+// - Production (IIS): NO tocamos Kestrel; IIS (ANCM) gestiona el hosting y el HTTPS del sitio.
+if (builder.Environment.IsDevelopment())
 {
-    serverOptions.ListenAnyIP(5000); // HTTP
-    serverOptions.ListenAnyIP(5001, listenOptions =>
+    builder.WebHost.ConfigureKestrel(serverOptions =>
     {
-        //listenOptions.UseHttps("C:\\Users\\premo\\source\\repos\\trs3.0nuevo\\TRS2.0\\opstrs03.bsc.es.pfx", "seidor");// Colegio
-        //listenOptions.UseHttps("C:\\Users\\dreyes\\Desktop\\Desarrollo\\TRS2.0\\TRS2.0\\Resources\\opstrs03.bsc.es.pfx", "seidor");//Casa 
-        listenOptions.UseHttps("C:\\Users\\dreyes\\Source\\Repos\\trs3.0\\TRS2.0\\Resources\\opstrs03.bsc.es.pfx", "seidor");//Casa
-
+        serverOptions.ListenAnyIP(5000); // HTTP (local)
+        serverOptions.ListenAnyIP(5001, listenOptions =>
+        {
+            // Certificado local para desarrollo
+            listenOptions.UseHttps(
+                "C:\\Users\\dreyes\\Source\\Repos\\trs3.0\\TRS2.0\\Resources\\opstrs03.bsc.es.pfx",
+                "seidor");
+        });
     });
-});
+}
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<TRSDBContext>(options =>

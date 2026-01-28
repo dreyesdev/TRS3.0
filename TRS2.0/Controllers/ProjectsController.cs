@@ -817,7 +817,7 @@ namespace TRS2._0.Controllers
                         .Where(pme => pme.PersonId == effortData.PersonId && pme.Month.Year == effortData.Month.Year && pme.Month.Month == effortData.Month.Month)
                         .Select(pme => pme.Value)
                         .FirstOrDefaultAsync();
-                    bool isOutOfContract = await IsOutOfContractAsync(person.Id, effortData.Month.Year, effortData.Month.Month);
+                     bool isOutOfContract = await IsOutOfContractAsync(person.Id, effortData.Month.Year, effortData.Month.Month);
 
                     if (isOutOfContract)
                     {
@@ -836,15 +836,25 @@ namespace TRS2._0.Controllers
                     DateTime effortMonthStart = new DateTime(effortData.Month.Year, effortData.Month.Month, 1);
                     DateTime effortMonthEnd = new DateTime(effortData.Month.Year, effortData.Month.Month, DateTime.DaysInMonth(effortData.Month.Year, effortData.Month.Month));
                     decimal maxPM = decimal.MaxValue; // Por defecto, no limitar el esfuerzo
+                    decimal projectMonthLimit = decimal.MaxValue; // Por defecto: el proyecto no limita por fechas ese mes
 
-                    if (!isOutOfContract && ((effortMonthStart < projectStartDate && effortMonthEnd >= projectStartDate) || (effortMonthStart <= projectEndDate && effortMonthEnd >= projectEndDate)))
+                    bool isProjectBoundaryMonth = (effortMonthStart < projectStartDate && effortMonthEnd >= projectStartDate) || (effortMonthStart <= projectEndDate && effortMonthEnd >= projectEndDate);
+
+                    if (!isOutOfContract && isProjectBoundaryMonth)
                     {
-                        maxPMPerson = await _workCalendarService.CalculateAdjustedMonthlyPM(effortData.PersonId, effortData.Month.Year, effortData.Month.Month, projectStartDate, projectEndDate);
-                        notifications.Add($"Adjusted PM value for {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy} is {maxPMPerson} due to date limitations.");
+                        // OJO: esto NO es el PM mensual de la persona. Es el máximo imputable a ESTE proyecto en ESTE mes.
+                        projectMonthLimit = await _workCalendarService.CalculateAdjustedMonthlyPM(
+                            effortData.PersonId,
+                            effortData.Month.Year,
+                            effortData.Month.Month,
+                            projectStartDate,
+                            projectEndDate
+                        );
+                        notifications.Add($"Adjusted PM value for {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy} is {projectMonthLimit} due to date limitations.");
                     }
 
-
-                    decimal availableEffort = maxPMPerson - totalEffortsPerMonth;
+                    
+                    decimal availableOverall = maxPMPerson - totalEffortsPerMonth;
 
                     // Condición para manejar la reducción de esfuerzos
                     if (newEffort < currentEffort)
@@ -861,7 +871,7 @@ namespace TRS2._0.Controllers
                     }
                     else
                     { 
-                        if (availableEffort <= 0) // Si intentamos aumentar el esfuerzo pero no hay disponibilidad
+                        if (availableOverall <= 0) // Si intentamos aumentar el esfuerzo pero no hay disponibilidad
                         {
                             notifications.Add($"For {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}, there is no available capacity to increase efforts.");
                             continue; // Salta al siguiente esfuerzo sin intentar guardar este cambio
@@ -869,12 +879,12 @@ namespace TRS2._0.Controllers
                         else
                         {
                         
-                            decimal effortToSave = Math.Min(newEffort, availableEffort);
-                                                        
-                            if (newEffort > availableEffort)
-                            {
-                                decimal overflow = newEffort - availableEffort;                                                             
-                                notifications.Add($"For {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}, only {availableEffort} was saved due to availability or project limits. {overflow} could not be saved.");
+                            decimal effortToSave = Math.Min(newEffort, availableOverall);
+                            effortToSave = Math.Min(effortToSave, projectMonthLimit);
+
+                            if (newEffort > effortToSave)                            {
+                                                                                       
+                                notifications.Add($"For {person.Name} in WP '{wp.Name}' for {effortData.Month:MMMM yyyy}, only {effortToSave} was saved due to availability or project limits.");
                             }
 
                             if (perseffort != null)
