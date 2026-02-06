@@ -300,7 +300,7 @@ namespace TRS2._0.Controllers
                 var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
 
                 decimal estimatedHours;
-                if (await _workCalendarService.HasNoContractDaysAsync(validPersonId, currentYear, currentMonth))
+                if ((await _workCalendarService.HasNoContractDaysAsync(validPersonId, currentYear, currentMonth)) || (await _workCalendarService.HasAffiliationZero(validPersonId, currentYear, currentMonth)))
                 {
                     var maxByAffiliation = await _workCalendarService.CalculateMaxHoursByAffiliationOnlyAsync(validPersonId, currentYear, currentMonth);
                     estimatedHours = Math.Round(maxByAffiliation * effort, 2);

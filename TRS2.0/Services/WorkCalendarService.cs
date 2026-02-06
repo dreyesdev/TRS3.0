@@ -1495,6 +1495,20 @@ public class WorkCalendarService
         return hasNoContract;
     }
 
+    public async Task<bool> HasAffiliationZero(int personId, int year, int month)
+    {
+        var startDate = new DateTime(year, month, 1);
+        var endDate = startDate.AddMonths(1).AddDays(-1);
+
+        var affiliationZero = await _context.AffxPersons.AnyAsync(l =>
+            l.PersonId == personId &&
+            l.Start <= endDate &&
+            l.End >= startDate &&
+            l.AffId == 0
+        );
+
+        return affiliationZero;
+    }
 
     public async Task<decimal> CalculateMaxHoursByAffiliationOnlyAsync(int personId, int year, int month)
     {

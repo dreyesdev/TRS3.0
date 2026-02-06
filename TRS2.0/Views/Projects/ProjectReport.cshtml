@@ -207,9 +207,13 @@
                         int startMonth = ((reportPeriod.StartDate.Year - Model.Project.Start.Value.Year) * 12) + reportPeriod.StartDate.Month - Model.Project.Start.Value.Month + 1;
                         int endMonth = ((reportPeriod.EndDate.Year - Model.Project.Start.Value.Year) * 12) + reportPeriod.EndDate.Month - Model.Project.Start.Value.Month + 1;
                         <tr>
-                            <td class="periodo" data-periodo-id="@reportPeriod.Id" style="text-align: center;" data-index="@index">
-                                <button type="button" class="btn btn-primary btn-block font-weight-bold">@($"P {index}")</button>
-                            </td>
+                                <td style="text-align:center;">
+                                    <button type="button"
+                                            class="btn btn-primary btn-block font-weight-bold periodo period-btn"
+                                            data-periodo-id="@reportPeriod.Id">
+                                        @($"P {index}")
+                                    </button>
+                                </td>
                             <td style="text-align: center;">@reportPeriod.StartDate.ToString("dd-MM-yyyy") / @reportPeriod.EndDate.ToString("dd-MM-yyyy")</td>
                             <td style="text-align: center;">M @startMonth / M @endMonth</td>
                             <td style="text-align: center;">
@@ -310,6 +314,22 @@
 
 </div>
 </div>
+<div id="periodDetailsLoadingOverlay" style="display:none;">
+    <div class="loading-box">
+        <div class="loading-title">Cargando periodo…</div>
+        <div class="loading-subtitle">
+            Calculando datos por persona. Esto puede tardar en periodos grandes.
+        </div>
+
+        <div class="loading-progress">
+            <div id="periodDetailsProgressBar" class="loading-progress-bar" style="width:0%"></div>
+        </div>
+
+        <div class="loading-percent">
+            <span id="periodDetailsProgressText">0%</span>
+        </div>
+    </div>
+</div>
 <div id="detallesPeriodoContainer" class="table-container-period"></div>
 
 
@@ -329,37 +349,149 @@
     }
 
 
+    // ------------------------------------------------------------
+    // Period Details: anti-spam + overlay de carga + progreso estimado
+    // ------------------------------------------------------------
+
+    // Controla que solo haya 1 carga de PeriodDetails en vuelo.
+    // Evita que el usuario dispare 20 requests al mismo endpoint.
+    let periodDetailsInFlight = false;
+
+    // Timer para animar el progreso "estimado".
+    let periodDetailsProgressTimer = null;
+
+    /**
+     * Muestra el overlay bloqueante y arranca una barra de progreso "estimada".
+     * Nota: el % NO es real, es UX para que el usuario no spamee el botón.
+     */
+    function showPeriodDetailsLoadingOverlay() {
+        $('#periodDetailsLoadingOverlay').css('display', 'flex');
+
+        let progress = 0;
+        $('#periodDetailsProgressBar').css('width', '0%');
+        $('#periodDetailsProgressText').text('0%');
+
+        // Por si veníamos de una carga anterior
+        if (periodDetailsProgressTimer) {
+            clearInterval(periodDetailsProgressTimer);
+            periodDetailsProgressTimer = null;
+        }
+
+        // Subida rápida al inicio y lenta al final, quedándose en ~90% hasta que responda el server.
+        periodDetailsProgressTimer = setInterval(function () {
+            if (progress < 70) progress += 4;
+            else if (progress < 90) progress += 1;
+
+            $('#periodDetailsProgressBar').css('width', progress + '%');
+            $('#periodDetailsProgressText').text(progress + '%');
+        }, 250);
+    }
+
+    /**
+     * Oculta el overlay. Si fue OK, remata visualmente al 100%.
+     */
+    function hidePeriodDetailsLoadingOverlay(success) {
+        if (periodDetailsProgressTimer) {
+            clearInterval(periodDetailsProgressTimer);
+            periodDetailsProgressTimer = null;
+        }
+
+        if (success) {
+            $('#periodDetailsProgressBar').css('width', '100%');
+            $('#periodDetailsProgressText').text('100%');
+
+            // Pequeño delay para que el usuario perciba el "fin"
+            setTimeout(function () {
+                $('#periodDetailsLoadingOverlay').hide();
+            }, 250);
+        } else {
+            $('#periodDetailsLoadingOverlay').hide();
+        }
+    }
+
+    /**
+     * Deshabilita los botones de periodo para evitar clicks repetidos.
+     * OJO: en tu HTML la clase .periodo está en el <td>, y el botón está dentro,
+     * por eso deshabilitamos el <button> hijo.
+     */
+    function setPeriodButtonsEnabled(enabled) {
+        $('.periodo button').prop('disabled', !enabled);
+    }
+
     $(document).ready(function () {
+
         $(document).on('click', '.periodo', function () {
+
+            // Si ya hay una petición en curso, ignoramos el click.
+            if (periodDetailsInFlight) return;
+
+            periodDetailsInFlight = true;
+
+            // Bloqueo UI
+            setPeriodButtonsEnabled(false);
+            showPeriodDetailsLoadingOverlay();
+
+            // Datos del periodo seleccionado
             var periodoId = $(this).data('periodo-id');
             var projectId = @ViewBag.projId;
+
+            // Esta parte la conservamos EXACTAMENTE como la tenías
             var startDate = $(this).closest('tr').find('td:nth-child(2)').text().split(' / ')[0];
             var endDate = $(this).closest('tr').find('td:nth-child(2)').text().split(' / ')[1];
 
             $.ajax({
                 url: '/Projects/PeriodDetails',
+                method: 'GET',
                 data: { id: periodoId, projectId: projectId },
+
+                // Si tus periodos grandes tardan más, sube este timeout.
+                timeout: 120000,
+
                 success: function (data) {
+                    // Pintar parcial
                     $('#detallesPeriodoContainer').html(data);
                     $('#detallesPeriodoContainer').show();
-                    // $('#exportHoursBtn').show(); // Mostrar el botón de exportar horas
-                    $('#exportPMsBtn').show(); // Mostrar el botón de exportar PMs
-                    $('#exportPMSforWPToCSV').show(); // Mostrar el botón de exportar PMs por WP
-                    $('#exportPMSforAuditoria').show(); // Mostrar el botón de exportar PMs Auditoria
-                    $('#exportDeclaredHoursBtn').show(); // Mostrar el botón de exportar horas declaradas
-                    $('#exportEstimatedHoursBtn').show(); // Mostrar el botón de exportar horas estimadas
-                    $('#exportPMSforWPToCSVBtn').show(); // Mostrar el botón de exportar PMs Auditoria por WP
-                    $('#exportWorkedDaysBtn').show(); //Mostrar el botón de exportar días trabajados
-                    $('#exportEstimatedDaysBtn').show(); // Mostrar el botón de exportar días estimados
 
+                    // Mostrar botones (conservamos lo que ya hacías)
+                    $('#exportPMsBtn').show();
+                    $('#exportPMSforWPToCSV').show();
+                    $('#exportPMSforAuditoria').show();
+                    $('#exportDeclaredHoursBtn').show();
+                    $('#exportEstimatedHoursBtn').show();
+                    $('#exportPMSforWPToCSVBtn').show();
+                    $('#exportWorkedDaysBtn').show();
+                    $('#exportEstimatedDaysBtn').show();
 
-                    // Guardar las fechas del periodo seleccionado
+                    // Guardar fechas del periodo seleccionado
                     $('#exportPMSforWPToCSV').data('start-date', startDate);
                     $('#exportPMSforWPToCSV').data('end-date', endDate);
+
+                    // Cerrar overlay OK
+                    hidePeriodDetailsLoadingOverlay(true);
+                },
+
+                error: function (xhr, status) {
+                    // Si expira o falla, quitamos overlay y avisamos
+                    hidePeriodDetailsLoadingOverlay(false);
+
+                    // Abort/timeout: mensaje más claro
+                    if (status === 'timeout') {
+                        alert('La carga del periodo está tardando demasiado. Inténtalo de nuevo o revisa el tamaño del periodo.');
+                    } else {
+                        alert('No se pudo cargar el periodo. Inténtalo de nuevo.');
+                    }
+                },
+
+                complete: function () {
+                    // Pase lo que pase, se re-habilitan clicks y se libera el lock.
+                    periodDetailsInFlight = false;
+                    setPeriodButtonsEnabled(true);
                 }
             });
         });
+
     });
+
 
 
 
@@ -822,5 +954,83 @@
     .btn-block {
         white-space: nowrap;
     }
+
+    #periodDetailsLoadingOverlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.35);
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+    }
+
+        #periodDetailsLoadingOverlay .loading-box {
+            width: 420px;
+            background: #fff;
+            border-radius: 10px;
+            padding: 16px 18px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+            font-family: inherit;
+        }
+
+        #periodDetailsLoadingOverlay .loading-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        #periodDetailsLoadingOverlay .loading-subtitle {
+            font-size: 13px;
+            opacity: .8;
+            margin-bottom: 12px;
+        }
+
+        #periodDetailsLoadingOverlay .loading-progress {
+            width: 100%;
+            height: 10px;
+            background: #e9ecef;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #periodDetailsLoadingOverlay .loading-progress-bar {
+            height: 100%;
+            background: #0d6efd;
+            transition: width .25s ease;
+        }
+
+        #periodDetailsLoadingOverlay .loading-percent {
+            margin-top: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: right;
+        }
+    /* Botones de periodos: texto blanco siempre + hover con contraste */
+    .period-btn {
+        color: #fff !important;
+        font-weight: 700;
+    }
+
+        /* Si el enlace azul viene porque hay <a> o estilos raros encima */
+        .period-btn * {
+            color: #fff !important;
+        }
+
+        /* Hover/focus: sube contraste sin cambiar el “estilo TRS” */
+        .period-btn:hover,
+        .period-btn:focus {
+            color: #fff !important;
+            filter: brightness(0.92);
+            transform: translateY(-1px);
+        }
+
+        /* Cuando está deshabilitado (por el overlay), que se note */
+        .period-btn:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
     </style>
 
