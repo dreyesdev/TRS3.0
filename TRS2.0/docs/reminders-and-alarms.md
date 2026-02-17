@@ -69,6 +69,7 @@ Se ha implementado un sistema inicial de alarmas con icono de campana en la barr
    - Roles: `Admin`, `ProjectManager`.
    - Alcance: `Admin` ve todos los proyectos; `ProjectManager` solo proyectos donde es `PM` o `FM`.
    - Lógica: mes actual y mes anterior, detectando personas con esfuerzo asignado (`Perseffort.Value > 0`) y sin dedicación activa en ese mes.
+   - Acción `Revisar`: abre `/AlarmCenter/OutOfContractAssignedEffort`, una tabla con persona, proyecto, mes, esfuerzo y enlace directo a `Projects/GetPersonnelEffortsByPerson/{projId}/{personId}` para corregir.
 3. `timesheet.current_month.no_hours` (info)
    - Regla: `CurrentMonthNoHoursAlarmRule`.
    - **Escenario de prueba actual**: solo para `Researcher`.
