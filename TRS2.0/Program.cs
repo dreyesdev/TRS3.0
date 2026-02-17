@@ -10,7 +10,7 @@ using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuraci髇 de Serilog
+// Configuraci贸n de Serilog
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -20,7 +20,7 @@ Log.Logger = new LoggerConfiguration()
 
 
 
-// Configuraci髇 de Kestrel:
+// Configuraci贸n de Kestrel:
 // - Development: habilitamos HTTP/HTTPS para pruebas locales con certificado.
 // - Production (IIS): NO tocamos Kestrel; IIS (ANCM) gestiona el hosting y el HTTPS del sitio.
 if (builder.Environment.IsDevelopment())
@@ -64,14 +64,14 @@ builder.Services.Configure<IdentityOptions>(options =>
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.ExpireTimeSpan = TimeSpan.FromMinutes(60); // Expira la sesi髇 tras 60 minutos de inactividad
-    options.SlidingExpiration = true; // No renueva la sesi髇 autom醫icamente
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(60); // Expira la sesi贸n tras 60 minutos de inactividad
+    options.SlidingExpiration = true; // No renueva la sesi贸n autom谩ticamente
     options.Cookie.HttpOnly = true; // Protege la cookie contra accesos de JavaScript
-    options.Cookie.IsEssential = true; // Se mantiene en todas las pol韙icas de privacidad
+    options.Cookie.IsEssential = true; // Se mantiene en todas las pol铆ticas de privacidad
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Requiere HTTPS
     options.Cookie.SameSite = SameSiteMode.Strict; // Evita el acceso de otras aplicaciones
-    options.LoginPath = "/Account/Login"; // Redirige al login tras expiraci髇
-    options.AccessDeniedPath = "/Error/AccessDenied"; // P醙ina de error si no tiene permisos
+builder.Services.AddScoped<UserAlarmService>();
+    options.AccessDeniedPath = "/Error/AccessDenied"; // P谩gina de error si no tiene permisos
 });
 
 
@@ -96,7 +96,7 @@ builder.Services.AddScoped<ReminderService>();
 builder.Services.AddScoped<LoadDataService>();
 
 
-// Env韔 de Correos
+// Env铆o de Correos
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("Smtp"));
 
 // Opciones del sistema de recordatorios (Reply-To, DisplayName y flag del "cap")
@@ -108,7 +108,7 @@ builder.Services.AddScoped<IEmailSender, EmailSender>();
 builder.Services.AddScoped<IEmailSenderWithAttachments, EmailSender>();
 
 
-// Configuraci髇 de Quartz para ejecutar `LoadDataService` diariamente a la 1:00 AM
+// Configuraci贸n de Quartz para ejecutar `LoadDataService` diariamente a la 1:00 AM
 builder.Services.AddQuartz(q =>
 {
     q.UseMicrosoftDependencyInjectionJobFactory();
@@ -178,7 +178,7 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
-    // Aseg鷕ate de que todos los usuarios deben estar autenticados
+    // Aseg煤rate de que todos los usuarios deben estar autenticados
     app.Use(async (context, next) =>
     {
         var path = context.Request.Path;
@@ -240,7 +240,7 @@ public static class SeedData
             }
         }
 
-        // ?? NUEVO BLOQUE: asignar rol Leader autom醫icamente
+        // ?? NUEVO BLOQUE: asignar rol Leader autom谩ticamente
         var leaderIds = await context.Leaders.Select(l => l.LeaderId).ToListAsync();
 
         foreach (var leaderId in leaderIds)

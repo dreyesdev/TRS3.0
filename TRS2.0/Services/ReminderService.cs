@@ -249,6 +249,57 @@ namespace TRS2._0.Services
     bool WillSend
 );
 
+
+        public async Task<ReminderCandidate?> ComputeWeeklyReminderCandidateForPersonAsync(int personId, DateTime targetMonth)
+        {
+            var today = DateTime.Today;
+            var person = await _context.Personnel
+                .Where(p => p.Id == personId && !string.IsNullOrEmpty(p.Email))
+                .Select(p => new { p.Id, p.Name, p.Email })
+                .FirstOrDefaultAsync();
+
+            if (person == null)
+                return null;
+
+            var hasContractToday = await IsContractActiveAsync(person.Id, today);
+            if (!hasContractToday)
+            {
+                return new ReminderCandidate(person.Id, person.Name, person.Email, targetMonth, 0m, 0m, 0m, 0m, false);
+            }
+
+            var assignedWithEffort = await HasActiveAssignmentWithEffortAsync(person.Id, targetMonth.Year, targetMonth.Month);
+            if (!assignedWithEffort)
+            {
+                return new ReminderCandidate(person.Id, person.Name, person.Email, targetMonth, 0m, 0m, 0m, 0m, false);
+            }
+
+            var declaredDict = await _workCalendarService
+                .GetDeclaredHoursPerMonthForPerson(person.Id, targetMonth, targetMonth);
+            declaredDict.TryGetValue(targetMonth, out decimal declaredHours);
+
+            var dailyHours = await _workCalendarService
+                .CalculateDailyWorkHoursWithDedicationAndLeaves(person.Id, targetMonth.Year, targetMonth.Month);
+            var requiredBase = dailyHours.Values.Sum();
+
+            var assignedFraction = _options.UseAssignmentCap
+                ? await GetAssignedFractionAsync(person.Id, targetMonth.Year, targetMonth.Month)
+                : 1m;
+
+            var requiredThreshold = await GetRequiredThresholdAsync(person.Id, targetMonth.Year, targetMonth.Month, requiredBase);
+            var willSend = requiredThreshold > 0m && declaredHours < requiredThreshold;
+
+            return new ReminderCandidate(
+                person.Id,
+                person.Name,
+                person.Email,
+                targetMonth,
+                declaredHours,
+                requiredBase,
+                assignedFraction,
+                requiredThreshold,
+                willSend);
+        }
+
         public async Task<List<ReminderCandidate>> ComputeWeeklyReminderCandidatesAsync(
     DateTime targetMonth,
     bool onlyWillSend)

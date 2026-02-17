@@ -1,10 +1,58 @@
-﻿@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Identity
 @using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels
+@using TRS2._0.Services
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
+@inject UserAlarmService UserAlarmService
 
 @if (SignInManager.IsSignedIn(User))
 {
+    var currentUser = await UserManager.GetUserAsync(User);
+    var alarms = await UserAlarmService.GetActiveAlarmsForUserAsync(currentUser);
+
+    <li class="nav-item dropdown me-2">
+        <a class="nav-link text-dark position-relative" href="#" id="alarmDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Alarmas pendientes">
+            <i class="bi bi-bell-fill"></i>
+            @if (alarms.Count > 0)
+            {
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                    @alarms.Count
+                    <span class="visually-hidden">alarmas activas</span>
+                </span>
+            }
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="alarmDropdown" style="min-width: 360px; max-width: 420px;">
+            @if (alarms.Count == 0)
+            {
+                <li><span class="dropdown-item-text text-muted">No tienes alarmas pendientes.</span></li>
+            }
+            else
+            {
+                foreach (var alarm in alarms)
+                {
+                    var badgeClass = alarm.Severity switch
+                    {
+                        "danger" => "bg-danger",
+                        "warning" => "bg-warning text-dark",
+                        _ => "bg-info text-dark"
+                    };
+
+                    <li class="px-3 py-2 border-bottom">
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                            <strong>@alarm.Title</strong>
+                            <span class="badge @badgeClass">@alarm.Severity</span>
+                        </div>
+                        <div class="small text-muted mt-1">@alarm.Description</div>
+                        @if (!string.IsNullOrWhiteSpace(alarm.ActionUrl))
+                        {
+                            <a href="@alarm.ActionUrl" class="small">Revisar</a>
+                        }
+                    </li>
+                }
+            }
+        </ul>
+    </li>
+
     <li class="nav-item">
         <span class="nav-link text-dark">@User.Identity.Name |</span>
     </li>
