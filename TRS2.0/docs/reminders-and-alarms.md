@@ -64,9 +64,11 @@ Se ha implementado un sistema inicial de alarmas con icono de campana en la barr
 1. `timesheet.pending.previous_month` (danger)
    - Regla: `PendingPreviousMonthTimesheetAlarmRule`.
    - Roles: `Researcher`, `ProjectManager`, `Leader`, `User`.
-2. `dedication.contract.inactive` (warning)
-   - Regla: `InactiveContractAlarmRule`.
+2. `project.out_of_contract.assigned_effort` (danger)
+   - Regla: `OutOfContractAssignedEffortAlarmRule`.
    - Roles: `Admin`, `ProjectManager`.
+   - Alcance: `Admin` ve todos los proyectos; `ProjectManager` solo proyectos donde es `PM` o `FM`.
+   - Lógica: mes actual y mes anterior, detectando personas con esfuerzo asignado (`Perseffort.Value > 0`) y sin dedicación activa en ese mes.
 3. `timesheet.current_month.no_hours` (info)
    - Regla: `CurrentMonthNoHoursAlarmRule`.
    - **Escenario de prueba actual**: solo para `Researcher`.

@@ -95,7 +95,7 @@ builder.Services.AddScoped<WorkCalendarService>();
 builder.Services.AddScoped<ReminderService>();
 builder.Services.AddScoped<LoadDataService>();
 builder.Services.AddScoped<IUserAlarmRule, PendingPreviousMonthTimesheetAlarmRule>();
-builder.Services.AddScoped<IUserAlarmRule, InactiveContractAlarmRule>();
+builder.Services.AddScoped<IUserAlarmRule, OutOfContractAssignedEffortAlarmRule>();
 builder.Services.AddScoped<IUserAlarmRule, CurrentMonthNoHoursAlarmRule>();
 builder.Services.AddScoped<UserAlarmService>();
 
