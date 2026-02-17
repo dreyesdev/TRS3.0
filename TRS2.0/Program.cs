@@ -70,7 +70,6 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.IsEssential = true; // Se mantiene en todas las políticas de privacidad
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Requiere HTTPS
     options.Cookie.SameSite = SameSiteMode.Strict; // Evita el acceso de otras aplicaciones
-builder.Services.AddScoped<UserAlarmService>();
     options.AccessDeniedPath = "/Error/AccessDenied"; // Página de error si no tiene permisos
 });
 
@@ -94,6 +93,7 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddScoped<WorkCalendarService>();
 builder.Services.AddScoped<ReminderService>();
 builder.Services.AddScoped<LoadDataService>();
+builder.Services.AddScoped<UserAlarmService>();
 
 
 // Envío de Correos
