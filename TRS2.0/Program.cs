@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using TRS2._0.Models.DataModels;
 using TRS2._0.Services;
+using TRS2._0.Services.Alarms;
 using Quartz;
 using Quartz.Impl;
 using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
@@ -70,7 +71,6 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.IsEssential = true; // Se mantiene en todas las políticas de privacidad
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Requiere HTTPS
     options.Cookie.SameSite = SameSiteMode.Strict; // Evita el acceso de otras aplicaciones
-builder.Services.AddScoped<UserAlarmService>();
     options.AccessDeniedPath = "/Error/AccessDenied"; // Página de error si no tiene permisos
 });
 
@@ -94,6 +94,10 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddScoped<WorkCalendarService>();
 builder.Services.AddScoped<ReminderService>();
 builder.Services.AddScoped<LoadDataService>();
+builder.Services.AddScoped<IUserAlarmRule, PendingPreviousMonthTimesheetAlarmRule>();
+builder.Services.AddScoped<IUserAlarmRule, InactiveContractAlarmRule>();
+builder.Services.AddScoped<IUserAlarmRule, CurrentMonthNoHoursAlarmRule>();
+builder.Services.AddScoped<UserAlarmService>();
 
 
 // Envío de Correos

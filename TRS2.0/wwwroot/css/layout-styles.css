@@ -54,3 +54,20 @@ button.accept-policy {
     text-align: center;
     line-height: 60px; /* Ajusta esta altura al tamaño de tu footer */
 }
+
+.alarm-nav-link {
+    padding-top: 0.7rem;
+}
+
+.alarm-nav-link .bi-bell-fill {
+    font-size: 1rem;
+}
+
+.alarm-badge {
+    top: 58%;
+    left: 76%;
+    transform: translate(-20%, -20%);
+    font-size: 0.62rem;
+    line-height: 1;
+    padding: 0.2rem 0.35rem;
+}

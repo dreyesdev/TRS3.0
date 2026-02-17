@@ -55,22 +55,26 @@ Se ha implementado un sistema inicial de alarmas con icono de campana en la barr
 
 ### Arquitectura
 
-- `UserAlarmService` centraliza las reglas de alarmas por usuario.
-- Cada alarma es una consulta independiente (una regla = una query principal).
+- `UserAlarmService` ahora solo orquesta: obtiene roles del usuario y ejecuta reglas externas (`IUserAlarmRule`).
+- Cada alarma vive en una clase independiente dentro de `Services/Alarms` y decide si aplica según roles.
 - Endpoint API disponible: `GET /api/alarms/me`.
 
 ### Alarmas incluidas en esta primera versión
 
 1. `timesheet.pending.previous_month` (danger)
-   - Usa el mismo motor del reminder para el mes anterior.
+   - Regla: `PendingPreviousMonthTimesheetAlarmRule`.
+   - Roles: `Researcher`, `ProjectManager`, `Leader`, `User`.
 2. `dedication.contract.inactive` (warning)
-   - Dispara si no existe dedicación activa hoy.
+   - Regla: `InactiveContractAlarmRule`.
+   - Roles: `Admin`, `ProjectManager`.
 3. `timesheet.current_month.no_hours` (info)
-   - Si hay asignación este mes y ya es día 10 o posterior, pero no hay horas declaradas.
+   - Regla: `CurrentMonthNoHoursAlarmRule`.
+   - **Escenario de prueba actual**: solo para `Researcher`.
 
 ### Extensión recomendada
 
 Para añadir nuevas alarmas:
-1. Crear nueva regla en `UserAlarmService`.
-2. Asignar código único, severidad y URL de resolución.
-3. (Opcional) Exponer configuración por `appsettings` para habilitar/deshabilitar alarmas por entorno.
+1. Crear una clase que implemente `IUserAlarmRule`.
+2. Implementar la lógica de rol + consulta y devolver `UserAlarmViewModel` cuando aplique.
+3. Registrar la regla en `Program.cs` con `AddScoped<IUserAlarmRule, ...>()`.
+4. (Opcional) Exponer configuración por `appsettings` para activar/desactivar reglas por entorno.
