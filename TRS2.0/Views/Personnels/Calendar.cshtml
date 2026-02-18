@@ -6,9 +6,10 @@
     var selectedPersonId = ViewBag.SelectedPersonId;    
 }
 
-<h2>Calendar</h2>
+<div class="container personnel-calendar-ux">
+    <h2 class="calendar-page-title">Calendar</h2>
 
-<div class="container">
+    <div class="calendar-filter-shell">
     <div class="row">
         <!-- Columna de selección de personal -->
         <div class="col-md-6">
@@ -40,12 +41,9 @@
         </div>
     </div>
 </div>
-<hr />
+    </div>
 
-
-
-
-<div id="calendar"></div>
+    <div id="calendar" class="calendar-surface"></div>
 
 <div class="modal fade" id="event-modal">
     <div class="modal-dialog">
@@ -97,9 +95,6 @@
 <div id="context-menu">
 </div>
 
-<div id="calendar"></div>
-
-
 
 <div class="calendar-legend">
     <div class="legend-item"><span class="color-box" style="background-color: darkorange;"></span> Leave</div>
@@ -129,9 +124,14 @@
             },
             locale: 'es',          // ← NEW
             firstDay: 1,           // ← NEW (lunes)
-            multiMonthMinWidth: 200,
+            multiMonthMinWidth: 155,
+            multiMonthMaxColumns: 3,
             initialView: 'multiMonthYear',
-            height: 'auto'
+            dayMaxEvents: true,
+            dayMaxEventRows: 2,
+            height: "auto",
+            contentHeight: "auto",
+            expandRows: true
           });
           calendar.render();
         });
@@ -301,9 +301,121 @@
         margin-right: 5px;
     }
     
-    h2 {
+    .personnel-calendar-ux {
+        max-width: 1680px;
+    }
+
+    .calendar-page-title {
         text-align: center;
-        font-weight: bold;
+        font-weight: 700;
+        color: #fff;
+        margin: 0 0 14px;
+        background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+        border-radius: 12px;
+        padding: 12px 16px;
+        box-shadow: 0 8px 20px rgba(12, 56, 96, 0.16);
+    }
+
+    .calendar-filter-shell {
+        border: 1px solid #d7e6f3;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(14, 57, 98, 0.08);
+        background: #fff;
+        padding: 14px;
+        margin-bottom: 14px;
+    }
+
+    .calendar-surface {
+        border: 1px solid #d7e6f3;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(14, 57, 98, 0.10);
+        background: #fff;
+        padding: 10px;
+    }
+
+
+    .calendar-filter-shell h2 {
+        text-align: center;
+        font-weight: 700;
+        color: #ffffff;
+        background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+        border-radius: 9px;
+        padding: 8px 10px;
+        margin-bottom: 10px;
+    }
+
+    .calendar-filter-shell .form-control {
+        border-radius: 8px;
+    }
+
+    #personDetails {
+        border: 1px solid #d7e6f3;
+        border-radius: 10px;
+        box-shadow: inset 0 0 0 1px #eef5fd;
+    }
+
+    #calendar .fc-scroller,
+    #calendar .fc-scroller-liquid-absolute {
+        overflow: visible !important;
+    }
+
+    #calendar .fc-view-harness {
+        height: auto !important;
+    }
+
+    #calendar .fc-toolbar-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #ffffff;
+        background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+        border-radius: 8px;
+        padding: 4px 12px;
+    }
+
+    #calendar .fc-daygrid-day-number,
+    #calendar .fc-col-header-cell-cushion {
+        color: #1f4566;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    #calendar .fc-multiMonthMonth {
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid #dbe7f2;
+    }
+
+    #calendar .fc-daygrid-day-frame,
+    #calendar .fc-multimonth-daygrid-day-frame {
+        min-height: 52px;
+    }
+
+    #calendar .fc-event {
+        border-radius: 6px;
+        font-size: 0.76rem;
+        line-height: 1.25;
+        padding: 1px 2px;
+        border: none;
+    }
+
+    .calendar-legend {
+        flex-wrap: wrap;
+        gap: 10px;
+        border: 1px solid #d7e6f3;
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: #f7fbff;
+    }
+
+    @@media (max-width: 992px) {
+        #calendar {
+            font-size: 0.9rem;
+        }
+
+        #calendar .fc-daygrid-day-frame,
+        #calendar .fc-multimonth-daygrid-day-frame {
+            min-height: 44px;
+        }
     }
 
 </style>
