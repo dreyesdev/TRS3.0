@@ -220,7 +220,7 @@
                                     @totalEstimado.ToString("0.#")
                                 </div>
                             </td>
-                            <td class="sticky-last-column sticky-percent-column">@((wp.Effort * 100).ToString("0.0", CultureInfo.CurrentCulture))</td>
+                            <td class="sticky-last-column sticky-percent-column">@((wp.Effort * 100).ToString("0.#", CultureInfo.CurrentCulture))</td>
                         </tr>
                     }
                     <!-- Fila de Totales aquí -->
@@ -586,8 +586,6 @@
         overflow-y: auto;
         overflow-x: auto;
         position: relative;
-        padding-bottom: 10px;
-        margin-bottom: 8px;
     }
 
     .table {
@@ -837,11 +835,11 @@
 
     .sticky-penultimate-column {
         position: sticky;
-        right: var(--timesheet-percent-col-width);
+        right: 52px;
         background-color: #ffffff !important;
         z-index: 8;
-        min-width: var(--timesheet-summary-col-width);
-        width: var(--timesheet-summary-col-width);
+        min-width: 130px;
+        width: 130px;
         box-shadow: -1px 0 0 #c9d0d8 inset, 1px 0 0 #c9d0d8 inset;
     }
 
@@ -849,10 +847,18 @@
         position: sticky;
         right: 0;
         background-color: #ffffff !important;
-        z-index: 9;
-        min-width: var(--timesheet-percent-col-width);
-        width: var(--timesheet-percent-col-width);
-        box-shadow: -1px 0 0 #c9d0d8 inset, 1px 0 0 #c9d0d8 inset;
+        z-index: 7;
+        min-width: 52px;
+        width: 52px;
+        box-shadow: -1px 0 0 #c9d0d8 inset;
+    }
+
+    .sticky-summary-column {
+        background-clip: padding-box;
+    }
+
+    .sticky-percent-column {
+        background-clip: padding-box;
     }
 
 
@@ -1007,8 +1013,9 @@
         line-height: 1.35;
         padding: 8px 10px;
         border-radius: 8px;
-        top: 12px;
-        right: calc(100% + 12px);
+        bottom: calc(100% + 10px);
+        right: 50%;
+        transform: translateX(50%);
         box-shadow: 0 8px 18px rgba(0,0,0,.25);
         white-space: normal;
         text-align: left;
@@ -1017,9 +1024,10 @@
     .timesheet-help::before {
         content: "";
         border: 6px solid transparent;
-        border-left-color: #123f68;
-        top: 16px;
-        right: calc(100% + 1px);
+        border-top-color: #123f68;
+        bottom: calc(100% - 2px);
+        right: 50%;
+        transform: translateX(50%);
     }
 
     .timesheet-help:hover::after,
@@ -1047,8 +1055,8 @@
         }
 
         .timesheet-help::after {
-            right: calc(100% + 10px);
-            width: min(320px, 70vw);
+            right: 50%;
+            transform: translateX(50%);
         }
     }
 
