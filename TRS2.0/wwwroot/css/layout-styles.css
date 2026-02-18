@@ -54,3 +54,127 @@ button.accept-policy {
     text-align: center;
     line-height: 60px; /* Ajusta esta altura al tamaño de tu footer */
 }
+
+.alarm-nav-link {
+    padding-top: 0.7rem;
+}
+
+.alarm-nav-link .bi-bell-fill {
+    font-size: 1rem;
+}
+
+.alarm-badge {
+    top: 58%;
+    left: 76%;
+    transform: translate(-20%, -20%);
+    font-size: 0.62rem;
+    line-height: 1;
+    padding: 0.2rem 0.35rem;
+}
+
+.context-menu-shell {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+    padding: 0.25rem 0.75rem 0.75rem;
+    background: linear-gradient(180deg, rgba(244,247,252,0.95) 0%, rgba(244,247,252,0.7) 70%, rgba(244,247,252,0) 100%);
+    backdrop-filter: saturate(140%) blur(2px);
+}
+
+.context-menu-inner {
+    border-radius: 14px;
+    border: 1px solid #d9e2ef;
+    box-shadow: 0 10px 30px rgba(13, 42, 76, 0.08);
+    background: #ffffff;
+    padding: 0.7rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.context-menu-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.75rem;
+    border-radius: 999px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: #0d3f6b;
+    background: #eef5ff;
+    white-space: nowrap;
+}
+
+.context-menu-title .bi {
+    font-size: 1rem;
+}
+
+.context-menu-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.context-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.42rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 9px;
+    text-decoration: none;
+    font-weight: 500;
+    color: #224767;
+    background: #f8fbff;
+    border: 1px solid #e4edf7;
+    transition: all 0.2s ease;
+}
+
+.context-link .bi {
+    font-size: 0.92rem;
+}
+
+.context-link:hover {
+    transform: translateY(-1px);
+    color: #0d3f6b;
+    border-color: #b8d0ea;
+    background: #edf5ff;
+    box-shadow: 0 8px 18px rgba(17, 76, 129, 0.14);
+}
+
+.context-link.active {
+    color: #ffffff;
+    border-color: #1c5f98;
+    background: linear-gradient(135deg, #17548a 0%, #2173b6 100%);
+    box-shadow: 0 8px 18px rgba(16, 75, 130, 0.35);
+}
+
+.context-link.active .bi {
+    color: #dff1ff;
+}
+
+.personnel-context-menu .context-menu-title {
+    color: #104b54;
+    background: #ebfbf9;
+}
+
+@media (max-width: 992px) {
+    .context-menu-shell {
+        position: static;
+        padding: 0.2rem 0.55rem 0.6rem;
+    }
+
+    .context-menu-inner {
+        padding: 0.55rem;
+    }
+
+    .context-menu-title {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .context-menu-links {
+        width: 100%;
+    }
+}
