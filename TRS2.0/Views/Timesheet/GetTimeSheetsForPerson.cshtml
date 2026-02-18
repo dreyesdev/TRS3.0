@@ -548,8 +548,10 @@
         font-weight: bold;
         text-align: center;
         vertical-align: middle;
-        max-width: 500px;
-        max-height: 10px;
+        max-width: 560px;
+        padding-left: 14px !important;
+        padding-right: 16px !important;
+        box-sizing: border-box;
     }
 
     .second-line-cell {
@@ -566,6 +568,7 @@
     .table-responsive {
         overflow-x: auto;
         margin-bottom: 1rem;
+        padding-left: 0;
     }
 
     .scrollable-table-container {
@@ -574,10 +577,12 @@
     }
 
     .table {
-        width: 100%;
+        width: max-content;
+        min-width: 100%;
         margin-bottom: 1rem;
         color: #212529;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
     }
 
         .table td {
@@ -737,6 +742,7 @@
 
     .sticky-day-header {
         z-index: 4; /* Menor que top-left sticky header */
+        background-color: #343a40;
     }
 
     tfoot th {
@@ -791,16 +797,22 @@
 
     .sticky-penultimate-column {
         position: sticky;
-        right: 50px; /* Ajusta este valor según el ancho de la última columna */
-        background-color: white;
-        z-index: 1;
+        right: 72px;
+        background-color: #ffffff !important;
+        z-index: 7;
+        min-width: 130px;
+        width: 130px;
+        box-shadow: -1px 0 0 #c9d0d8 inset, 1px 0 0 #c9d0d8 inset;
     }
 
     .sticky-last-column {
         position: sticky;
         right: 0;
-        background-color: white;
-        z-index: 1;
+        background-color: #ffffff !important;
+        z-index: 8;
+        min-width: 72px;
+        width: 72px;
+        box-shadow: -1px 0 0 #c9d0d8 inset;
     }
 
 
@@ -843,7 +855,7 @@
 
     .timesheet-nav-group .form-control {
         width: auto;
-        min-width: 150px;
+        min-width: 140px;
     }
 
     .year-quick-select-inline {
@@ -857,12 +869,15 @@
         display: inline-flex;
         align-items: center;
         gap: 10px;
-        min-width: 500px;
+        min-width: 760px;
         margin-left: auto;
+        flex: 1 1 auto;
     }
 
     .timesheet-progress-bar {
-        min-width: 320px;
+        min-width: 520px;
+        width: 100%;
+        margin-bottom: 0;
     }
 
     .total-hours-label {
@@ -870,9 +885,15 @@
     }
 
     .top-left-header {
-        z-index: 8 !important;
+        z-index: 9 !important;
         background-color: #343a40 !important;
         box-shadow: 2px 0 0 #fff;
+    }
+
+    thead .sticky-penultimate-column,
+    thead .sticky-last-column {
+        background-color: #343a40 !important;
+        color: #fff !important;
     }
 
     .header-top-line {

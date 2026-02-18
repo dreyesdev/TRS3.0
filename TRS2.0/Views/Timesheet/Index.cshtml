@@ -10,7 +10,7 @@
     <div class="personnel-filter-shell">
         <div class="row g-3">
             <div class="col-md-6">
-                <h3 class="text-primary">Person Selection</h3>
+                <h3 class="card-section-title">Person Selection</h3>
 
                 <div id="personnelSelectContainer" class="custom-select">
                     <div id="personnelSelectHeader" class="person-result" data-person-id="">
@@ -33,7 +33,7 @@
             </div>
 
             <div class="col-md-6">
-                <h3 class="text-primary">Person Details</h3>
+                <h3 class="card-section-title">Person Details</h3>
                 <div id="personDetails" class="card p-3">
                     <p class="text-muted mb-0 text-center">Select a person to open their timesheet.</p>
                 </div>
@@ -102,6 +102,17 @@
 }
 
 <style>
+
+    .timesheet-landing-ux .card-section-title {
+        text-align: center;
+        font-weight: 700;
+        color: #ffffff;
+        background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+        border-radius: 9px;
+        padding: 8px 10px;
+        margin-bottom: 10px;
+    }
+
     .timesheet-landing-ux .custom-select {
         background-color: #f8fbff;
         border: 1px solid #d3e4f5;
