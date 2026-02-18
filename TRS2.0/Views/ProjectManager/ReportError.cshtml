@@ -2,8 +2,8 @@
 
 <div class="container mt-3 report-error-ux">
     <div class="report-error-hero">
-        <h2 class="mb-1"><i class="bi bi-bug"></i> Reportar incidencia</h2>
-        <p class="mb-0">Cuéntanos qué ha pasado. Incluiremos automáticamente tu usuario y correo para poder ayudarte más rápido.</p>
+        <h2 class="mb-1 text-center"><i class="bi bi-bug"></i> Report an issue</h2>
+        <p class="mb-0 text-center">Tell us what happened. We automatically include your user details so we can help you faster.</p>
     </div>
 
     @if (TempData["SuccessMessage"] != null)
@@ -22,22 +22,22 @@
 
     <div class="card report-error-card">
         <div class="card-header">
-            <h4 class="mb-0"><i class="bi bi-envelope-paper"></i> Nuevo reporte</h4>
+            <h4 class="mb-0 text-center"><i class="bi bi-envelope-paper"></i> New report</h4>
         </div>
         <div class="card-body">
             <div class="reporter-meta mb-4">
-                <div class="reporter-meta-title">Información del remitente (se enviará en el correo)</div>
+                <div class="reporter-meta-title">Sender information (included in the email)</div>
                 <div class="row g-2 mt-1">
                     <div class="col-md-4">
-                        <label class="form-label">Usuario</label>
+                        <label class="form-label">User</label>
                         <input type="text" class="form-control" value="@Model.ReporterUserName" readonly />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Nombre</label>
+                        <label class="form-label">Full name</label>
                         <input type="text" class="form-control" value="@Model.ReporterFullName" readonly />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Correo</label>
+                        <label class="form-label">Email</label>
                         <input type="text" class="form-control" value="@Model.ReporterEmail" readonly />
                     </div>
                 </div>
@@ -52,19 +52,19 @@
 
                 <div class="col-12">
                     <label asp-for="Description" class="form-label"></label>
-                    <textarea asp-for="Description" class="form-control" rows="6" required placeholder="Explica los pasos para reproducir el error, qué esperabas y qué ocurrió realmente."></textarea>
+                    <textarea asp-for="Description" class="form-control" rows="6" required placeholder="Describe steps to reproduce the issue, expected behavior, and actual behavior."></textarea>
                     <span asp-validation-for="Description" class="text-danger"></span>
                 </div>
 
                 <div class="col-12">
                     <label asp-for="Attachment" class="form-label"></label>
                     <input asp-for="Attachment" type="file" class="form-control" />
-                    <div class="form-text">Opcional: captura de pantalla o fichero de apoyo.</div>
+                    <div class="form-text">Optional: screenshot or supporting file.</div>
                 </div>
 
                 <div class="col-12 d-flex justify-content-end">
                     <button type="submit" class="btn btn-warning report-submit-btn">
-                        <i class="bi bi-send"></i> Enviar reporte
+                        <i class="bi bi-send"></i> Send report
                     </button>
                 </div>
             </form>

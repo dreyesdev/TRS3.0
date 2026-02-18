@@ -281,6 +281,16 @@ public class ProjectManagerController : Controller
                 model.ReporterFullName = $"{personnel.Name} {personnel.Surname}".Trim();
                 model.ReporterEmail = personnel.Email;
             }
+
+            if (string.IsNullOrWhiteSpace(model.ReporterEmail))
+            {
+                model.ReporterEmail = loggedInUser.Email;
+            }
+
+            if (string.IsNullOrWhiteSpace(model.ReporterFullName))
+            {
+                model.ReporterFullName = loggedInUser.UserName;
+            }
         }
 
         return model;
@@ -348,18 +358,18 @@ public class ProjectManagerController : Controller
                 await client.SendMailAsync(mailMessage);
             }
 
-            TempData["SuccessMessage"] = "El reporte ha sido enviado con éxito.";
+            TempData["SuccessMessage"] = "Your report was sent successfully.";
             return RedirectToAction("ReportError");
         }
         catch (SmtpException smtpEx)
         {
             _logger.LogError($"SMTP Error: {smtpEx.StatusCode} - {smtpEx.Message}");
-            TempData["ErrorMessage"] = $"Hubo un error SMTP: {smtpEx.StatusCode} - {smtpEx.Message}";
+            TempData["ErrorMessage"] = $"SMTP error: {smtpEx.StatusCode} - {smtpEx.Message}";
         }
         catch (Exception ex)
         {
             _logger.LogError($"Error General al enviar correo: {ex.Message}");
-            TempData["ErrorMessage"] = $"Hubo un error al enviar el reporte: {ex.Message}";
+            TempData["ErrorMessage"] = $"There was an error sending the report: {ex.Message}";
         }
 
         return RedirectToAction("ReportError");
