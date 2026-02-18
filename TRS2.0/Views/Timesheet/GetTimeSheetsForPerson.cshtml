@@ -845,7 +845,7 @@
         position: sticky;
         right: var(--timesheet-percent-col-width);
         background-color: #ffffff !important;
-        z-index: 12;
+        z-index: 10;
         min-width: var(--timesheet-summary-col-width);
         width: var(--timesheet-summary-col-width);
         max-width: var(--timesheet-summary-col-width);
@@ -859,7 +859,7 @@
         position: sticky;
         right: 0;
         background-color: #ffffff !important;
-        z-index: 11;
+        z-index: 9;
         min-width: var(--timesheet-percent-col-width);
         width: var(--timesheet-percent-col-width);
         max-width: var(--timesheet-percent-col-width);
@@ -963,7 +963,14 @@
     thead .sticky-last-column {
         background-color: #343a40 !important;
         color: #fff !important;
+        z-index: 40 !important;
     }
+
+    tbody .sticky-summary-column,
+    tbody .sticky-percent-column {
+        z-index: 10 !important;
+    }
+
 
     .header-top-line {
         border-bottom: 1px solid #ffffff;

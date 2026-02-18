@@ -565,3 +565,21 @@ button.accept-policy {
         width: fit-content;
     }
 }
+
+
+.projects-ux .project-details-card {
+    border: 1px solid #d7e6f3;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(14, 57, 98, 0.10);
+    overflow: hidden;
+}
+
+.projects-ux .project-details-card > .card-header {
+    background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+    color: #ffffff;
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: .01em;
+    font-size: 1.2rem;
+    border-bottom: 0;
+}
