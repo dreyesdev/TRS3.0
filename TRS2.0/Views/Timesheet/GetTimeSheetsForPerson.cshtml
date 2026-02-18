@@ -38,6 +38,7 @@
                     <option value="@year">@year</option>
                 }
             </select>
+            <div id="yearQuickSelectInline" class="year-quick-select-inline" aria-label="Quick year selector"></div>
             <button id="goButton" class="btn btn-success">Go</button>
         </div>
 
@@ -56,8 +57,8 @@
         }
 
         <div class="timesheet-progress-wrap">
-            <span class="font-weight-bold">Total Hours this month: @Model.TotalHours.ToString("0.0")</span>
-            <div class="progress w-100 position-relative">
+            <span class="font-weight-bold total-hours-label">Total Hours this month: @Model.TotalHours.ToString("0.0")</span>
+            <div class="progress w-100 position-relative timesheet-progress-bar">
                 <div class="progress-bar bg-success" role="progressbar" style="width: @ViewBag.PercentageUsed%" aria-valuenow="@ViewBag.PercentageUsed" aria-valuemin="0" aria-valuemax="100">
                     <span class="position-absolute w-100 text-center font-weight-bold" style="color: black;">@ViewBag.PercentageUsed%</span>
                 </div>
@@ -88,7 +89,7 @@
                         <th class="sticky-penultimate-column">
                             <div style="border-bottom: 1px solid white; margin-bottom: 2px; text-align: center; font-weight: bold">ACTUAL</div>
                             <div style="text-align: center; font-weight: bold;">ESTIMATED HOURS
-                                <span class="timesheet-help" tabindex="0" title="Estimated hours are calculated from your monthly effort percentage. Because this is a conversion to hours and rounding is applied, small differences above or below the estimate are expected and not a problem.">?</span>
+                                <span class="timesheet-help" tabindex="0" role="button" aria-label="Help about estimated hours" data-tooltip="Estimated hours are calculated from your monthly effort percentage. Because this is a conversion to hours and rounding is applied, small differences above or below the estimate are expected and not a problem.">?</span>
                             </div>
                         </th>
                         <th class="sticky-last-column">%</th>
@@ -285,33 +286,15 @@
 </div>
 <hr/>
 <div class="below-main-table" style="display: flex; justify-content: space-between; margin-top: 10px;">
-    <div class="legend-box" style="width: 300px; margin-left:10px; padding: 10px; margin-top: 10px; margin-bottom: 15px; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,.1);">
-    <h4 style="margin-bottom: 20px; text-align: center; font-weight: bold">Legend</h4>
-    <div class="mb-2">
-        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: darkorange; border: 1px solid black;">&nbsp;</span>
-        <span style="margin-left: 8px;">Leave</span>
+    <div class="legend-box">
+        <h4 class="legend-title">Legend</h4>
+        <div class="legend-item"><span class="legend-color legend-leave">&nbsp;</span><span>Leave</span></div>
+        <div class="legend-item"><span class="legend-color legend-partial-leave">&nbsp;</span><span>Partial Leave</span></div>
+        <div class="legend-item"><span class="legend-color legend-holiday">&nbsp;</span><span>Holiday</span></div>
+        <div class="legend-item"><span class="legend-color legend-out-contract">&nbsp;</span><span>Out of contract</span></div>
+        <div class="legend-item"><span class="legend-color legend-travel">&nbsp;</span><span>Travel</span></div>
+        <div class="legend-item"><span class="legend-color legend-national-holiday">&nbsp;</span><span>National Holiday</span></div>
     </div>
-    <div class="mb-2">
-        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: lightcoral; border: 1px solid black;">&nbsp;</span>
-        <span style="margin-left: 8px;">Partial Leave</span>
-        </div>
-    <div class="mb-2">
-        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: lightblue; border: 1px solid black;">&nbsp;</span>
-        <span style="margin-left: 8px;">Holiday</span>
-    </div>
-    <div class="mb-2">
-        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: red; border: 1px solid black;">&nbsp;</span>
-        <span style="margin-left: 8px;">Out of contract</span>
-    </div>
-    <div class="mb-2">
-        <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: pink; border: 1px solid black;">&nbsp;</span>
-        <span style="margin-left: 8px;">Travel</span>
-    </div>
-        <div class="mb-2">
-            <span class="legend-color" style="display: inline-block; width: 20px; height: 20px; background-color: green; border: 1px solid black;">&nbsp;</span>
-            <span style="margin-left: 8px;">National Holiday</span>
-        </div>
-</div>
     <div class="travel-table-container" style="flex-grow: 1; overflow-x: auto; margin-left: 20px; margin-right:20px;">
         <h4 style="margin-bottom: 5px; text-align: center; font-weight: bold">TRAVELS</h4>
         <table class="table table-bordered" style="min-width: 600px;">
@@ -401,7 +384,7 @@
     document.getElementById('yearSelect').value = '@Model.CurrentYear';
 
     function renderYearQuickSelect() {
-        const container = document.getElementById('yearQuickSelect');
+        const container = document.getElementById('yearQuickSelectInline');
         if (!container) return;
 
         const selectedYear = parseInt(document.getElementById('yearSelect').value || '@Model.CurrentYear', 10);
@@ -765,17 +748,46 @@
 
 
     .legend-box {
-        width: 300px;
+        width: 320px;
         margin-left: 10px;
-        padding: 10px;
-        margin-top: 10px; /* Reducido desde 20px */
-        border: 1px solid #ccc;
-        box-shadow: 0 2px 4px rgba(0,0,0,.1);
+        padding: 14px;
+        margin-top: 10px;
+        border: 1px solid #d7e6f3;
+        border-radius: 12px;
+        box-shadow: 0 8px 18px rgba(14, 57, 98, .10);
+        background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
     }
 
-        .legend-box .mb-2 {
-            margin-bottom: 15px; /* Incrementado para mayor separación */
-        }
+    .legend-title {
+        margin-bottom: 14px;
+        text-align: center;
+        font-weight: 700;
+        color: #154f82;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        font-weight: 500;
+        color: #1f4566;
+    }
+
+    .legend-color {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        border: 1px solid rgba(0,0,0,.3);
+    }
+
+    .legend-leave { background-color: darkorange; }
+    .legend-partial-leave { background-color: lightcoral; }
+    .legend-holiday { background-color: lightblue; }
+    .legend-out-contract { background-color: red; }
+    .legend-travel { background-color: pink; }
+    .legend-national-holiday { background-color: green; }
 
     .sticky-penultimate-column {
         position: sticky;
@@ -808,23 +820,25 @@
     }
 
     .timesheet-control-panel {
-        display: grid;
-        grid-template-columns: 2fr auto 1fr;
-        gap: 10px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
         border: 1px solid #d7e6f3;
         border-radius: 12px;
         background: #fff;
         padding: 12px;
         box-shadow: 0 8px 20px rgba(14, 57, 98, 0.08);
-        align-items: center;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        white-space: nowrap;
     }
 
     .timesheet-nav-group,
     .timesheet-actions-group {
-        display: flex;
+        display: inline-flex;
         align-items: center;
         gap: 8px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
     }
 
     .timesheet-nav-group .form-control {
@@ -832,17 +846,27 @@
         min-width: 150px;
     }
 
-    .year-quick-select {
-        display: flex;
+    .year-quick-select-inline {
+        display: inline-flex;
         align-items: center;
-        justify-content: center;
         gap: 6px;
+        margin-left: 2px;
     }
 
     .timesheet-progress-wrap {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 500px;
+        margin-left: auto;
+    }
+
+    .timesheet-progress-bar {
+        min-width: 320px;
+    }
+
+    .total-hours-label {
+        margin-bottom: 0;
     }
 
     .top-left-header {
@@ -863,6 +887,7 @@
     }
 
     .timesheet-help {
+        position: relative;
         display: inline-flex;
         justify-content: center;
         align-items: center;
@@ -887,17 +912,57 @@
         outline: none;
     }
 
-    @@media (max-width: 1200px) {
-        .timesheet-control-panel {
-            grid-template-columns: 1fr;
-        }
+    .timesheet-help::after,
+    .timesheet-help::before {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .15s ease;
+        position: absolute;
+        z-index: 1200;
+    }
 
+    .timesheet-help::after {
+        content: attr(data-tooltip);
+        width: 320px;
+        background: #123f68;
+        color: #fff;
+        font-size: .78rem;
+        line-height: 1.35;
+        padding: 8px 10px;
+        border-radius: 8px;
+        top: 24px;
+        right: -150px;
+        box-shadow: 0 8px 18px rgba(0,0,0,.25);
+        white-space: normal;
+        text-align: left;
+    }
+
+    .timesheet-help::before {
+        content: "";
+        border: 6px solid transparent;
+        border-bottom-color: #123f68;
+        top: 13px;
+        right: 2px;
+    }
+
+    .timesheet-help:hover::after,
+    .timesheet-help:hover::before,
+    .timesheet-help:focus::after,
+    .timesheet-help:focus::before {
+        opacity: 1;
+    }
+
+    @media (max-width: 1200px) {
         .timesheet-progress-wrap {
-            order: 3;
+            min-width: 420px;
         }
 
-        .year-quick-select {
-            justify-content: flex-start;
+        .timesheet-progress-bar {
+            min-width: 250px;
+        }
+
+        .timesheet-help::after {
+            right: -80px;
         }
     }
 
