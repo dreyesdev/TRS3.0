@@ -401,3 +401,78 @@ button.accept-policy {
 .projects-report-partial-ux .btn {
     border-radius: 8px;
 }
+
+
+/* ===== Personnel Views Professional Theme ===== */
+.personnel-ux {
+    max-width: 1680px;
+}
+
+.personnel-page-title {
+    text-align: center;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 14px;
+    background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 20px rgba(12, 56, 96, 0.16);
+}
+
+.personnel-filter-shell,
+.personnel-data-shell {
+    border: 1px solid #d7e6f3;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(14, 57, 98, 0.08);
+    background: #fff;
+    padding: 12px;
+}
+
+.personnel-ux .card {
+    border: 1px solid #d7e6f3;
+    border-radius: 10px;
+    box-shadow: 0 6px 14px rgba(12,56,96,.08);
+}
+
+.personnel-ux h2,
+.personnel-ux h3 {
+    text-align: center;
+}
+
+.personnel-ux .text-primary,
+.personnel-ux .card-title,
+.personnel-ux .card-detail-label {
+    color: #124f82 !important;
+}
+
+.personnel-ux .form-control,
+.personnel-ux .form-select {
+    border-radius: 8px;
+    border-color: #cfe0ef;
+}
+
+.personnel-ux .form-control:focus,
+.personnel-ux .form-select:focus {
+    border-color: #8ab6df;
+    box-shadow: 0 0 0 0.2rem rgba(20, 95, 160, 0.16);
+}
+
+.personnel-ux .table thead th {
+    background: linear-gradient(180deg, #154f82 0%, #0f3f6a 100%);
+    color: #fff;
+}
+
+.personnel-ux .table tbody tr:nth-child(even) {
+    background-color: #fbfdff;
+}
+
+.personnel-ux .table tbody tr:hover {
+    background-color: #edf5ff;
+}
+
+.personnel-loginlog-ux .global-hours-table thead th:first-child,
+.personnel-loginlog-ux .global-hours-table thead th:nth-child(2),
+.personnel-loginlog-ux .global-hours-table thead th:nth-child(3),
+.personnel-loginlog-ux .global-hours-table thead th:nth-child(4) {
+    background-color: #0f3f6a;
+}
