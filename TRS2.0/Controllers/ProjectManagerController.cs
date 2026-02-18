@@ -259,9 +259,31 @@ public class ProjectManagerController : Controller
     }
 
     [Authorize(Roles = "ProjectManager,Researcher,Admin")]
-    public IActionResult ReportError()
+    public async Task<IActionResult> ReportError()
     {
-        return View();
+        var model = await BuildReportErrorPrefillAsync();
+        return View(model);
+    }
+
+    private async Task<ReportErrorViewModel> BuildReportErrorPrefillAsync()
+    {
+        var model = new ReportErrorViewModel
+        {
+            ReporterUserName = User?.Identity?.Name ?? string.Empty
+        };
+
+        var loggedInUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == User.Identity.Name);
+        if (loggedInUser != null)
+        {
+            var personnel = await _context.Personnel.FirstOrDefaultAsync(p => p.BscId == loggedInUser.UserName);
+            if (personnel != null)
+            {
+                model.ReporterFullName = $"{personnel.Name} {personnel.Surname}".Trim();
+                model.ReporterEmail = personnel.Email;
+            }
+        }
+
+        return model;
     }
 
     [HttpPost]
@@ -270,6 +292,10 @@ public class ProjectManagerController : Controller
     {
         if (!ModelState.IsValid)
         {
+            var prefillModel = await BuildReportErrorPrefillAsync();
+            model.ReporterUserName = prefillModel.ReporterUserName;
+            model.ReporterFullName = prefillModel.ReporterFullName;
+            model.ReporterEmail = prefillModel.ReporterEmail;
             return View("ReportError", model);
         }
 
@@ -282,24 +308,10 @@ public class ProjectManagerController : Controller
             string username = smtpSettings["Username"];
             string password = smtpSettings["Password"];
 
-            // Obtener el usuario logueado
-            var loggedInUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == User.Identity.Name);
-
-
-            // Inicializar variables para nombre y apellido
-            string name = string.Empty;
-            string surname = string.Empty;
-
-            if (loggedInUser != null)
-            {
-                // Obtener la información de Personnel usando el BscId
-                var personnel = await _context.Personnel.FirstOrDefaultAsync(p => p.BscId == loggedInUser.UserName);
-                if (personnel != null)
-                {
-                    name = personnel.Name;
-                    surname = personnel.Surname;
-                }
-            }
+            var prefillModel = await BuildReportErrorPrefillAsync();
+            var reporterName = string.IsNullOrWhiteSpace(prefillModel.ReporterFullName) ? "Unknown user" : prefillModel.ReporterFullName;
+            var reporterUser = string.IsNullOrWhiteSpace(prefillModel.ReporterUserName) ? "n/a" : prefillModel.ReporterUserName;
+            var reporterEmail = string.IsNullOrWhiteSpace(prefillModel.ReporterEmail) ? "n/a" : prefillModel.ReporterEmail;
 
             using (var client = new SmtpClient(host, port))
             {
@@ -309,8 +321,11 @@ public class ProjectManagerController : Controller
                 var mailMessage = new MailMessage
                 {
                     From = new MailAddress($"{username}@bsc.es"), // Usa el usuario autenticado
-                    Subject = $"Nuevo Reporte de Error de {name} {surname}: {model.Title}",
+                    Subject = $"Nuevo Reporte de Error de {reporterName}: {model.Title}",
                     Body = $"<h3>Detalles del Error</h3>" +
+                           $"<p><strong>Usuario:</strong> {reporterUser}</p>" +
+                           $"<p><strong>Nombre:</strong> {reporterName}</p>" +
+                           $"<p><strong>Correo:</strong> {reporterEmail}</p>" +
                            $"<p><strong>Título:</strong> {model.Title}</p>" +
                            $"<p><strong>Descripción:</strong></p><p>{model.Description}</p>",
                     IsBodyHtml = true

@@ -52,17 +52,17 @@
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1 trs-main-nav-links">
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Inicio</a>
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index"><i class="bi bi-house-door"></i> Inicio</a>
                         </li>
                         @if (User.Identity.IsAuthenticated)
                         {
                             @if (User.IsInRole("Admin") || User.IsInRole("ProjectManager"))
                             {
                                 <li class="nav-item">
-                                    <a class="nav-link text-dark" asp-area="" asp-controller="Projects" asp-action="InitialRedirect">Proyectos</a>
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="Projects" asp-action="InitialRedirect"><i class="bi bi-folder2-open"></i> Proyectos</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link text-dark" asp-area="" asp-controller="Personnels" asp-action="Index">Personal</a>
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="Personnels" asp-action="Index"><i class="bi bi-people"></i> Personal</a>
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link text-dark nav-investigator-link" asp-area="" asp-controller="TimeSheet" asp-action="Index"><i class="bi bi-person-badge"></i> Investigador</a>
@@ -96,7 +96,7 @@
                             @if (User.IsInRole("Admin") || User.IsInRole("ProjectManager") || User.IsInRole("User") || User.IsInRole("Researcher"))
                             {
                                 <li class="nav-item">
-                                    <a class="nav-link text-dark" asp-area="" asp-controller="TimeSheet" asp-action="GetTimeSheetsForPerson">TimeSheet</a>
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="TimeSheet" asp-action="GetTimeSheetsForPerson"><i class="bi bi-clock-history"></i> TimeSheet</a>
                                 </li>
                             }
                             @if (User.IsInRole("Admin") || User.IsInRole("ProjectManager") || User.IsInRole("Researcher"))
@@ -172,7 +172,7 @@
 
                         }
                     </ul>
-                    <ul class="navbar-nav">
+                    <ul class="navbar-nav trs-user-nav-shell">
                         <partial name="_LoginPartial" />
                     </ul>
                 </div>

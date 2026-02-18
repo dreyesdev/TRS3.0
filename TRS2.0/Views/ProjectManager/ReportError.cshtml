@@ -1,51 +1,126 @@
-﻿@model TRS2._0.Models.ViewModels.ReportErrorViewModel
+@model TRS2._0.Models.ViewModels.ReportErrorViewModel
 
-<div class="container mt-4">
-    <div class="card shadow">
-        <div class="card-header bg-warning text-dark">
-            <h2 class="mb-0"><i class="bi bi-exclamation-circle"></i> Reportar un Error</h2>
+<div class="container mt-3 report-error-ux">
+    <div class="report-error-hero">
+        <h2 class="mb-1"><i class="bi bi-bug"></i> Reportar incidencia</h2>
+        <p class="mb-0">Cuéntanos qué ha pasado. Incluiremos automáticamente tu usuario y correo para poder ayudarte más rápido.</p>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success report-error-alert" role="alert">
+            <i class="bi bi-check-circle"></i> @TempData["SuccessMessage"]
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger report-error-alert" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> @TempData["ErrorMessage"]
+        </div>
+    }
+
+    <div class="card report-error-card">
+        <div class="card-header">
+            <h4 class="mb-0"><i class="bi bi-envelope-paper"></i> Nuevo reporte</h4>
         </div>
         <div class="card-body">
-
-            <!-- ✅ Mensajes de Éxito/Error -->
-            @if (TempData["SuccessMessage"] != null)
-            {
-                <div class="alert alert-success">
-                    <i class="bi bi-check-circle"></i> @TempData["SuccessMessage"]
+            <div class="reporter-meta mb-4">
+                <div class="reporter-meta-title">Información del remitente (se enviará en el correo)</div>
+                <div class="row g-2 mt-1">
+                    <div class="col-md-4">
+                        <label class="form-label">Usuario</label>
+                        <input type="text" class="form-control" value="@Model.ReporterUserName" readonly />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" class="form-control" value="@Model.ReporterFullName" readonly />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Correo</label>
+                        <input type="text" class="form-control" value="@Model.ReporterEmail" readonly />
+                    </div>
                 </div>
-            }
+            </div>
 
-            @if (TempData["ErrorMessage"] != null)
-            {
-                <div class="alert alert-danger">
-                    <i class="bi bi-exclamation-triangle"></i> @TempData["ErrorMessage"]
-                </div>
-            }
-
-            <form asp-controller="ProjectManager" asp-action="SubmitErrorReport" method="post" enctype="multipart/form-data">
-                <div class="mb-3">
+            <form asp-controller="ProjectManager" asp-action="SubmitErrorReport" method="post" enctype="multipart/form-data" class="row g-3">
+                <div class="col-12">
                     <label asp-for="Title" class="form-label"></label>
                     <input asp-for="Title" class="form-control" required />
                     <span asp-validation-for="Title" class="text-danger"></span>
                 </div>
 
-                <div class="mb-3">
+                <div class="col-12">
                     <label asp-for="Description" class="form-label"></label>
-                    <textarea asp-for="Description" class="form-control" rows="4" required></textarea>
+                    <textarea asp-for="Description" class="form-control" rows="6" required placeholder="Explica los pasos para reproducir el error, qué esperabas y qué ocurrió realmente."></textarea>
                     <span asp-validation-for="Description" class="text-danger"></span>
                 </div>
 
-                <div class="mb-3">
+                <div class="col-12">
                     <label asp-for="Attachment" class="form-label"></label>
                     <input asp-for="Attachment" type="file" class="form-control" />
+                    <div class="form-text">Opcional: captura de pantalla o fichero de apoyo.</div>
                 </div>
 
-                <button type="submit" class="btn btn-warning">
-                    <i class="bi bi-send"></i> Enviar Reporte
-                </button>
+                <div class="col-12 d-flex justify-content-end">
+                    <button type="submit" class="btn btn-warning report-submit-btn">
+                        <i class="bi bi-send"></i> Enviar reporte
+                    </button>
+                </div>
             </form>
         </div>
     </div>
 </div>
 
+<style>
+    .report-error-ux {
+        max-width: 980px;
+    }
 
+    .report-error-hero {
+        border: 1px solid #d7e6f3;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+        color: #fff;
+        padding: 14px 16px;
+        margin-bottom: 14px;
+        box-shadow: 0 8px 18px rgba(12,56,96,.16);
+    }
+
+    .report-error-alert {
+        border-radius: 10px;
+    }
+
+    .report-error-card {
+        border: 1px solid #d7e6f3;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(14,57,98,.10);
+        overflow: hidden;
+    }
+
+    .report-error-card > .card-header {
+        background: linear-gradient(180deg, #154f82 0%, #0f3f6a 100%);
+        color: #fff;
+        border-bottom: 0;
+    }
+
+    .reporter-meta {
+        border: 1px solid #dbe9f6;
+        border-radius: 10px;
+        padding: 12px;
+        background: #f7fbff;
+    }
+
+    .reporter-meta-title {
+        font-weight: 700;
+        color: #114b7f;
+        margin-bottom: 4px;
+    }
+
+    .report-submit-btn {
+        border-radius: 10px;
+        min-width: 180px;
+        font-weight: 600;
+        box-shadow: 0 6px 14px rgba(255,193,7,.3);
+    }
+</style>
