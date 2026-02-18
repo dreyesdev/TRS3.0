@@ -46,7 +46,7 @@ namespace TRS2._0.Services.Alarms
                     ? $"Hay {items.Count} viaje(s) pendientes para {peopleCount} persona(s)."
                     : $"Tienes {items.Count} viaje(s) pendiente(s) en {projectCodes.Count} proyecto(s) de tu alcance.",
                 Severity = "warning",
-                ActionUrl = "/Personnels/PendingTravels"
+                ActionUrl = "/Personnels/PendingTravelsForApproval"
             };
         }
     }
