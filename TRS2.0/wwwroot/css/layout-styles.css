@@ -476,3 +476,26 @@ button.accept-policy {
 .personnel-loginlog-ux .global-hours-table thead th:nth-child(4) {
     background-color: #0f3f6a;
 }
+
+/* Investigator nav CTA aligned with redesigned cards */
+.trs-main-nav .nav-investigator-link {
+    border: 1px solid #cfe0ef;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f4f9ff 0%, #e8f2ff 100%);
+    font-weight: 600;
+    color: #124f82 !important;
+    padding: 6px 12px !important;
+    margin: 2px 8px;
+    box-shadow: 0 5px 12px rgba(12, 56, 96, 0.10);
+}
+
+.trs-main-nav .nav-investigator-link:hover,
+.trs-main-nav .nav-investigator-link:focus {
+    background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+    color: #fff !important;
+    border-color: transparent;
+}
+
+.trs-main-nav .nav-investigator-link i {
+    margin-right: 6px;
+}

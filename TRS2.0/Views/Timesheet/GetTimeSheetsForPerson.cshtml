@@ -7,22 +7,18 @@
     var monthName = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(@Model.CurrentMonth);
     var monthNameCapitalized = new DateTime(Model.CurrentYear, Model.CurrentMonth, 1)
         .ToString("MMMM", System.Globalization.CultureInfo.CreateSpecificCulture("en"));
-}    
+}
 <script src="~/lib/jquery/dist/jquery.min.js"></script>
-<div class="container-fluid" style="max-width: 2000px;  padding-right: 5; padding-left: 5; margin-right: auto; margin-left: auto;">   
-    <h2 style="margin-bottom: 0;">Timesheet for @Model.Person.Name @Model.Person.Surname - @monthNameCapitalized @Model.CurrentYear</h2>
+<div class="container-fluid timesheet-ux" style="max-width: 2000px; padding-right: 5px; padding-left: 5px; margin-right: auto; margin-left: auto;">
+    <h2 class="timesheet-page-title">Timesheet for @Model.Person.Name @Model.Person.Surname · @monthNameCapitalized @Model.CurrentYear</h2>
 
-    <!-- Sección de controles para cambiar de mes, con el selector de fechas en el centro -->
-    <div class="d-flex justify-content-between mb-3">
-        <!-- Contenedor para botones, selectores y "Save All" -->
-        <div class="d-flex align-items-center" style="width: 40%;">
-            <!-- Botón Previous -->
+    <div class="timesheet-control-panel mb-3">
+        <div class="timesheet-nav-group">
             <button id="prevMonthButton" class="btn btn-primary">Previous</button>
-            <!-- Botón Next -->
-            <button id="nextMonthButton" class="btn btn-primary mx-2">Next</button
-            <!-- Selectores de Mes y Año -->
-            <select id="monthSelect" class="form-control mx-2">
-                <option value="">Select the month</option>
+            <button id="nextMonthButton" class="btn btn-primary">Next</button>
+
+            <select id="monthSelect" class="form-control">
+                <option value="">Select month</option>
                 <option value="1">January</option>
                 <option value="2">February</option>
                 <option value="3">March</option>
@@ -36,20 +32,20 @@
                 <option value="11">November</option>
                 <option value="12">December</option>
             </select>
-            <select id="yearSelect" class="form-control mx-2">
-                <option value="">Select the year</option>
+            <select id="yearSelect" class="form-control">
                 @for (int year = DateTime.Now.Year - 10; year <= DateTime.Now.Year + 10; year++)
                 {
                     <option value="@year">@year</option>
                 }
             </select>
-            <button id="goButton" class="btn btn-success mx-2">Go</button>
-            
+            <button id="goButton" class="btn btn-success">Go</button>
         </div>
+
+        <div id="yearQuickSelect" class="year-quick-select" aria-label="Quick year selector"></div>
 
         @if ((bool?)ViewBag.AllowEdit == true)
         {
-            <div class="d-flex justify-content-center align-items-center gap-2" style="width: 20%;">
+            <div class="timesheet-actions-group">
                 <button id="saveAllButton" class="btn btn-success">Save All</button>
 
                 @if ((bool?)ViewBag.ShowAutoFillButton == true)
@@ -59,21 +55,15 @@
             </div>
         }
 
-
-
-        <!-- Contenedor para la barra de progreso -->
-        <div class="w-50 d-flex align-items-center">
-            <span class="mr-2 font-weight-bold">Total Hours this month: @Model.TotalHours.ToString("0.0")</span>
+        <div class="timesheet-progress-wrap">
+            <span class="font-weight-bold">Total Hours this month: @Model.TotalHours.ToString("0.0")</span>
             <div class="progress w-100 position-relative">
                 <div class="progress-bar bg-success" role="progressbar" style="width: @ViewBag.PercentageUsed%" aria-valuenow="@ViewBag.PercentageUsed" aria-valuemin="0" aria-valuemax="100">
                     <span class="position-absolute w-100 text-center font-weight-bold" style="color: black;">@ViewBag.PercentageUsed%</span>
                 </div>
             </div>
-
         </div>
     </div>
-
-
 
     <div class="table-responsive">
         <div class="scrollable-table-container">
@@ -82,8 +72,8 @@
 
                 <thead class="thead-dark">
                     <tr>
-                        <th class="sticky-column sticky-header">
-                            <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">Project</div>
+                        <th class="sticky-column sticky-header top-left-header">
+                            <div class="header-top-line">Project</div>
                             <div style="text-align: center;">WP - Title</div>
 
                         </th>
@@ -97,7 +87,9 @@
                         }
                         <th class="sticky-penultimate-column">
                             <div style="border-bottom: 1px solid white; margin-bottom: 2px; text-align: center; font-weight: bold">ACTUAL</div>
-                            <div style="text-align: center; font-weight: bold;">ESTIMATED HOURS</div>
+                            <div style="text-align: center; font-weight: bold;">ESTIMATED HOURS
+                                <span class="timesheet-help" tabindex="0" title="Estimated hours are calculated from your monthly effort percentage. Because this is a conversion to hours and rounding is applied, small differences above or below the estimate are expected and not a problem.">?</span>
+                            </div>
                         </th>
                         <th class="sticky-last-column">%</th>
                     </tr>
@@ -108,7 +100,7 @@
                         <tr>
                             <td class="single-line-cell sticky-column">
 
-                                <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center;">@* @wp.ProjectSAPCode*@@wp.ProjectName</div>
+                                <div class="header-top-line body-top-line">@* @wp.ProjectSAPCode*@@wp.ProjectName</div>
                                 <div style="text-align: center;">@wp.WpName - @wp.WpTitle</div>
 
                             </td>
@@ -179,7 +171,7 @@
                                 string inputStyle = highlightYellow ? "background-color: yellow;" : "";
                                 <td class="hour-input-cell" style="@cellStyle">
                                     @if (editable && (bool?)ViewBag.AllowEdit == true)
-                                    {                                        
+                                    {
                                         <input type="text" class="form-control input-hours"
                                                style="@inputStyle"
                                                value="@((timesheetEntry != null) ? timesheetEntry.Hours.ToString("0.##") : "0")"
@@ -189,7 +181,7 @@
                                                data-original-value="@((timesheetEntry != null) ? timesheetEntry.Hours.ToString("0.##") : "0")" />
                                     }
                                     else
-                                    {                                        
+                                    {
                                         <span class="font-weight-bold" style="display: block; text-align: center;">
                                             @((timesheetEntry != null) ? timesheetEntry.Hours.ToString("0.##") : "0")
                                         </span>
@@ -404,7 +396,31 @@
         window.location.href = redirectUrl;
     });
 
-        
+
+    document.getElementById('monthSelect').value = '@Model.CurrentMonth';
+    document.getElementById('yearSelect').value = '@Model.CurrentYear';
+
+    function renderYearQuickSelect() {
+        const container = document.getElementById('yearQuickSelect');
+        if (!container) return;
+
+        const selectedYear = parseInt(document.getElementById('yearSelect').value || '@Model.CurrentYear', 10);
+        const years = [selectedYear - 1, selectedYear, selectedYear + 1];
+        container.innerHTML = years.map(y =>
+            `<button type="button" class="btn btn-sm ${y === selectedYear ? 'btn-primary' : 'btn-outline-primary'}" data-year="${y}">${y}</button>`
+        ).join('');
+
+        container.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', function () {
+                document.getElementById('yearSelect').value = this.dataset.year;
+                renderYearQuickSelect();
+            });
+        });
+    }
+
+    document.getElementById('yearSelect').addEventListener('change', renderYearQuickSelect);
+    renderYearQuickSelect();
+
         document.getElementById('goButton').addEventListener('click', function () {
             var selectedMonth = document.getElementById('monthSelect').value;
             var selectedYear = document.getElementById('yearSelect').value;
@@ -420,7 +436,7 @@
         });
 
 
-    document.getElementById('saveAllButton').addEventListener('click', function () {
+    document.getElementById('saveAllButton')?.addEventListener('click', function () {
         var changedTimesheets = [];
         var invalidInputs = [];
 
@@ -487,7 +503,7 @@
             var projectB = $(b).find('td').eq(0).find('div').eq(0).text().match(/\(([^)]+)\)/)[1].toUpperCase();
             var wpA = $(a).find('td').eq(0).find('div').eq(1).text().split(' ')[0].toUpperCase();
             var wpB = $(b).find('td').eq(0).find('div').eq(1).text().split(' ')[0].toUpperCase();
-                        
+
             // Ordenar por ProjectName
             if (projectA < projectB) return -1;
             if (projectA > projectB) return 1;
@@ -502,7 +518,7 @@
             return 0;
         });
 
-        
+
 
         $.each(rows, function (index, row) {
             table.append(row);
@@ -726,18 +742,18 @@
         position: sticky;
         left: 0;
         background-color: white;
-        z-index: 3;
+        z-index: 5;
     }
 
     .sticky-header {
         position: sticky;
         top: 0;
         background-color: #343a40;
-        z-index: 3;
+        z-index: 6;
     }
 
     .sticky-day-header {
-        z-index: 2; /* Menor que el de la primera columna */
+        z-index: 4; /* Menor que top-left sticky header */
     }
 
     tfoot th {
@@ -746,7 +762,7 @@
         z-index: 2;
     }
 
-    
+
 
     .legend-box {
         width: 300px;
@@ -774,7 +790,117 @@
         background-color: white;
         z-index: 1;
     }
-    
+
+
+    .timesheet-ux {
+        margin-top: 8px;
+    }
+
+    .timesheet-page-title {
+        text-align: center;
+        font-weight: 700;
+        margin-bottom: 14px;
+        color: #fff;
+        background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+        border-radius: 12px;
+        padding: 12px 16px;
+        box-shadow: 0 8px 20px rgba(12, 56, 96, 0.16);
+    }
+
+    .timesheet-control-panel {
+        display: grid;
+        grid-template-columns: 2fr auto 1fr;
+        gap: 10px;
+        border: 1px solid #d7e6f3;
+        border-radius: 12px;
+        background: #fff;
+        padding: 12px;
+        box-shadow: 0 8px 20px rgba(14, 57, 98, 0.08);
+        align-items: center;
+    }
+
+    .timesheet-nav-group,
+    .timesheet-actions-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .timesheet-nav-group .form-control {
+        width: auto;
+        min-width: 150px;
+    }
+
+    .year-quick-select {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .timesheet-progress-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .top-left-header {
+        z-index: 8 !important;
+        background-color: #343a40 !important;
+        box-shadow: 2px 0 0 #fff;
+    }
+
+    .header-top-line {
+        border-bottom: 1px solid #ffffff;
+        margin-bottom: 2px;
+        margin-top: 8px;
+        text-align: center;
+    }
+
+    .body-top-line {
+        border-bottom-color: #d7e6f3;
+    }
+
+    .timesheet-help {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 18px;
+        height: 18px;
+        margin-left: 6px;
+        border-radius: 50%;
+        background: #ffffff;
+        color: #0e4f86;
+        border: 1px solid #b9d0e6;
+        font-size: .75rem;
+        cursor: help;
+        font-weight: 700;
+    }
+
+
+
+    .timesheet-help:hover,
+    .timesheet-help:focus {
+        background: #0e4f86;
+        color: #fff;
+        outline: none;
+    }
+
+    @media (max-width: 1200px) {
+        .timesheet-control-panel {
+            grid-template-columns: 1fr;
+        }
+
+        .timesheet-progress-wrap {
+            order: 3;
+        }
+
+        .year-quick-select {
+            justify-content: flex-start;
+        }
+    }
+
 </style>
 
 
