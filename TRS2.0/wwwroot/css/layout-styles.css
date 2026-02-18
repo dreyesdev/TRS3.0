@@ -478,6 +478,17 @@ button.accept-policy {
 }
 
 /* Investigator nav CTA aligned with redesigned cards */
+.trs-main-nav .navbar-nav .nav-item {
+    display: inline-flex;
+    align-items: center;
+}
+
+.trs-main-nav .navbar-nav .nav-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+}
+
 .trs-main-nav .nav-investigator-link {
     border: 1px solid #cfe0ef;
     border-radius: 10px;
@@ -492,7 +503,7 @@ button.accept-policy {
     justify-content: center;
     gap: 6px;
     white-space: nowrap;
-    line-height: 1.1;
+    line-height: 1;
 }
 
 .trs-main-nav .nav-investigator-link:hover,
