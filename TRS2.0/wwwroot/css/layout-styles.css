@@ -302,8 +302,12 @@ button.accept-policy {
 }
 
 .projects-index-ux .project-column h2 {
-    color: #0f4f85;
+    color: #f4fbff;
     font-weight: 700;
+    background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 0 0 12px 0 !important;
 }
 
 .projects-index-ux .project-column a {
@@ -364,4 +368,42 @@ button.accept-policy {
     border: 1px solid #dce7f3;
     border-radius: 10px;
     background: #f7fbff;
+}
+
+
+.projects-report-ux .table thead th {
+    background: linear-gradient(180deg, #114e81 0%, #0e3f68 100%);
+}
+
+.projects-person-per-ux h2 {
+    color: #0f4f85;
+    font-weight: 700;
+    background: linear-gradient(180deg, #f8fbff 0%, #eff6fd 100%);
+    border: 1px solid #d6e6f5;
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 20px rgba(12, 56, 96, 0.08);
+}
+
+.projects-person-per-ux .table-responsive {
+    border: 1px solid #d7e6f3;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(14, 57, 98, 0.08);
+    background: #fff;
+    padding: 10px;
+}
+
+.projects-person-per-ux .legend {
+    border: 1px solid #dce7f3;
+    border-radius: 10px;
+    background: #f7fbff;
+}
+
+.projects-report-partial-ux .table thead th {
+    background: linear-gradient(180deg, #154f82 0%, #0f3f6a 100%);
+    color: #fff;
+}
+
+.projects-report-partial-ux .btn {
+    border-radius: 8px;
 }

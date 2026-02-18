@@ -17,7 +17,7 @@
 
 
 
-<div class="container mt-3">
+<div class="container mt-3 projects-ux projects-report-ux">
     <div class="row">
         <!-- Encapsula los detalles del proyecto en una tarjeta -->
         <div class="col-md-6">
@@ -131,7 +131,10 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var wp in ViewBag.WpDetails)
+                            @foreach (var wp in ((IEnumerable<dynamic>)ViewBag.WpDetails)
+                                .OrderBy(w => string.Equals((string)w.Name, "TRAVELS", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                                .ThenBy(w => { var match = System.Text.RegularExpressions.Regex.Match((string)(w.Name ?? string.Empty), @"\d+"); return match.Success ? int.Parse(match.Value) : int.MaxValue; })
+                                .ThenBy(w => (string)w.Name))
                             {
                                 // Calcula las sumas de las columnas
                                 totalEstimated += Convert.ToDecimal(wp.Pms);
@@ -185,7 +188,7 @@
 
     </div>
     <hr />
-<div class="container mt-3">
+<div class="container mt-3 projects-ux projects-report-ux">
     @if (Model.ReportPeriods.Any())
     {
         <div class="card mt-4">
