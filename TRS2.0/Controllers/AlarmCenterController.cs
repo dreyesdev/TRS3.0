@@ -32,7 +32,7 @@ namespace TRS2._0.Controllers
 
             var roles = await _userManager.GetRolesAsync(currentUser);
             var assignments = await _outOfContractAssignedEffortService
-                .GetOutOfContractAssignmentsAsync(currentUser.PersonnelId.Value, roles);
+                .GetOutOfContractAssignmentsAsync(currentUser.PersonnelId.Value, (IReadOnlyCollection<string>)roles);
 
             var model = new OutOfContractAssignedEffortPageViewModel
             {
