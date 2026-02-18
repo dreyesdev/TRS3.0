@@ -11,11 +11,11 @@
     var alarms = await UserAlarmService.GetActiveAlarmsForUserAsync(currentUser);
 
     <li class="nav-item dropdown me-2">
-        <a class="nav-link text-dark position-relative" href="#" id="alarmDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Alarmas pendientes">
+        <a class="nav-link text-dark position-relative alarm-nav-link" href="#" id="alarmDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Alarmas pendientes">
             <i class="bi bi-bell-fill"></i>
             @if (alarms.Count > 0)
             {
-                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                <span class="position-absolute badge rounded-pill bg-danger alarm-badge">
                     @alarms.Count
                     <span class="visually-hidden">alarmas activas</span>
                 </span>
@@ -53,16 +53,24 @@
         </ul>
     </li>
 
-    <li class="nav-item">
-        <span class="nav-link text-dark">@User.Identity.Name |</span>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link text-dark" asp-area="" asp-controller="Account" asp-action="ChangePassword">Change Password</a>
-    </li>
-    <li class="nav-item">
-        <form method="post" asp-area="" asp-controller="Account" asp-action="Logout" id="logoutForm" class="navbar-right">
-            <button type="submit" class="btn btn-link nav-link text-dark">Logout</button>
-        </form>
+    <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle text-dark d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Cuenta de usuario">
+            <i class="bi bi-person-circle me-1"></i>
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+            <li>
+                <span class="dropdown-item-text fw-semibold">@User.Identity.Name</span>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+                <a class="dropdown-item" asp-area="" asp-controller="Account" asp-action="ChangePassword">Change Password</a>
+            </li>
+            <li>
+                <form method="post" asp-area="" asp-controller="Account" asp-action="Logout" id="logoutForm" class="mb-0">
+                    <button type="submit" class="dropdown-item">Logout</button>
+                </form>
+            </li>
+        </ul>
     </li>
 }
 else
