@@ -1,0 +1,96 @@
+@model IEnumerable<TRS2._0.Models.ViewModels.PendingTravelApprovalViewModel>
+
+@{
+    ViewData["Title"] = "Pending Travels for Approval";
+}
+
+<div class="container personnel-ux personnel-pendingtravels-ux">
+    <h2 class="personnel-page-title">Pending Travels for Approval</h2>
+
+    <div class="personnel-data-shell">
+        <div class="mb-3 text-muted fw-semibold">
+            @if (User.IsInRole("Admin"))
+            {
+                <span>Showing all pending travels (Admin scope).</span>
+            }
+            else
+            {
+                <span>Showing pending travels for projects where you are PM or FM.</span>
+            }
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered shadow">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>Code</th>
+                        <th>Person</th>
+                        <th style="width: 120px;">Start Date</th>
+                        <th style="width: 120px;">End Date</th>
+                        <th>Project 1</th>
+                        <th>Dedication 1</th>
+                        <th>Project 2</th>
+                        <th>Dedication 2</th>
+                        <th>Destiny</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="11" class="text-center text-muted">No pending travels found for your scope.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td>@item.Code</td>
+                                <td>@item.PersonName</td>
+                                <td>@item.StartDate</td>
+                                <td>@item.EndDate</td>
+                                <td>@item.Project1</td>
+                                <td>@item.Dedication1</td>
+                                <td>@item.Project2</td>
+                                <td>@item.Dedication2</td>
+                                <td>@item.Destiny</td>
+                                <td class="font-weight-bold" style="color: orange">@item.Status</td>
+                                <td>
+                                    <div class="d-flex justify-content-between">
+                                        <button class="btn btn-success btn-sm mx-1" onclick="approveTravel('@item.Code')">Approve</button>
+                                        <button class="btn btn-danger btn-sm mx-1" onclick="cancelTravel('@item.Code')">Cancel</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function approveTravel(travelId) {
+            if (confirm('Are you sure you want to approve this travel?')) {
+                $.post('@Url.Action("ApproveTravel", "Personnels")', { id: travelId }, function (response) {
+                    alert(response.message);
+                    location.reload();
+                });
+            }
+        }
+
+        function cancelTravel(travelId) {
+            if (confirm('Are you sure you want to cancel this travel?')) {
+                $.post('@Url.Action("CancelTravel", "Personnels")', { id: travelId }, function (response) {
+                    alert(response.message);
+                    location.reload();
+                });
+            }
+        }
+    </script>
+}
