@@ -5,8 +5,10 @@
     var selectedPersonId = ViewBag.SelectedPersonId;
 }
 
-<h2 class="text-center my-4">Travel Management</h2>
+<div class="container personnel-ux personnel-travels-ux">
+<h2 class="personnel-page-title">Travel Management</h2>
 
+<div class="personnel-filter-shell">
 <div class="container">
     <div class="row">
         <!-- Columna de selección de personal -->
@@ -36,11 +38,13 @@
         </div>
     </div>
 </div>
+</div>
 
 <hr />
 
-<div id="travelsTableContainer" class="mt-4">
+<div id="travelsTableContainer" class="mt-4 personnel-data-shell">
     <!-- Tabla de viajes se cargará aquí -->
+</div>
 </div>
 
 @section Scripts {
