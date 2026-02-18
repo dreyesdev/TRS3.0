@@ -4,41 +4,39 @@
     ViewData["Title"] = "Personnel Selection";
 }
 
-<div class="container">
-    <div class="row">
-        <!-- Columna de selección de personal -->
-        <div class="col-md-6">
-            <h2>Person Selection</h2>
+<div class="container personnel-ux timesheet-landing-ux mt-3">
+    <h2 class="personnel-page-title">Investigador · Timesheet Access</h2>
 
-            <!-- Contenedor para seleccionar personal -->
-            <div id="personnelSelectContainer" class="custom-select">
-                <div id="personnelSelectHeader" class="person-result" data-person-id="">
-                    <span>Please select a person from the list below:</span>
+    <div class="personnel-filter-shell">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <h3 class="card-section-title">Person Selection</h3>
+
+                <div id="personnelSelectContainer" class="custom-select">
+                    <div id="personnelSelectHeader" class="person-result" data-person-id="">
+                        <span>Please select a person from the list below:</span>
+                    </div>
+                    <div id="personnelSelect" class="search-results-container" style="display: none;">
+                        @foreach (var person in Model.OrderBy(p => p.Surname).ThenBy(p => p.Name))
+                        {
+                            <div class="person-result" data-person-id="@person.Id">
+                                <span>@person.Surname, @person.Name</span>
+                                <span class="badge bg-primary">@person.DepartmentNavigation.Name</span>
+                            </div>
+                        }
+                    </div>
                 </div>
-                <div id="personnelSelect" class="search-results-container" style="display: none;">
-                    @foreach (var person in Model)
-                    {
-                        <div class="person-result" data-person-id="@person.Id">
-                            <span>@person.Name @person.Surname</span> <span class="badge bg-primary">@person.DepartmentNavigation.Name</span>
-                        </div>
-                    }
-                </div>
+
+                <p class="mt-3 mb-1">Or start typing here the name of the person:</p>
+                <input type="text" id="searchTerm" class="form-control" placeholder="Start typing..." onkeyup="filterPersonnel()" />
+                <div id="searchResults" class="search-results-container mt-2"></div>
             </div>
 
-            <!-- Barra de búsqueda -->
-            <p>Or start typing here the name of the person:</p>
-            <input type="text" id="searchTerm" class="form-control" placeholder="Start typing..." onkeyup="filterPersonnel()" />
-
-            <!-- Resultados de búsqueda -->
-            <div id="searchResults" class="search-results-container">
-            </div>
-        </div>
-
-        <!-- Columna de detalles del personal -->
-        <div class="col-md-6">
-            <h2>Person Details</h2>
-            <div id="personDetails" class="card">
-                <!-- Aquí se cargarán los detalles del personal -->
+            <div class="col-md-6">
+                <h3 class="card-section-title">Person Details</h3>
+                <div id="personDetails" class="card p-3">
+                    <p class="text-muted mb-0 text-center">Select a person to open their timesheet.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -48,18 +46,14 @@
     <script>
         document.getElementById('personnelSelectHeader').addEventListener('click', function () {
             var personnelSelect = document.getElementById('personnelSelect');
-            if (personnelSelect.style.display === 'none' || personnelSelect.style.display === '') {
-                personnelSelect.style.display = 'block';
-            } else {
-                personnelSelect.style.display = 'none';
-            }
+            personnelSelect.style.display = (personnelSelect.style.display === 'none' || personnelSelect.style.display === '') ? 'block' : 'none';
         });
 
         document.getElementById('personnelSelect').addEventListener('click', function (event) {
-            if (event.target && event.target.matches('div.person-result')) {
-                var personId = event.target.getAttribute('data-person-id');
-                window.location.href = '@Url.Action("GetTimeSheetsForPerson", "Timesheet", new { personId = "__personId__" })'.replace('__personId__', personId);
-            }
+            const row = event.target.closest('div.person-result');
+            if (!row) return;
+            var personId = row.getAttribute('data-person-id');
+            window.location.href = '@Url.Action("GetTimeSheetsForPerson", "Timesheet", new { personId = "__personId__" })'.replace('__personId__', personId);
         });
 
         function filterPersonnel() {
@@ -70,12 +64,12 @@
                 data: { searchTerm: searchTerm },
                 success: function (data) {
                     var resultsDiv = document.getElementById('searchResults');
-                    resultsDiv.innerHTML = ''; // Limpiar resultados anteriores
+                    resultsDiv.innerHTML = '';
 
                     data.forEach(function (person) {
                         var personDiv = document.createElement('div');
                         personDiv.className = 'person-result';
-                        personDiv.innerHTML = `<span>${person.name} ${person.surname}</span> <span class="badge bg-primary">${person.departmentName || 'N/A'}</span>`;
+                        personDiv.innerHTML = `<span>${person.surname}, ${person.name}</span> <span class="badge bg-primary">${person.departmentName || 'N/A'}</span>`;
                         personDiv.setAttribute('data-person-id', person.id);
 
                         personDiv.onclick = function () {
@@ -88,23 +82,15 @@
 
                         resultsDiv.appendChild(personDiv);
                     });
+                    resultsDiv.style.display = 'block';
                 }
             });
         }
 
-        document.getElementById('searchResults').addEventListener('click', function (event) {
-            if (event.target && event.target.matches('div.person-result')) {
-                var personId = event.target.getAttribute('data-person-id');
-                window.location.href = '@Url.Action("GetTimeSheetsForPerson", "Timesheet", new { personId = "__personId__" })'.replace('__personId__', personId);
-            }
-        });
-
-        // Mostrar la lista de resultados cuando el campo de búsqueda recibe el foco
         document.getElementById('searchTerm').addEventListener('focus', function () {
             document.getElementById('searchResults').style.display = 'block';
         });
 
-        // Cerrar la lista de resultados cuando se hace clic fuera de ella
         document.addEventListener('click', function (event) {
             var personnelSelect = document.getElementById('personnelSelect');
             var personnelSelectHeader = document.getElementById('personnelSelectHeader');
@@ -116,66 +102,58 @@
 }
 
 <style>
-    .person-result {
-        cursor: pointer;
-        padding: 5px;
+
+    .timesheet-landing-ux .card-section-title {
+        text-align: center;
+        font-weight: 700;
+        color: #ffffff;
+        background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+        border-radius: 9px;
+        padding: 8px 10px;
+        margin-bottom: 10px;
     }
 
-        .person-result:hover {
-            background-color: #eee;
-        }
-
-        .person-result.active {
-            background-color: #4c87c6;
-        }
-
-    .card-detail-label {
-        font-weight: bold;
-    }
-
-    .card-title {
-        font-weight: bold;
-    }
-
-    #searchResults {
-        max-height: 200px; /* Ajusta esto según tus necesidades */
-        overflow-y: auto;
-        display: none; /* Inicialmente oculto */
-    }
-
-    .custom-select {
-        background-color: #f8f9fa;
-        border: 1px solid #ced4da;
+    .timesheet-landing-ux .custom-select {
+        background-color: #f8fbff;
+        border: 1px solid #d3e4f5;
         padding: 10px;
-        border-radius: 8px;
+        border-radius: 10px;
     }
 
-    .search-results-container {
-        max-height: 250px;
+    .timesheet-landing-ux .search-results-container {
+        max-height: 280px;
         overflow-y: auto;
-        border: 1px solid #ced4da;
-        border-radius: 8px;
-        padding: 5px;
+        border: 1px solid #d3e4f5;
+        border-radius: 10px;
+        padding: 6px;
         background-color: #fff;
-        margin-top: 10px;
+        display: none;
     }
 
-    .person-result {
+    .timesheet-landing-ux .person-result {
         display: flex;
         align-items: center;
         justify-content: space-between;
         padding: 10px;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid #e9f1f8;
         cursor: pointer;
-        transition: background 0.3s;
+        transition: background-color .2s ease;
     }
 
-        .person-result:hover {
-            background-color: #f1f1f1;
-        }
+    .timesheet-landing-ux .person-result:last-child {
+        border-bottom: none;
+    }
 
-        .person-result.active {
-            background-color: #4c87c6;
-            color: white;
-        }
+    .timesheet-landing-ux .person-result:hover {
+        background-color: #eef5ff;
+    }
+
+    .timesheet-landing-ux .person-result.active {
+        background-color: #1b6dac;
+        color: #fff;
+    }
+
+    .timesheet-landing-ux .card {
+        min-height: 260px;
+    }
 </style>
