@@ -583,3 +583,34 @@ button.accept-policy {
     font-size: 1.2rem;
     border-bottom: 0;
 }
+
+
+.projects-ux .project-details-card .detail-item {
+    margin-bottom: 0;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.projects-ux .project-details-card .detail-item:not(:last-child) {
+    border-bottom: 1px solid #d9e2eb;
+}
+
+.projects-ux .project-details-card .detail-item dt {
+    color: #155084;
+    font-weight: 700;
+}
+
+.projects-ux .project-details-card .detail-item dd {
+    color: #1b2f45;
+    font-weight: 500;
+}
+
+.projects-ux .project-details-card .third-parties-header {
+    background: #000000 !important;
+    color: #ffffff !important;
+    text-align: center;
+    font-size: 2rem;
+    font-weight: 700;
+    border-radius: 12px 12px 0 0;
+    line-height: 1.1;
+}
