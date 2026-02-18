@@ -18,6 +18,7 @@
    - [Ajuste Automático de Overload](#ajuste-automático-de-overload)
 7. [Mapa de Dependencias (Controllers → Services → Datos)](#mapa-de-dependencias-controllers--services--datos)
 8. [Cómo renderizar y exportar](#cómo-renderizar-y-exportar)
+9. [Documentación Integral de Solución](./solution-documentation.md)
 
 ---
 
