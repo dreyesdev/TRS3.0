@@ -477,7 +477,39 @@ button.accept-policy {
     background-color: #0f3f6a;
 }
 
-/* Investigator nav CTA aligned with redesigned cards */
+/* Main nav CTA style aligned with redesigned cards */
+.trs-main-nav .navbar-nav .nav-item {
+    display: inline-flex;
+    align-items: center;
+}
+
+.trs-main-nav .trs-main-nav-links > .nav-item > .nav-link,
+.trs-main-nav .trs-main-nav-links > .nav-item > .dropdown-toggle {
+    border: 1px solid #cfe0ef;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f4f9ff 0%, #e8f2ff 100%);
+    font-weight: 600;
+    color: #124f82 !important;
+    padding: 5px 10px !important;
+    margin: 0 4px;
+    box-shadow: 0 3px 10px rgba(12, 56, 96, 0.10);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+    line-height: 1;
+}
+
+.trs-main-nav .trs-main-nav-links > .nav-item > .nav-link:hover,
+.trs-main-nav .trs-main-nav-links > .nav-item > .dropdown-toggle:hover,
+.trs-main-nav .trs-main-nav-links > .nav-item > .nav-link:focus,
+.trs-main-nav .trs-main-nav-links > .nav-item > .dropdown-toggle:focus {
+    background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+    color: #fff !important;
+    border-color: transparent;
+}
+
 .trs-main-nav .nav-investigator-link {
     border: 1px solid #cfe0ef;
     border-radius: 10px;
@@ -492,7 +524,7 @@ button.accept-policy {
     justify-content: center;
     gap: 6px;
     white-space: nowrap;
-    line-height: 1.1;
+    line-height: 1;
 }
 
 .trs-main-nav .nav-investigator-link:hover,
@@ -504,4 +536,50 @@ button.accept-policy {
 
 .trs-main-nav .nav-investigator-link i {
     margin-right: 0;
+}
+
+
+.trs-main-nav .trs-user-nav-shell {
+    margin-left: 10px;
+    padding: 4px 8px;
+    border: 1px solid #cfe0ef;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f8fbff 0%, #edf5ff 100%);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.75), 0 3px 10px rgba(12,56,96,.08);
+    gap: 2px;
+}
+
+.trs-main-nav .trs-user-nav-shell .nav-link {
+    border-radius: 9px;
+}
+
+.trs-main-nav .trs-user-nav-shell .nav-link:hover,
+.trs-main-nav .trs-user-nav-shell .nav-link:focus {
+    background: rgba(14,79,134,.08);
+}
+
+@media (max-width: 1200px) {
+    .trs-main-nav .trs-user-nav-shell {
+        margin-left: 0;
+        margin-top: 8px;
+        width: fit-content;
+    }
+}
+
+
+.projects-ux .project-details-card {
+    border: 1px solid #d7e6f3;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(14, 57, 98, 0.10);
+    overflow: hidden;
+}
+
+.projects-ux .project-details-card > .card-header {
+    background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+    color: #ffffff;
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: .01em;
+    font-size: 1.2rem;
+    border-bottom: 0;
 }
