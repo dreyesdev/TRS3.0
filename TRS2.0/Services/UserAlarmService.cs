@@ -29,7 +29,7 @@ namespace TRS2._0.Services
             var context = new UserAlarmContext
             {
                 User = user,
-                Roles = roles
+                Roles = (IReadOnlyCollection<string>)roles
             };
 
             var alarms = new List<UserAlarmViewModel>();
