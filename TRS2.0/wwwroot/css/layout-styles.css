@@ -537,3 +537,31 @@ button.accept-policy {
 .trs-main-nav .nav-investigator-link i {
     margin-right: 0;
 }
+
+
+.trs-main-nav .trs-user-nav-shell {
+    margin-left: 10px;
+    padding: 4px 8px;
+    border: 1px solid #cfe0ef;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f8fbff 0%, #edf5ff 100%);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.75), 0 3px 10px rgba(12,56,96,.08);
+    gap: 2px;
+}
+
+.trs-main-nav .trs-user-nav-shell .nav-link {
+    border-radius: 9px;
+}
+
+.trs-main-nav .trs-user-nav-shell .nav-link:hover,
+.trs-main-nav .trs-user-nav-shell .nav-link:focus {
+    background: rgba(14,79,134,.08);
+}
+
+@media (max-width: 1200px) {
+    .trs-main-nav .trs-user-nav-shell {
+        margin-left: 0;
+        margin-top: 8px;
+        width: fit-content;
+    }
+}
