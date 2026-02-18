@@ -4,7 +4,7 @@
     ViewData["Title"] = "Effort Plan";
 }
 
-<div class="container-fluid my-custom-container">
+<div class="container-fluid my-custom-container projects-ux projects-effortplan-ux">
     <h2 class="effort-plan-title">
         Effort Plan
         <hr class="title-divider">
@@ -24,7 +24,7 @@
             <thead class="thead-dark">
                 <tr>
                         <th>
-                            <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center">Effort Target</div>
+                            <div style="border-bottom: 1px solid #fff; margin-bottom: 2px; margin-top: 8px; text-align: center">Effort Target</div>
                             <div style="text-align: center">Total Effort</div>
                         </th>
                     <th>Actions</th>
@@ -34,7 +34,7 @@
                             <th>
                                 <div class="month-year-header">          
                                     
-                                    <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center">@month.ToString("MMM").Substring(0, 1).ToUpper()@month.ToString("MMM").Substring(1).ToLower()</div>
+                                    <div style="border-bottom: 1px solid #fff; margin-bottom: 2px; margin-top: 8px; text-align: center">@month.ToString("MMM").Substring(0, 1).ToUpper()@month.ToString("MMM").Substring(1).ToLower()</div>
                                     <div style="text-align: center">@month.ToString("yyyy")</div>
                                 </div>
                             </th>
@@ -50,7 +50,7 @@
                     <tr>
                         <td class="@(wp.TotalEffort != wp.getPMs(wp.WpId) ? "effort-mismatch" : "effort-match")">
 
-                                <div style="border-bottom: 1px solid #333; margin-bottom: 2px; margin-top: 8px; text-align: center">@wp.getPMs(wp.WpId)</div>
+                                <div style="border-bottom: 1px solid #fff; margin-bottom: 2px; margin-top: 8px; text-align: center">@wp.getPMs(wp.WpId)</div>
                                 <div style="text-align: center">@wp.TotalEffort</div>
                         </td>
                         <td>
