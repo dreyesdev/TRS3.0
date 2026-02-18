@@ -180,115 +180,123 @@
         </nav>
     </header>
 
-    <!-- Menú secundario de proyectos, solo se muestra en las vistas de detalles de proyecto -->
-    @if (Context.Request.Path.StartsWithSegments("/Projects/Details") ||
-    Context.Request.Path.StartsWithSegments("/Projects/EffortPlan") ||
-    Context.Request.Path.StartsWithSegments("/Projects/PersonnelSelection") ||
-    Context.Request.Path.StartsWithSegments("/Projects/PersonnelEffortPlan") ||
-    Context.Request.Path.StartsWithSegments("/Projects/GetPersonnelEffortsByPerson") ||
-    Context.Request.Path.StartsWithSegments("/Projects/ProjectReport"))
+    @{
+        var currentPath = Context.Request.Path.Value ?? string.Empty;
+        var isProjectDetailsArea = Context.Request.Path.StartsWithSegments("/Projects/Details") ||
+            Context.Request.Path.StartsWithSegments("/Projects/EffortPlan") ||
+            Context.Request.Path.StartsWithSegments("/Projects/PersonnelSelection") ||
+            Context.Request.Path.StartsWithSegments("/Projects/PersonnelEffortPlan") ||
+            Context.Request.Path.StartsWithSegments("/Projects/GetPersonnelEffortsByPerson") ||
+            Context.Request.Path.StartsWithSegments("/Projects/ProjectReport");
+    }
+
+    @if (isProjectDetailsArea)
     {
-        <div class="project-details-menu">
-            <nav class="navbar navbar-expand-lg navbar-light bg-light">
-                <div class="container-fluid">
-                    <!-- Botón para Details & Wps -->
-                    <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("Details", "Projects", new { id = ViewBag.ProjId })">
-                        Details & Wps
-                    </a>
+        <div class="context-menu-shell project-context-menu">
+            <div class="container-fluid">
+                <div class="context-menu-inner">
+                    <div class="context-menu-title">
+                        <i class="bi bi-kanban-fill"></i>
+                        <span>Project Workspace</span>
+                    </div>
 
-                    <!-- Separador -->
-                    <span class="vertical-separator"></span>
-
-                    <!-- Botón para Effort Plan -->
-                    <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("EffortPlan", "Projects", new { projId = ViewBag.ProjId })">
-                        Effort Plan
-                    </a>
-
-                    <!-- Separador -->
-                    <span class="vertical-separator"></span>
-
-                    <!-- Botón para Personnel Selection -->
-                    <a class="navbar-brand btn btn-outline-primary text-dark" href="@Url.Action("PersonnelSelection", "Projects", new { projId = ViewBag.ProjId })">
-                        Personnel Selection
-                    </a>
-                    <!-- Separador -->
-                    <span class="vertical-separator"></span>
-
-                    <!-- Botón para Personnel Effort Plan -->
-                    <a class="navbar-brand btn btn-outline-primary text-dark" href="@Url.Action("PersonnelEffortPlan", "Projects", new { projId = ViewBag.ProjId })">
-                        Personnel Effort Plan
-                    </a>
-
-                    <!-- Botón para Personnel Project Report -->
-                    <a class="navbar-brand btn btn-outline-primary text-dark" href="@Url.Action("ProjectReport", "Projects", new { projId = ViewBag.ProjId })">
-                        Project Report
-                    </a>
-
+                    <div class="context-menu-links">
+                        <a class="context-link @(currentPath.Contains("/Projects/Details") ? "active" : "")" href="@Url.Action("Details", "Projects", new { id = ViewBag.ProjId })">
+                            <i class="bi bi-grid-1x2"></i>
+                            <span>Details & WPs</span>
+                        </a>
+                        <a class="context-link @(currentPath.Contains("/Projects/EffortPlan") ? "active" : "")" href="@Url.Action("EffortPlan", "Projects", new { projId = ViewBag.ProjId })">
+                            <i class="bi bi-graph-up"></i>
+                            <span>Effort Plan</span>
+                        </a>
+                        <a class="context-link @(currentPath.Contains("/Projects/PersonnelSelection") ? "active" : "")" href="@Url.Action("PersonnelSelection", "Projects", new { projId = ViewBag.ProjId })">
+                            <i class="bi bi-person-check"></i>
+                            <span>Personnel Selection</span>
+                        </a>
+                        <a class="context-link @(currentPath.Contains("/Projects/PersonnelEffortPlan") || currentPath.Contains("/Projects/GetPersonnelEffortsByPerson") ? "active" : "")" href="@Url.Action("PersonnelEffortPlan", "Projects", new { projId = ViewBag.ProjId })">
+                            <i class="bi bi-table"></i>
+                            <span>Personnel Effort Plan</span>
+                        </a>
+                        <a class="context-link @(currentPath.Contains("/Projects/ProjectReport") ? "active" : "")" href="@Url.Action("ProjectReport", "Projects", new { projId = ViewBag.ProjId })">
+                            <i class="bi bi-file-earmark-bar-graph"></i>
+                            <span>Project Report</span>
+                        </a>
+                    </div>
                 </div>
-            </nav>
+            </div>
         </div>
     }
 
-    <!-- Menú secundario de personal, se muestra en las vistas relacionadas con personal -->
     @if (Context.Request.Path.StartsWithSegments("/Personnels"))
     {
-        <div class="personal-details-menu">
-            <nav class="navbar navbar-expand-lg navbar-light bg-light">
-                <div class="container-fluid">
-                    <!-- Botones del Submenú -->
-                    @if (TempData["SelectedPersonId"] != null)
-                    {
-                        TempData.Keep("SelectedPersonId"); // Mantener el valor para su uso posterior
+        <div class="context-menu-shell personnel-context-menu">
+            <div class="container-fluid">
+                <div class="context-menu-inner">
+                    <div class="context-menu-title">
+                        <i class="bi bi-people-fill"></i>
+                        <span>Personnel Workspace</span>
+                    </div>
 
-                        <!-- Actualizar los enlaces del menú para incluir el SelectedPersonId -->
-                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark"
-                           href="@Url.Action("Calendar", "Personnels", new { id = TempData["SelectedPersonId"] })">
-                            Calendar
-                        </a>
-                        <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark"
-                           href="@Url.Action("Dedication", "Personnels", new { id = TempData["SelectedPersonId"] })">
-                            Dedication
-                        </a>
-                        <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark"
-                           href="@Url.Action("ExternalRate", "Personnels", new { id = TempData["SelectedPersonId"] })">
-                            External Rate
-                        </a>
-                        <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark"
-                           href="@Url.Action("Travels", "Personnels", new { id = TempData["SelectedPersonId"] })">
-                            Travels
-                        </a>
-                        <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark"
-                           href="@Url.Action("PendingTravels", "Personnels", new { id = TempData["SelectedPersonId"] })">
-                            Pending Travels
-                        </a>
-                        <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark"
-                           href="@Url.Action("LoginLog", "Personnels", new { id = TempData["SelectedPersonId"] })">
-                            LoginLog
-                        </a>
-                    }
-                    else
-                    {
-                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("Calendar", "Personnels")">
-                            Calendar
-                        </a>
-                        <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("Dedication", "Personnels")">Dedication</a>
-                        <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("ExternalRate", "Personnels")">External Rate</a>
-                        <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("Travels", "Personnels")">Travels</a>
-                        <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary me-2 text-dark" href="@Url.Action("PendingTravels", "Personnels")">Pending Travels</a>
-                        <span class="vertical-separator"></span>
-                        <a class="navbar-brand btn btn-outline-primary text-dark" href="@Url.Action("LoginLog", "Personnels")">Login Log</a>
-                    }
+                    <div class="context-menu-links">
+                        @if (TempData["SelectedPersonId"] != null)
+                        {
+                            TempData.Keep("SelectedPersonId");
+
+                            <a class="context-link @(currentPath.Contains("/Personnels/Calendar") ? "active" : "")" href="@Url.Action("Calendar", "Personnels", new { id = TempData["SelectedPersonId"] })">
+                                <i class="bi bi-calendar3"></i>
+                                <span>Calendar</span>
+                            </a>
+                            <a class="context-link @(currentPath.Contains("/Personnels/Dedication") ? "active" : "")" href="@Url.Action("Dedication", "Personnels", new { id = TempData["SelectedPersonId"] })">
+                                <i class="bi bi-hourglass-split"></i>
+                                <span>Dedication</span>
+                            </a>
+                            <a class="context-link @(currentPath.Contains("/Personnels/ExternalRate") ? "active" : "")" href="@Url.Action("ExternalRate", "Personnels", new { id = TempData["SelectedPersonId"] })">
+                                <i class="bi bi-currency-euro"></i>
+                                <span>External Rate</span>
+                            </a>
+                            <a class="context-link @(currentPath.Contains("/Personnels/Travels") ? "active" : "")" href="@Url.Action("Travels", "Personnels", new { id = TempData["SelectedPersonId"] })">
+                                <i class="bi bi-airplane"></i>
+                                <span>Travels</span>
+                            </a>
+                            <a class="context-link @(currentPath.Contains("/Personnels/PendingTravels") ? "active" : "")" href="@Url.Action("PendingTravels", "Personnels", new { id = TempData["SelectedPersonId"] })">
+                                <i class="bi bi-clock-history"></i>
+                                <span>Pending Travels</span>
+                            </a>
+                            <a class="context-link @(currentPath.Contains("/Personnels/LoginLog") ? "active" : "")" href="@Url.Action("LoginLog", "Personnels", new { id = TempData["SelectedPersonId"] })">
+                                <i class="bi bi-journal-text"></i>
+                                <span>Login Log</span>
+                            </a>
+                        }
+                        else
+                        {
+                            <a class="context-link @(currentPath.Contains("/Personnels/Calendar") ? "active" : "")" href="@Url.Action("Calendar", "Personnels")">
+                                <i class="bi bi-calendar3"></i>
+                                <span>Calendar</span>
+                            </a>
+                            <a class="context-link @(currentPath.Contains("/Personnels/Dedication") ? "active" : "")" href="@Url.Action("Dedication", "Personnels")">
+                                <i class="bi bi-hourglass-split"></i>
+                                <span>Dedication</span>
+                            </a>
+                            <a class="context-link @(currentPath.Contains("/Personnels/ExternalRate") ? "active" : "")" href="@Url.Action("ExternalRate", "Personnels")">
+                                <i class="bi bi-currency-euro"></i>
+                                <span>External Rate</span>
+                            </a>
+                            <a class="context-link @(currentPath.Contains("/Personnels/Travels") ? "active" : "")" href="@Url.Action("Travels", "Personnels")">
+                                <i class="bi bi-airplane"></i>
+                                <span>Travels</span>
+                            </a>
+                            <a class="context-link @(currentPath.Contains("/Personnels/PendingTravels") ? "active" : "")" href="@Url.Action("PendingTravels", "Personnels")">
+                                <i class="bi bi-clock-history"></i>
+                                <span>Pending Travels</span>
+                            </a>
+                            <a class="context-link @(currentPath.Contains("/Personnels/LoginLog") ? "active" : "")" href="@Url.Action("LoginLog", "Personnels")">
+                                <i class="bi bi-journal-text"></i>
+                                <span>Login Log</span>
+                            </a>
+                        }
+                    </div>
                 </div>
-            </nav>
+            </div>
         </div>
     }
 
