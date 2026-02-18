@@ -95,6 +95,8 @@ button.accept-policy {
 
 .context-menu-title {
     display: inline-flex;
+    width: 100%;
+    justify-content: center;
     align-items: center;
     gap: 0.5rem;
     padding: 0.45rem 0.75rem;
@@ -329,14 +331,15 @@ button.accept-policy {
 }
 
 .projects-effortplan-ux .effort-plan-title,
-.projects-personnel-effort-ux h2 {
-    color: #0f4f85;
+.projects-personnel-effort-ux h2,
+.projects-person-per-ux h2 {
+    color: #ffffff;
     font-weight: 700;
-    background: linear-gradient(180deg, #f8fbff 0%, #eff6fd 100%);
-    border: 1px solid #d6e6f5;
+    background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+    border: 1px solid #0e4f86;
     border-radius: 12px;
     padding: 12px 16px;
-    box-shadow: 0 8px 20px rgba(12, 56, 96, 0.08);
+    box-shadow: 0 8px 20px rgba(12, 56, 96, 0.18);
 }
 
 .projects-effortplan-ux .main-effort-plan-table,
@@ -375,15 +378,6 @@ button.accept-policy {
     background: linear-gradient(180deg, #114e81 0%, #0e3f68 100%);
 }
 
-.projects-person-per-ux h2 {
-    color: #0f4f85;
-    font-weight: 700;
-    background: linear-gradient(180deg, #f8fbff 0%, #eff6fd 100%);
-    border: 1px solid #d6e6f5;
-    border-radius: 12px;
-    padding: 12px 16px;
-    box-shadow: 0 8px 20px rgba(12, 56, 96, 0.08);
-}
 
 .projects-person-per-ux .table-responsive {
     border: 1px solid #d7e6f3;
