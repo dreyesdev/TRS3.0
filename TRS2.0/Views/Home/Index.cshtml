@@ -1,55 +1,150 @@
-﻿@{
+@{
     ViewData["Title"] = "Time Recording System (TRS)";
 }
 
-<!-- Improved Landing Page -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to TRS</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css">
-    <style>
-        body {
-            background: #002147; /* Corporate dark blue */
-            color: white;
-            text-align: center;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-        }
+<div class="trs-home-landing">
+    <div class="trs-home-bg-orb trs-home-bg-orb-a" aria-hidden="true"></div>
+    <div class="trs-home-bg-orb trs-home-bg-orb-b" aria-hidden="true"></div>
+    <div class="trs-home-grid" aria-hidden="true"></div>
 
-        .hero {
-            max-width: 700px;
-            padding: 20px;
-        }
+    <section class="trs-home-hero-card">
+        <div class="trs-home-badge">Barcelona Supercomputing Center</div>
+        <h1 class="trs-home-title">Time Recording System</h1>
 
-        .btn-custom {
-            background: #0056b3;
-            color: white;
-            padding: 12px 24px;
-            font-size: 18px;
-            border-radius: 5px;
-            transition: background 0.3s;
-        }
-
-            .btn-custom:hover {
-                background: #004494;
-            }
-    </style>
-</head>
-<body>
-    <div class="hero">
-        <h1>Welcome to TRS</h1>
-        <p class="lead">Time Recording System - Track and manage your working hours efficiently.</p>
         @if (!User.Identity.IsAuthenticated)
         {
-            <a href="/Account/Login" class="btn btn-custom">Log In</a>
+            <a href="/Account/Login" class="btn trs-home-login-btn">Log In</a>
         }
-    </div>
-</body>
-</html>
+        else
+        {
+            <div class="trs-home-quick-hint">
+                Use the top Navigation to access to your Timesheet.
+            </div>
+        }
+    </section>
+</div>
 
+<style>
+    .trs-home-landing {
+        position: relative;
+        min-height: calc(100vh - 180px);
+        border-radius: 18px;
+        overflow: hidden;
+        background: radial-gradient(circle at 20% 15%, #114e83 0%, #072f57 35%, #052241 70%, #031a35 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 16px;
+        isolation: isolate;
+    }
+
+    .trs-home-bg-orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(0);
+        opacity: .45;
+        z-index: 0;
+    }
+
+    .trs-home-bg-orb-a {
+        width: 420px;
+        height: 420px;
+        background: radial-gradient(circle, rgba(96,180,255,.45) 0%, rgba(96,180,255,.08) 60%, transparent 75%);
+        top: -130px;
+        left: -120px;
+    }
+
+    .trs-home-bg-orb-b {
+        width: 360px;
+        height: 360px;
+        background: radial-gradient(circle, rgba(65,161,236,.38) 0%, rgba(65,161,236,.08) 60%, transparent 75%);
+        bottom: -140px;
+        right: -90px;
+    }
+
+    .trs-home-grid {
+        position: absolute;
+        inset: 0;
+        background-image: linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px);
+        background-size: 42px 42px;
+        mask-image: radial-gradient(circle at center, rgba(0,0,0,.95), rgba(0,0,0,.25) 70%, transparent 100%);
+        z-index: 0;
+    }
+
+    .trs-home-hero-card {
+        position: relative;
+        z-index: 1;
+        max-width: 840px;
+        width: 100%;
+        text-align: center;
+        padding: 34px 30px;
+        border: 1px solid rgba(185, 214, 242, 0.45);
+        border-radius: 18px;
+        background: linear-gradient(170deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,.08) 100%);
+        backdrop-filter: blur(8px);
+        box-shadow: 0 20px 48px rgba(1, 16, 34, .35);
+        color: #f6fbff;
+    }
+
+    .trs-home-badge {
+        display: inline-block;
+        margin-bottom: 14px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(8, 40, 70, .55);
+        border: 1px solid rgba(197, 223, 247, .45);
+        font-size: .86rem;
+        letter-spacing: .03em;
+        color: #d7ecff;
+    }
+
+    .trs-home-title {
+        font-size: clamp(2.6rem, 5.2vw, 4.4rem);
+        font-weight: 700;
+        margin-bottom: 22px;
+        line-height: 1.1;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        text-shadow: 0 10px 24px rgba(1, 24, 47, .45);
+        background-image: linear-gradient(90deg, #ffffff 0%, #d1ebff 45%, #a7d4ff 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        position: relative;
+    }
+
+    .trs-home-title::after {
+        content: "";
+        display: block;
+        width: min(420px, 80%);
+        height: 2px;
+        margin: 14px auto 0;
+        background: linear-gradient(90deg, transparent 0%, rgba(194, 225, 250, .85) 20%, rgba(194, 225, 250, .85) 80%, transparent 100%);
+    }
+
+    .trs-home-login-btn {
+        background: linear-gradient(135deg, #ffd54f 0%, #ffbe2d 100%);
+        border: none;
+        color: #1d2e40;
+        font-weight: 700;
+        padding: 11px 28px;
+        border-radius: 10px;
+        box-shadow: 0 10px 24px rgba(255, 193, 60, .35);
+    }
+
+    .trs-home-login-btn:hover {
+        color: #172637;
+        transform: translateY(-1px);
+    }
+
+    .trs-home-quick-hint {
+        margin: 8px auto 0;
+        max-width: 640px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: rgba(5, 34, 60, .45);
+        border: 1px solid rgba(188, 216, 242, .35);
+        color: #d8ecff;
+        font-size: .95rem;
+    }
+</style>

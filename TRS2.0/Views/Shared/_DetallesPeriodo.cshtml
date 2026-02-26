@@ -476,72 +476,71 @@
         }
     });
 
-        document.getElementById('downloadTimesheetsButton').addEventListener('click', function () {
-        const checkboxes = document.querySelectorAll('.cell-checkbox:checked');
+        async function downloadTimesheetPdf(url) {
+            try {
+                const response = await fetch(url, { method: 'GET' });
+                if (!response.ok) {
+                    const serverMessage = await response.text();
+                    alert(serverMessage || 'Timesheet export failed. Please review Manual Date and try again.');
+                    return;
+                }
 
-        checkboxes.forEach(cb => {
-            const td = cb.closest('td');
-            const timesheetBtn = td.querySelector('.btn-info');
+                const blob = await response.blob();
+                const objectUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = objectUrl;
 
-            if (timesheetBtn) {
+                const contentDisposition = response.headers.get('Content-Disposition') || '';
+                const fileNameMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+                const fileName = decodeURIComponent((fileNameMatch && (fileNameMatch[1] || fileNameMatch[2])) || 'Timesheet.pdf');
+                a.download = fileName;
+
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(objectUrl);
+            } catch (error) {
+                console.error(error);
+                alert('Error exporting Timesheet. Please try again.');
+            }
+        }
+
+        function getManualParams() {
+            const dateEl = document.getElementById('manualDate');
+            const codeEl = document.getElementById('manualCode');
+
+            let query = '';
+            if (dateEl && dateEl.value) {
+                query += `&manualDate=${encodeURIComponent(dateEl.value)}`;
+            }
+            if (codeEl && codeEl.value && codeEl.value.trim().length > 0) {
+                query += `&manualCode=${encodeURIComponent(codeEl.value.trim())}`;
+            }
+            return query;
+        }
+
+        // Botón individual de cada celda
+        function exportTimesheetWithDate(personId, year, month, projectId) {
+            const extra = getManualParams();
+            const url = `/Timesheet/ExportTimesheetToPdf2?personId=${personId}&year=${year}&month=${month}&project=${projectId}${extra}`;
+            downloadTimesheetPdf(url);
+        }
+
+        // "Download Timesheets" (cabecera, múltiple)
+        document.getElementById('downloadTimesheetsButton')?.addEventListener('click', async function () {
+            const checkboxes = document.querySelectorAll('.cell-checkbox:checked');
+            const extra = getManualParams();
+
+            for (const cb of checkboxes) {
                 const personId = cb.dataset.personid;
                 const year = cb.dataset.year;
                 const month = cb.dataset.month;
                 const projectId = @ViewBag.ProjectId;
 
-                // Construir la URL y lanzar la descarga
-                const url = `/Timesheet/ExportTimesheetToPdf2?personId=${personId}&year=${year}&month=${month}&project=${projectId}`;
-                window.open(url, '_blank');
+                const url = `/Timesheet/ExportTimesheetToPdf2?personId=${personId}&year=${year}&month=${month}&project=${projectId}${extra}`;
+                await downloadTimesheetPdf(url);
             }
         });
-    });
-
-    function exportTimesheetWithDate(personId, year, month, projectId) {
-    const manualDateEl = document.getElementById('manualDate');
-    const manualDate = manualDateEl && manualDateEl.value
-        ? `&manualDate=${encodeURIComponent(manualDateEl.value)}`
-        : '';
-    const url = `/Timesheet/ExportTimesheetToPdf2?personId=${personId}&year=${year}&month=${month}&project=${projectId}${manualDate}`;
-    window.open(url, '_blank');
-  }
-
-  function getManualParams() {
-    const dateEl = document.getElementById('manualDate');
-    const codeEl = document.getElementById('manualCode');
-
-    let query = '';
-    if (dateEl && dateEl.value) {
-      query += `&manualDate=${encodeURIComponent(dateEl.value)}`;
-    }
-    if (codeEl && codeEl.value && codeEl.value.trim().length > 0) {
-      // No lo trates como número: puede llevar ceros a la izquierda o letras
-      query += `&manualCode=${encodeURIComponent(codeEl.value.trim())}`;
-    }
-    return query;
-  }
-
-  // Botón individual de cada celda
-  function exportTimesheetWithDate(personId, year, month, projectId) {
-    const extra = getManualParams();
-    const url = `/Timesheet/ExportTimesheetToPdf2?personId=${personId}&year=${year}&month=${month}&project=${projectId}${extra}`;
-    window.open(url, '_blank');
-  }
-
-  // "Download Timesheets" (cabecera, múltiple)
-  document.getElementById('downloadTimesheetsButton')?.addEventListener('click', function () {
-    const checkboxes = document.querySelectorAll('.cell-checkbox:checked');
-    const extra = getManualParams();
-
-    checkboxes.forEach(cb => {
-      const personId = cb.dataset.personid;
-      const year = cb.dataset.year;
-      const month = cb.dataset.month;
-      const projectId = @ViewBag.ProjectId;
-
-      const url = `/Timesheet/ExportTimesheetToPdf2?personId=${personId}&year=${year}&month=${month}&project=${projectId}${extra}`;
-      window.open(url, '_blank');
-    });
-  });
 
 </script>
 
