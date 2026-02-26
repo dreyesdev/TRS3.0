@@ -1,3 +1,4 @@
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -8,18 +9,17 @@ namespace TRS2._0.Migrations
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<bool>(
-                name: "ManualLogin",
+            migrationBuilder.AddColumn<DateTime>(
+                name: "ManualLoginDate",
                 table: "UserLoginHistories",
-                type: "boolean",
-                nullable: false,
-                defaultValue: false);
+                type: "date",
+                nullable: true);
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "ManualLogin",
+                name: "ManualLoginDate",
                 table: "UserLoginHistories");
         }
     }

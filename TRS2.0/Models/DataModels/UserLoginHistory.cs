@@ -15,7 +15,8 @@ namespace TRS2._0.Models
 
         public DateTime LoginTime { get; set; }
 
-        public bool ManualLogin { get; set; } = false;
+        [Column(TypeName = "date")]
+        public DateTime? ManualLoginDate { get; set; }
 
         [ForeignKey("PersonId")]
         public virtual Personnel Personnel { get; set; } // Relación con la tabla de personal

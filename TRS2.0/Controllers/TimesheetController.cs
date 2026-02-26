@@ -984,10 +984,10 @@ namespace TRS2._0.Controllers
                     }
                 }
 
-                await SaveManualLoginDateAsync(personId, selectedDate.Value);
+                await SaveManualLoginDateAsync(personId, year, month, selectedDate.Value);
                 if (responsibleId != 0 && responsibleId != personId)
                 {
-                    await SaveManualLoginDateAsync(responsibleId, selectedDate.Value);
+                    await SaveManualLoginDateAsync(responsibleId, year, month, selectedDate.Value);
                 }
             }
 
@@ -1429,27 +1429,28 @@ namespace TRS2._0.Controllers
             return (true, string.Empty);
         }
 
-        private async Task SaveManualLoginDateAsync(int personId, DateTime selectedDate)
+        private async Task SaveManualLoginDateAsync(int personId, int year, int month, DateTime selectedDate)
         {
-            var selectedDay = selectedDate.Date;
+            var signatureYear = month == 12 ? year + 1 : year;
+            var signatureMonth = month == 12 ? 1 : month + 1;
 
-            var sameDayLogin = await _context.UserLoginHistories
-                .Where(x => x.PersonId == personId && x.LoginTime.Date == selectedDay)
+            var samePeriodLogin = await _context.UserLoginHistories
+                .Where(x => x.PersonId == personId && x.LoginTime.Year == signatureYear && x.LoginTime.Month == signatureMonth)
                 .OrderByDescending(x => x.LoginTime)
                 .FirstOrDefaultAsync();
 
-            if (sameDayLogin == null)
+            if (samePeriodLogin == null)
             {
                 _context.UserLoginHistories.Add(new UserLoginHistory
                 {
                     PersonId = personId,
-                    LoginTime = selectedDay,
-                    ManualLogin = true
+                    LoginTime = new DateTime(signatureYear, signatureMonth, 1),
+                    ManualLoginDate = selectedDate.Date
                 });
             }
-            else if (!sameDayLogin.ManualLogin)
+            else
             {
-                sameDayLogin.ManualLogin = true;
+                samePeriodLogin.ManualLoginDate = selectedDate.Date;
             }
 
             await _context.SaveChangesAsync();
@@ -1464,14 +1465,15 @@ namespace TRS2._0.Controllers
         //}
         public async Task<string> GetLastLoginDateForPerson(int personId, int year, int month)
         {
-            var lastLogin = await _context.UserLoginHistories
+            var lastLoginEntry = await _context.UserLoginHistories
                 .Where(x => x.PersonId == personId && x.LoginTime.Year == year && x.LoginTime.Month == month)
-                .OrderByDescending(x => x.ManualLogin)
+                .OrderByDescending(x => x.ManualLoginDate.HasValue)
+                .ThenByDescending(x => x.ManualLoginDate)
                 .ThenByDescending(x => x.LoginTime)
-                .Select(x => x.LoginTime)
                 .FirstOrDefaultAsync();
 
-            return lastLogin != default ? lastLogin.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
+            var effectiveDate = lastLoginEntry?.ManualLoginDate ?? lastLoginEntry?.LoginTime;
+            return effectiveDate.HasValue ? effectiveDate.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
         }
 
         public async Task<string> GetLastLoginDateForNextMonth(int personId, int year, int month)
@@ -1484,14 +1486,15 @@ namespace TRS2._0.Controllers
                 year++;
             }
 
-            var lastLogin = await _context.UserLoginHistories
+            var lastLoginEntry = await _context.UserLoginHistories
                 .Where(x => x.PersonId == personId && x.LoginTime.Year == year && x.LoginTime.Month == month)
-                .OrderByDescending(x => x.ManualLogin)
+                .OrderByDescending(x => x.ManualLoginDate.HasValue)
+                .ThenByDescending(x => x.ManualLoginDate)
                 .ThenByDescending(x => x.LoginTime)
-                .Select(x => x.LoginTime)
                 .FirstOrDefaultAsync();
 
-            return lastLogin != default ? lastLogin.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
+            var effectiveDate = lastLoginEntry?.ManualLoginDate ?? lastLoginEntry?.LoginTime;
+            return effectiveDate.HasValue ? effectiveDate.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
         }
 
         [HttpPost]
