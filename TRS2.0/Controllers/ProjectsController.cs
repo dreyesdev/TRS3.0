@@ -1619,6 +1619,8 @@ namespace TRS2._0.Controllers
                             effortByMonth.TryGetValue(dateKey, out totalEffortForMonth);
                         }
 
+                        totalEffortInProyect[month] = totalEffortForMonth;
+
                         var hoursInProjectForMonth = totalHoursForMonth * totalEffortForMonth;
                         var roundedHoursInProjectForMonth = Math.Round(hoursInProjectForMonth * 2, MidpointRounding.AwayFromZero) / 2;
                         hoursInProject[month] = roundedHoursInProjectForMonth;

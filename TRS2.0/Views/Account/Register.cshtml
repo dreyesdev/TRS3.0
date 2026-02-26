@@ -1,78 +1,113 @@
-﻿@model TRS2._0.Models.ViewModels.RegisterViewModel
+@model TRS2._0.Models.ViewModels.RegisterViewModel
 
 @{
     ViewData["Title"] = "Register";
 }
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Account</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <style>
-        body {
-            background: linear-gradient(to right, darkblue, #2575fc);
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+<div class="trs-auth-page">
+    <div class="trs-auth-bg-orb trs-auth-bg-orb-a" aria-hidden="true"></div>
+    <div class="trs-auth-bg-orb trs-auth-bg-orb-b" aria-hidden="true"></div>
+    <div class="trs-auth-grid" aria-hidden="true"></div>
 
-        .register-container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-        }
+    <section class="trs-auth-card">
+        <div class="trs-auth-badge">Barcelona Supercomputing Center</div>
+        <h1 class="trs-auth-title">Create Account</h1>
+        <p class="trs-auth-support-text">Use your BSC ID (not your email address).</p>
 
-        .form-control {
-            border-radius: 5px;
-        }
-
-        .btn-primary {
-            background: #2575fc;
-            border: none;
-            transition: background 0.3s;
-        }
-
-            .btn-primary:hover {
-                background: #1a5ac6;
-            }
-    </style>
-</head>
-<body>
-    <div class="register-container">
-        <h3 class="mb-3">Create your account</h3>
-        <p class="text-muted">Use your BSC ID (not your email address)</p>
-
-        <form method="post" asp-action="Register" asp-controller="Account">
+        <form method="post" asp-action="Register" asp-controller="Account" class="trs-auth-form">
             <div class="mb-3 text-start">
                 <label class="form-label" for="BSCID">BSC ID</label>
-                <input asp-for="BSCID" class="form-control" placeholder="e.g., jsmith" />
+                <input asp-for="BSCID" class="form-control trs-auth-input" placeholder="e.g., jsmith" />
                 <span asp-validation-for="BSCID" class="text-danger"></span>
-                <div class="form-text">This is the same ID you use to access the <strong>Intranet</strong>.</div>
+                <div class="form-text text-light">This is the same ID you use to access the <strong>Intranet</strong>.</div>
             </div>
 
-            <button type="submit" class="btn btn-primary w-100 mt-3">Register</button>
+            <button type="submit" class="btn trs-auth-primary-btn w-100 mt-3">Register</button>
 
-            <div class="text-danger mt-3">
-                @Html.ValidationSummary(true)
-            </div>
+            <div class="text-danger mt-3">@Html.ValidationSummary(true)</div>
         </form>
 
-        <p class="mt-4">
+        <p class="mt-4 mb-0">
             Already have an account?
-            <a asp-action="Login" asp-controller="Account">Log in</a>
+            <a asp-action="Login" asp-controller="Account" class="trs-auth-link">Log in</a>
         </p>
-    </div>
-</body>
-</html>
+    </section>
+</div>
 
+<style>
+    .trs-auth-page {
+        position: relative;
+        min-height: calc(100vh - 180px);
+        border-radius: 18px;
+        overflow: hidden;
+        background: radial-gradient(circle at 20% 15%, #114e83 0%, #072f57 35%, #052241 70%, #031a35 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 16px;
+        isolation: isolate;
+    }
 
+    .trs-auth-bg-orb { position: absolute; border-radius: 50%; opacity: .45; z-index: 0; }
+    .trs-auth-bg-orb-a { width: 420px; height: 420px; background: radial-gradient(circle, rgba(96,180,255,.45) 0%, rgba(96,180,255,.08) 60%, transparent 75%); top: -130px; left: -120px; }
+    .trs-auth-bg-orb-b { width: 360px; height: 360px; background: radial-gradient(circle, rgba(65,161,236,.38) 0%, rgba(65,161,236,.08) 60%, transparent 75%); bottom: -140px; right: -90px; }
 
+    .trs-auth-grid {
+        position: absolute;
+        inset: 0;
+        background-image: linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px);
+        background-size: 42px 42px;
+        mask-image: radial-gradient(circle at center, rgba(0,0,0,.95), rgba(0,0,0,.25) 70%, transparent 100%);
+        z-index: 0;
+    }
+
+    .trs-auth-card {
+        position: relative;
+        z-index: 1;
+        max-width: 540px;
+        width: 100%;
+        padding: 34px 30px;
+        border: 1px solid rgba(185, 214, 242, 0.45);
+        border-radius: 18px;
+        background: linear-gradient(170deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,.08) 100%);
+        backdrop-filter: blur(8px);
+        box-shadow: 0 20px 48px rgba(1, 16, 34, .35);
+        color: #f6fbff;
+    }
+
+    .trs-auth-badge {
+        display: inline-block;
+        margin-bottom: 14px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(8, 40, 70, .55);
+        border: 1px solid rgba(197, 223, 247, .45);
+        font-size: .86rem;
+        letter-spacing: .03em;
+        color: #d7ecff;
+    }
+
+    .trs-auth-title { font-size: clamp(1.8rem, 3vw, 2.5rem); margin-bottom: 8px; }
+    .trs-auth-support-text { color: #dbeeff; margin-bottom: 18px; }
+
+    .trs-auth-input { border-color: rgba(170, 204, 233, .65); }
+    .trs-auth-input:focus { box-shadow: 0 0 0 .2rem rgba(160, 209, 255, .25); border-color: #8ec8f2; }
+
+    .trs-auth-primary-btn {
+        background: linear-gradient(135deg, #ffd54f 0%, #ffbe2d 100%);
+        border: none;
+        color: #1d2e40;
+        font-weight: 700;
+        padding: 11px 28px;
+        border-radius: 10px;
+        box-shadow: 0 10px 24px rgba(255, 193, 60, .35);
+    }
+
+    .trs-auth-primary-btn:hover { color: #172637; transform: translateY(-1px); }
+    .trs-auth-link { color: #d7ecff; }
+    .trs-auth-link:hover { color: #fff; }
+</style>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

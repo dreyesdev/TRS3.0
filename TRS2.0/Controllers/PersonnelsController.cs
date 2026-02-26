@@ -517,6 +517,77 @@ namespace TRS2._0.Controllers
         }
 
 
+
+        [HttpGet]
+        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,ProjectManager")]
+        public async Task<IActionResult> PendingTravelsForApproval()
+        {
+            var userName = User?.Identity?.Name;
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                return Forbid();
+            }
+
+            var viewerPersonId = await _context.Personnel
+                .Where(p => p.BscId == userName)
+                .Select(p => (int?)p.Id)
+                .FirstOrDefaultAsync();
+
+            if (viewerPersonId == null)
+            {
+                return Forbid();
+            }
+
+            var isAdmin = User.IsInRole("Admin");
+
+            var baseQuery = _context.Liquidations
+                .Where(l => l.Status == "4");
+
+            if (!isAdmin)
+            {
+                var scopedProjectCodes = await _context.Projects
+                    .Where(p => p.Pm == viewerPersonId || p.Fm == viewerPersonId)
+                    .Select(p => p.SapCode)
+                    .Where(code => !string.IsNullOrWhiteSpace(code))
+                    .ToListAsync();
+
+                if (scopedProjectCodes.Count == 0)
+                {
+                    return View(new List<PendingTravelApprovalViewModel>());
+                }
+
+                baseQuery = baseQuery
+                    .Where(l => scopedProjectCodes.Contains(l.Project1) || (l.Project2 != null && scopedProjectCodes.Contains(l.Project2)));
+            }
+
+            var pendingTravels = await baseQuery
+                .Select(l => new PendingTravelApprovalViewModel
+                {
+                    Code = l.Id,
+                    PersonId = l.PersId,
+                    PersonName = _context.Personnel
+                        .Where(p => p.Id == l.PersId)
+                        .Select(p => p.Name + " " + p.Surname)
+                        .FirstOrDefault() ?? "Unknown",
+                    StartDate = l.Start.ToString("yyyy-MM-dd"),
+                    EndDate = l.End.ToString("yyyy-MM-dd"),
+                    Project1 = l.Project1 ?? "N/A",
+                    Dedication1 = (decimal?)l.Dedication1 ?? 0m,
+                    Project2 = string.IsNullOrWhiteSpace(l.Project2) ? "N/A" : l.Project2,
+                    Dedication2 = (decimal?)l.Dedication2 ?? 0m,
+                    Destiny = l.Destiny,
+                    Status = "Pending"
+                })
+                .ToListAsync();
+
+            var orderedPendingTravels = pendingTravels
+                .OrderBy(l => l.Code.Length >= 7 ? l.Code.Substring(5, 2) : l.Code)
+                .ThenBy(l => l.Code.Length >= 4 ? l.Code.Substring(0, 4) : l.Code)
+                .ToList();
+
+            return View(orderedPendingTravels);
+        }
+
         [HttpGet]
         public async Task<IActionResult> GetAllPendingTravels()
         {
