@@ -1543,7 +1543,8 @@ namespace TRS2._0.Controllers
                     .GroupBy(l => new { l.PersonId, l.LoginTime.Year, l.LoginTime.Month })
                     .ToDictionary(
                         g => (g.Key.PersonId, g.Key.Year, g.Key.Month),
-                        g => g.OrderByDescending(x => x.LoginTime)
+                        g => g.OrderByDescending(x => x.ManualLogin)
+                              .ThenByDescending(x => x.LoginTime)
                               .First().LoginTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
                     );
                 // ─────────────────────────────────────────────────────────────────────────

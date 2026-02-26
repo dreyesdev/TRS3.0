@@ -13,7 +13,9 @@ namespace TRS2._0.Models
         [Required]
         public int PersonId { get; set; } // Nuevo campo para almacenar el ID del personal
 
-        public DateTime LoginTime { get; set; }        
+        public DateTime LoginTime { get; set; }
+
+        public bool ManualLogin { get; set; } = false;
 
         [ForeignKey("PersonId")]
         public virtual Personnel Personnel { get; set; } // Relación con la tabla de personal

@@ -331,6 +331,24 @@
         </div>
     </div>
 </div>
+
+<div id="auditPmsLoadingOverlay" style="display:none;">
+    <div class="loading-box">
+        <div class="loading-title">Exporting Audit PMs…</div>
+        <div class="loading-subtitle">
+            Preparing CSV data. This may take some time for large periods.
+        </div>
+
+        <div class="loading-progress">
+            <div id="auditPmsProgressBar" class="loading-progress-bar" style="width:0%"></div>
+        </div>
+
+        <div class="loading-percent">
+            <span id="auditPmsProgressText">0%</span>
+        </div>
+    </div>
+</div>
+
 <div id="detallesPeriodoContainer" class="table-container-period"></div>
 
 
@@ -360,6 +378,45 @@
 
     // Timer para animar el progreso "estimado".
     let periodDetailsProgressTimer = null;
+    let auditPmsProgressTimer = null;
+
+    function showAuditPmsLoadingOverlay() {
+        $('#auditPmsLoadingOverlay').css('display', 'flex');
+
+        let progress = 0;
+        $('#auditPmsProgressBar').css('width', '0%');
+        $('#auditPmsProgressText').text('0%');
+
+        if (auditPmsProgressTimer) {
+            clearInterval(auditPmsProgressTimer);
+            auditPmsProgressTimer = null;
+        }
+
+        auditPmsProgressTimer = setInterval(function () {
+            if (progress < 70) progress += 4;
+            else if (progress < 92) progress += 1;
+
+            $('#auditPmsProgressBar').css('width', progress + '%');
+            $('#auditPmsProgressText').text(progress + '%');
+        }, 250);
+    }
+
+    function hideAuditPmsLoadingOverlay(success) {
+        if (auditPmsProgressTimer) {
+            clearInterval(auditPmsProgressTimer);
+            auditPmsProgressTimer = null;
+        }
+
+        if (success) {
+            $('#auditPmsProgressBar').css('width', '100%');
+            $('#auditPmsProgressText').text('100%');
+            setTimeout(function () {
+                $('#auditPmsLoadingOverlay').hide();
+            }, 250);
+        } else {
+            $('#auditPmsLoadingOverlay').hide();
+        }
+    }
 
     /**
      * Muestra el overlay bloqueante y arranca una barra de progreso "estimada".
@@ -701,6 +758,8 @@
         console.log("Start Date (ISO):", startDateISO);
         console.log("End Date (ISO):", endDateISO);
 
+        showAuditPmsLoadingOverlay();
+
         fetch('@Url.Action("ExportPmsAuditoria", "Projects")', {
             method: 'POST',
             headers: {
@@ -722,8 +781,13 @@
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
+                hideAuditPmsLoadingOverlay(true);
             })
-            .catch(error => console.error('Error:', error));
+            .catch(error => {
+                hideAuditPmsLoadingOverlay(false);
+                console.error('Error:', error);
+                alert('Error exporting Audit PMs. Please try again.');
+            });
     }  
     
     function exportPMSAuditByWPToCSV() {
@@ -956,7 +1020,8 @@
         white-space: nowrap;
     }
 
-    #periodDetailsLoadingOverlay {
+    #periodDetailsLoadingOverlay,
+    #auditPmsLoadingOverlay {
         position: fixed;
         inset: 0;
         background: rgba(0,0,0,0.35);
@@ -966,7 +1031,8 @@
         justify-content: center;
     }
 
-        #periodDetailsLoadingOverlay .loading-box {
+        #periodDetailsLoadingOverlay .loading-box,
+        #auditPmsLoadingOverlay .loading-box {
             width: 420px;
             background: #fff;
             border-radius: 10px;
@@ -975,19 +1041,22 @@
             font-family: inherit;
         }
 
-        #periodDetailsLoadingOverlay .loading-title {
+        #periodDetailsLoadingOverlay .loading-title,
+        #auditPmsLoadingOverlay .loading-title {
             font-size: 16px;
             font-weight: 700;
             margin-bottom: 6px;
         }
 
-        #periodDetailsLoadingOverlay .loading-subtitle {
+        #periodDetailsLoadingOverlay .loading-subtitle,
+        #auditPmsLoadingOverlay .loading-subtitle {
             font-size: 13px;
             opacity: .8;
             margin-bottom: 12px;
         }
 
-        #periodDetailsLoadingOverlay .loading-progress {
+        #periodDetailsLoadingOverlay .loading-progress,
+        #auditPmsLoadingOverlay .loading-progress {
             width: 100%;
             height: 10px;
             background: #e9ecef;
@@ -995,13 +1064,15 @@
             overflow: hidden;
         }
 
-        #periodDetailsLoadingOverlay .loading-progress-bar {
+        #periodDetailsLoadingOverlay .loading-progress-bar,
+        #auditPmsLoadingOverlay .loading-progress-bar {
             height: 100%;
             background: #0d6efd;
             transition: width .25s ease;
         }
 
-        #periodDetailsLoadingOverlay .loading-percent {
+        #periodDetailsLoadingOverlay .loading-percent,
+        #auditPmsLoadingOverlay .loading-percent {
             margin-top: 10px;
             font-size: 13px;
             font-weight: 600;
