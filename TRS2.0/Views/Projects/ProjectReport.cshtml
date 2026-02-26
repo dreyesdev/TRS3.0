@@ -418,6 +418,21 @@
         }
     }
 
+    function runClientExportWithOverlay(exportAction) {
+        showAuditPmsLoadingOverlay();
+
+        setTimeout(function () {
+            try {
+                exportAction();
+                hideAuditPmsLoadingOverlay(true);
+            } catch (error) {
+                hideAuditPmsLoadingOverlay(false);
+                console.error('Error during export:', error);
+                alert('Error exporting file. Please try again.');
+            }
+        }, 20);
+    }
+
     /**
      * Muestra el overlay bloqueante y arranca una barra de progreso "estimada".
      * Nota: el % NO es real, es UX para que el usuario no spamee el botón.
@@ -587,121 +602,129 @@
     }   
 
     function exportHoursToCSV() {
-        var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-        var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+        runClientExportWithOverlay(function () {
+            var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
 
-        rows.forEach(function (row) {
-            var cols = row.querySelectorAll('th, td');
-            var rowData = [];
-            cols.forEach(function (col) {
-                var declaredHours = col.getAttribute('data-declared-hours');
-                var hoursInProject = col.getAttribute('data-hours-in-project');
-                if (declaredHours && hoursInProject) {
-                    rowData.push(`${declaredHours.replace('.', ',')} | ${hoursInProject.replace('.', ',')}`);
-                } else {
-                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
-                }
+            rows.forEach(function (row) {
+                var cols = row.querySelectorAll('th, td');
+                var rowData = [];
+                cols.forEach(function (col) {
+                    var declaredHours = col.getAttribute('data-declared-hours');
+                    var hoursInProject = col.getAttribute('data-hours-in-project');
+                    if (declaredHours && hoursInProject) {
+                        rowData.push(`${declaredHours.replace('.', ',')} | ${hoursInProject.replace('.', ',')}`);
+                    } else {
+                        rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
+                    }
+                });
+                csvContent += rowData.join(";") + "\r\n";
             });
-            csvContent += rowData.join(";") + "\r\n";
-        });
 
-        var encodedUri = encodeURI(csvContent);
-        var link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "horas_periodo.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+            var encodedUri = encodeURI(csvContent);
+            var link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "horas_periodo.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
     }
 
       function exportDeclaredHoursToCSV() {
-        var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-        var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+        runClientExportWithOverlay(function () {
+            var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
 
-        rows.forEach(function (row) {
-            var cols = row.querySelectorAll('th, td');
-            var rowData = [];
-            cols.forEach(function (col, colIdx) {
-                var declaredHours = col.getAttribute('data-declared-hours');
+            rows.forEach(function (row) {
+                var cols = row.querySelectorAll('th, td');
+                var rowData = [];
+                cols.forEach(function (col, colIdx) {
+                    var declaredHours = col.getAttribute('data-declared-hours');
 
-                if (declaredHours) {
-                    // Si hay atributo con el dato limpio, úsalo
-                    rowData.push(declaredHours.replace('.', ','));
-                } else {
-                    // Si no, limpiamos el texto de la celda (quitando Lock/Reopen/etc.)
-                    var txt = cleanCellText(col);
+                    if (declaredHours) {
+                        // Si hay atributo con el dato limpio, úsalo
+                        rowData.push(declaredHours.replace('.', ','));
+                    } else {
+                        // Si no, limpiamos el texto de la celda (quitando Lock/Reopen/etc.)
+                        var txt = cleanCellText(col);
 
-                    // Si quieres, limita la primera columna a “Nombre Apellidos” sin más adornos:
-                    // if (colIdx === 0) { ... }  // opcional si en la primera columna es donde salen esos botones
+                        // Si quieres, limita la primera columna a “Nombre Apellidos” sin más adornos:
+                        // if (colIdx === 0) { ... }  // opcional si en la primera columna es donde salen esos botones
 
-                    rowData.push(txt.replace('.', ','));
-                }
+                        rowData.push(txt.replace('.', ','));
+                    }
+                });
+                csvContent += rowData.join(";") + "\r\n";
             });
-            csvContent += rowData.join(";") + "\r\n";
-        });
 
-        var encodedUri = encodeURI(csvContent);
-        var link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "horas_declaradas.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+            var encodedUri = encodeURI(csvContent);
+            var link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "horas_declaradas.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
     }
 
     function exportEstimatedHoursToCSV() {
-        var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-        var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+        runClientExportWithOverlay(function () {
+            var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
 
-        rows.forEach(function (row) {
-            var cols = row.querySelectorAll('th, td');
-            var rowData = [];
-            cols.forEach(function (col) {
-                var hoursInProject = col.getAttribute('data-hours-in-project');
-                if (hoursInProject) {
-                    rowData.push(hoursInProject.replace('.', ','));
-                } else {
-                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
-                }
+            rows.forEach(function (row) {
+                var cols = row.querySelectorAll('th, td');
+                var rowData = [];
+                cols.forEach(function (col) {
+                    var hoursInProject = col.getAttribute('data-hours-in-project');
+                    if (hoursInProject) {
+                        rowData.push(hoursInProject.replace('.', ','));
+                    } else {
+                        rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
+                    }
+                });
+                csvContent += rowData.join(";") + "\r\n";
             });
-            csvContent += rowData.join(";") + "\r\n";
-        });
 
-        var encodedUri = encodeURI(csvContent);
-        var link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "horas_estimadas.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+            var encodedUri = encodeURI(csvContent);
+            var link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "horas_estimadas.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
     }
 
 
     function exportPMsToCSV() {
-        var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-        var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+        runClientExportWithOverlay(function () {
+            var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
 
-        rows.forEach(function (row) {
-            var cols = row.querySelectorAll('th, td');
-            var rowData = [];
-            cols.forEach(function (col) {
-                var totalEffort = col.getAttribute('data-total-effort');
-                if (totalEffort) {
-                    rowData.push(totalEffort.replace('.', ','));
-                } else {
-                    rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
-                }
+            rows.forEach(function (row) {
+                var cols = row.querySelectorAll('th, td');
+                var rowData = [];
+                cols.forEach(function (col) {
+                    var totalEffort = col.getAttribute('data-total-effort');
+                    if (totalEffort) {
+                        rowData.push(totalEffort.replace('.', ','));
+                    } else {
+                        rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
+                    }
+                });
+                csvContent += rowData.join(";") + "\r\n";
             });
-            csvContent += rowData.join(";") + "\r\n";
-        });
 
-        var encodedUri = encodeURI(csvContent);
-        var link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "PMs_periodo.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+            var encodedUri = encodeURI(csvContent);
+            var link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "PMs_periodo.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
     }
 
 
@@ -718,6 +741,8 @@
         console.log("Project ID:", projectId);
         console.log("Start Date (ISO):", startDateISO);
         console.log("End Date (ISO):", endDateISO);
+
+        showAuditPmsLoadingOverlay();
 
         fetch('@Url.Action("ExportPmsperWPtoCSV", "Projects")', {
             method: 'POST',
@@ -740,8 +765,13 @@
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
+                hideAuditPmsLoadingOverlay(true);
             })
-            .catch(error => console.error('Error:', error));
+            .catch(error => {
+                hideAuditPmsLoadingOverlay(false);
+                console.error('Error:', error);
+                alert('Error exporting PMs per WP. Please try again.');
+            });
     }
 
     function exportPMSforAuditoriaToCSV() {
@@ -804,6 +834,8 @@
         console.log("Start Date (ISO):", startDateISO);
         console.log("End Date (ISO):", endDateISO);
 
+        showAuditPmsLoadingOverlay();
+
         fetch('@Url.Action("ExportPmsAuditoriaByWP", "Projects")', {
             method: 'POST',
             headers: {
@@ -825,8 +857,13 @@
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
+                hideAuditPmsLoadingOverlay(true);
             })
-            .catch(error => console.error('Error:', error));
+            .catch(error => {
+                hideAuditPmsLoadingOverlay(false);
+                console.error('Error:', error);
+                alert('Error exporting Audit PMs per WP. Please try again.');
+            });
     }
 
         function exportWorkedDaysToCSV() {
@@ -837,6 +874,8 @@
         // Convertir las fechas al formato ISO 8601 (yyyy-MM-dd)
         var startDateISO = new Date(startDate.split('-').reverse().join('-')).toISOString().split('T')[0];
         var endDateISO = new Date(endDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+
+        showAuditPmsLoadingOverlay();
 
         fetch('@Url.Action("ExportWorkedDaysToCSV", "Projects")', {
             method: 'POST',
@@ -863,8 +902,13 @@
             document.body.appendChild(a);
             a.click();
             a.remove();
+            hideAuditPmsLoadingOverlay(true);
         })
-        .catch(error => console.error('Error exporting Worked Days:', error));
+        .catch(error => {
+            hideAuditPmsLoadingOverlay(false);
+            console.error('Error exporting Worked Days:', error);
+            alert('Error exporting Worked Days. Please try again.');
+        });
     }
 
         function exportEstimatedWorkedDaysToCSV() {
@@ -875,6 +919,8 @@
         // Convertir dd-MM-yyyy → yyyy-MM-dd (ISO)
         var startDateISO = new Date(startDate.split('-').reverse().join('-')).toISOString().split('T')[0];
         var endDateISO   = new Date(endDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+
+        showAuditPmsLoadingOverlay();
 
         fetch('@Url.Action("ExportEstimatedWorkedDaysToCSV", "Projects")', {
             method: 'POST',
@@ -897,8 +943,13 @@
             document.body.appendChild(a);
             a.click();
             a.remove();
+            hideAuditPmsLoadingOverlay(true);
         })
-        .catch(error => console.error('Error exporting Estimated Worked Days:', error));
+        .catch(error => {
+            hideAuditPmsLoadingOverlay(false);
+            console.error('Error exporting Estimated Worked Days:', error);
+            alert('Error exporting Estimated Worked Days. Please try again.');
+        });
     }
 
         function loadPeriodRates(periodId, projectId) {
@@ -1105,4 +1156,3 @@
         }
 
     </style>
-
