@@ -921,9 +921,8 @@ namespace TRS2._0.Controllers
             {
                 selectedDate = DateTime.ParseExact(manualDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
             }
-            var lastLoginDateInvestigator = await GetLastLoginDateForNextMonth(personId, year, month);
-            var model = await GetTimesheetDataForPerson(personId, year, month, project);
 
+            var model = await GetTimesheetDataForPerson(personId, year, month, project);
 
             // --- Responsable histórico para el periodo de la timesheet ---
             var monthStart = new DateTime(year, month, 1);
@@ -968,12 +967,34 @@ namespace TRS2._0.Controllers
                 ? $"{responsible.Name} {responsible.Surname}"
                 : "N/A";
 
-            // Usar este responsable para la fecha de firma (último login)
+            if (selectedDate.HasValue)
+            {
+                var investigatorDateValidation = await ValidateManualDateAsync(personId, selectedDate.Value);
+                if (!investigatorDateValidation.IsValid)
+                {
+                    return BadRequest(investigatorDateValidation.Message);
+                }
+
+                if (responsibleId != 0 && responsibleId != personId)
+                {
+                    var responsibleDateValidation = await ValidateManualDateAsync(responsibleId, selectedDate.Value);
+                    if (!responsibleDateValidation.IsValid)
+                    {
+                        return BadRequest($"Manual Date is not valid for responsible manager: {responsibleDateValidation.Message}");
+                    }
+                }
+
+                await SaveManualLoginDateAsync(personId, year, month, selectedDate.Value);
+                if (responsibleId != 0 && responsibleId != personId)
+                {
+                    await SaveManualLoginDateAsync(responsibleId, year, month, selectedDate.Value);
+                }
+            }
+
+            var lastLoginDateInvestigator = await GetLastLoginDateForNextMonth(personId, year, month);
             var lastLoginDateResponsible = responsibleId != 0
                 ? await GetLastLoginDateForNextMonth(responsibleId, year, month)
                 : null;
-
-
 
             var totalhours = model.TotalHours;
             var totalhoursworkedonproject = model.WorkPackages.Sum(wp => wp.Timesheets.Sum(ts => ts.Hours));
@@ -990,22 +1011,22 @@ namespace TRS2._0.Controllers
             DateTime? finalDateInvestigator = null;
             DateTime? finalDateResponsible = null;
 
-            if (!string.IsNullOrEmpty(lastLoginDateInvestigator))
-            {
-                finalDateInvestigator = DateTime.Parse(lastLoginDateInvestigator);
-            }
-            else if (selectedDate.HasValue)
+            if (selectedDate.HasValue)
             {
                 finalDateInvestigator = selectedDate;
-            }
-
-            if (!string.IsNullOrEmpty(lastLoginDateResponsible))
-            {
-                finalDateResponsible = DateTime.Parse(lastLoginDateResponsible);
-            }
-            else if (selectedDate.HasValue)
-            {
                 finalDateResponsible = selectedDate;
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(lastLoginDateInvestigator))
+                {
+                    finalDateInvestigator = DateTime.Parse(lastLoginDateInvestigator);
+                }
+
+                if (!string.IsNullOrEmpty(lastLoginDateResponsible))
+                {
+                    finalDateResponsible = DateTime.Parse(lastLoginDateResponsible);
+                }
             }
 
             var document = Document.Create(document =>
@@ -1377,6 +1398,64 @@ namespace TRS2._0.Controllers
             return File(stream.ToArray(), "application/pdf", pdfFileName);
         }
 
+        private async Task<(bool IsValid, string Message)> ValidateManualDateAsync(int personId, DateTime selectedDate)
+        {
+            var selectedDay = selectedDate.Date;
+
+            var isNationalHoliday = await _context.NationalHolidays
+                .AnyAsync(h => h.Date == selectedDay);
+
+            if (isNationalHoliday)
+            {
+                return (false, $"Manual Date {selectedDay:dd/MM/yyyy} is a national holiday.");
+            }
+
+            var leave = await _context.Leaves
+                .Where(l => l.PersonId == personId && l.Day == selectedDay)
+                .Select(l => l.Type)
+                .FirstOrDefaultAsync();
+
+            if (leave != 0)
+            {
+                return leave switch
+                {
+                    1 => (false, $"Manual Date {selectedDay:dd/MM/yyyy} collides with an absence day."),
+                    2 => (false, $"Manual Date {selectedDay:dd/MM/yyyy} collides with a vacation day."),
+                    3 => (false, $"Manual Date {selectedDay:dd/MM/yyyy} collides with a sick leave day."),
+                    _ => (false, $"Manual Date {selectedDay:dd/MM/yyyy} collides with a leave day.")
+                };
+            }
+
+            return (true, string.Empty);
+        }
+
+        private async Task SaveManualLoginDateAsync(int personId, int year, int month, DateTime selectedDate)
+        {
+            var signatureYear = month == 12 ? year + 1 : year;
+            var signatureMonth = month == 12 ? 1 : month + 1;
+
+            var samePeriodLogin = await _context.UserLoginHistories
+                .Where(x => x.PersonId == personId && x.LoginTime.Year == signatureYear && x.LoginTime.Month == signatureMonth)
+                .OrderByDescending(x => x.LoginTime)
+                .FirstOrDefaultAsync();
+
+            if (samePeriodLogin == null)
+            {
+                _context.UserLoginHistories.Add(new UserLoginHistory
+                {
+                    PersonId = personId,
+                    LoginTime = new DateTime(signatureYear, signatureMonth, 1),
+                    ManualLoginDate = selectedDate.Date
+                });
+            }
+            else
+            {
+                samePeriodLogin.ManualLoginDate = selectedDate.Date;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
         // Método auxiliar para redondear al entero o .5 más cercano
         // MÉTODO INACTIVO - SE COMENTA TRAS EL CAMBIO A DECIMALES COMPLETOS EN HORAS
         //private decimal RoundToNearestHalfOrWhole(decimal value)
@@ -1386,13 +1465,15 @@ namespace TRS2._0.Controllers
         //}
         public async Task<string> GetLastLoginDateForPerson(int personId, int year, int month)
         {
-            var lastLogin = await _context.UserLoginHistories
+            var lastLoginEntry = await _context.UserLoginHistories
                 .Where(x => x.PersonId == personId && x.LoginTime.Year == year && x.LoginTime.Month == month)
-                .OrderByDescending(x => x.LoginTime)
-                .Select(x => x.LoginTime)
+                .OrderByDescending(x => x.ManualLoginDate.HasValue)
+                .ThenByDescending(x => x.ManualLoginDate)
+                .ThenByDescending(x => x.LoginTime)
                 .FirstOrDefaultAsync();
 
-            return lastLogin != default ? lastLogin.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
+            var effectiveDate = lastLoginEntry?.ManualLoginDate ?? lastLoginEntry?.LoginTime;
+            return effectiveDate.HasValue ? effectiveDate.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
         }
 
         public async Task<string> GetLastLoginDateForNextMonth(int personId, int year, int month)
@@ -1405,13 +1486,15 @@ namespace TRS2._0.Controllers
                 year++;
             }
 
-            var lastLogin = await _context.UserLoginHistories
+            var lastLoginEntry = await _context.UserLoginHistories
                 .Where(x => x.PersonId == personId && x.LoginTime.Year == year && x.LoginTime.Month == month)
-                .OrderByDescending(x => x.LoginTime)
-                .Select(x => x.LoginTime)
+                .OrderByDescending(x => x.ManualLoginDate.HasValue)
+                .ThenByDescending(x => x.ManualLoginDate)
+                .ThenByDescending(x => x.LoginTime)
                 .FirstOrDefaultAsync();
 
-            return lastLogin != default ? lastLogin.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
+            var effectiveDate = lastLoginEntry?.ManualLoginDate ?? lastLoginEntry?.LoginTime;
+            return effectiveDate.HasValue ? effectiveDate.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
         }
 
         [HttpPost]

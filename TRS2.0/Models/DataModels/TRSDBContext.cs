@@ -284,6 +284,10 @@ public partial class TRSDBContext : IdentityDbContext<ApplicationUser>
             .WithMany()            
             .HasForeignKey(ulh => ulh.PersonId)
             .OnDelete(DeleteBehavior.NoAction); // Esto previene la eliminación en cascada
+
+        modelBuilder.Entity<UserLoginHistory>()
+            .Property(ulh => ulh.ManualLoginDate)
+            .HasColumnType("date");
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
