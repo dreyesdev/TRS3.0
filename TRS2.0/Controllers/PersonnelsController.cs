@@ -543,7 +543,7 @@ namespace TRS2._0.Controllers
                 .Select(p => p.Affiliation)
                 .FirstOrDefaultAsync();
 
-            return personAff > 0 ? personAff : 1;
+            return (int)(personAff > 0 ? personAff : 1);
         }
 
         private async Task<decimal> ResolveDedicationForDate(int personId, DateTime date)
