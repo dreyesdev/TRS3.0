@@ -211,49 +211,6 @@ namespace TRS2._0.Controllers
         }
 
 
-
-        [HttpGet]
-        [Route("Tools/GetGlobalEffortBreakdown")]
-        public async Task<IActionResult> GetGlobalEffortBreakdown(int year)
-        {
-            var raw = await _context.Persefforts
-                .Where(pe => pe.Month.Year == year)
-                .Include(pe => pe.WpxPersonNavigation)
-                    .ThenInclude(wpp => wpp.WpNavigation)
-                        .ThenInclude(wp => wp.Proj)
-                .Select(pe => new
-                {
-                    PersonId = pe.WpxPersonNavigation.Person,
-                    Month = pe.Month.Month,
-                    Value = pe.Value,
-                    ProjectAcronim = pe.WpxPersonNavigation.WpNavigation.Proj != null
-                        ? pe.WpxPersonNavigation.WpNavigation.Proj.Acronim
-                        : "",
-                    WpName = pe.WpxPersonNavigation.WpNavigation.Name
-                })
-                .ToListAsync();
-
-            var rowsByPerson = raw
-                .GroupBy(r => r.PersonId)
-                .ToDictionary(
-                    personGroup => personGroup.Key,
-                    personGroup => personGroup
-                        .GroupBy(r => new { r.ProjectAcronim, r.WpName })
-                        .Select(g => new PersonEffortFlatRow
-                        {
-                            ProjectAcronym = g.Key.ProjectAcronim ?? "",
-                            WpName = g.Key.WpName ?? "",
-                            MonthValues = g.GroupBy(x => x.Month)
-                                           .ToDictionary(mg => mg.Key, mg => mg.Sum(x => x.Value))
-                        })
-                        .OrderBy(r => r.ProjectAcronym)
-                        .ThenBy(r => r.WpName)
-                        .ToList()
-                );
-
-            return Json(new { rowsByPerson });
-        }
-
         public class PersonEffortFlatRow
         {
             public string ProjectAcronym { get; set; } = "";

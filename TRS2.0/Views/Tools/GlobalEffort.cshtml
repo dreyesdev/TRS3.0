@@ -133,10 +133,8 @@
                 const personRows = Array.from(document.querySelectorAll(".global-hours-table tbody tr"))
                     .filter(row => !row.classList.contains('person-details'));
 
-                const breakdownByPerson = await fetchGlobalBreakdown(year);
-
                 for (const row of personRows) {
-                    const personId = Number(row.getAttribute('data-personid'));
+                    const personId = row.getAttribute('data-personid');
                     const cols = row.querySelectorAll("td");
                     const rowData = [];
 
@@ -145,7 +143,7 @@
                     });
                     csvBody += rowData.join(";") + "\r\n";
 
-                    const breakdownRows = breakdownByPerson[personId] || breakdownByPerson[String(personId)] || [];
+                    const breakdownRows = await fetchBreakdown(personId, year);
                     breakdownRows.forEach(detail => {
                         const detailRow = [
                             "↳",
@@ -176,15 +174,15 @@
             }
         }
 
-        async function fetchGlobalBreakdown(year) {
+        async function fetchBreakdown(personId, year) {
             try {
-                const url = '@Url.Action("GetGlobalEffortBreakdown", "Tools")' + `?year=${year}`;
+                const url = '@Url.Action("GetPersonEffortBreakdown", "Tools")' + `?personId=${personId}&year=${year}`;
                 const resp = await fetch(url);
-                if (!resp.ok) return {};
+                if (!resp.ok) return [];
                 const data = await resp.json();
-                return data.rowsByPerson || {};
+                return data.rows || [];
             } catch {
-                return {};
+                return [];
             }
         }
 
