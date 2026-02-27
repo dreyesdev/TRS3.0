@@ -343,6 +343,111 @@ namespace TRS2._0.Controllers
         }
 
         [HttpGet]
+        public async Task<IActionResult> ExternalRate(int? personId)
+        {
+            if (personId.HasValue)
+            {
+                ViewBag.SelectedPersonId = personId.Value;
+            }
+            else if (TempData["SelectedPersonId"] != null)
+            {
+                ViewBag.SelectedPersonId = TempData["SelectedPersonId"];
+                TempData.Keep("SelectedPersonId");
+            }
+
+            var persons = await _context.Personnel.ToListAsync();
+            return View(persons);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetExternalRateData(int personId)
+        {
+            var rates = await _context.PersonManualRates
+                .Where(r => r.PersonId == personId)
+                .OrderBy(r => r.StartDate)
+                .Select(r => new
+                {
+                    r.Id,
+                    pId = r.PersonId,
+                    StartDate = r.StartDate.ToString("yyyy-MM-dd"),
+                    EndDate = r.EndDate.ToString("yyyy-MM-dd"),
+                    HourlyRate = r.HourlyRate,
+                    AnnualCost = r.AnnualCost,
+                    Dedication = r.Dedication,
+                    AnnualHours = r.AnnualHours,
+                    CreatedAt = r.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                })
+                .ToListAsync();
+
+            return Json(rates);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> AddExternalRate(int personId, DateTime startDate, DateTime endDate, decimal hourlyRate)
+        {
+            if (startDate.Date > endDate.Date)
+            {
+                return Json(new { success = false, message = "Start date cannot be later than end date." });
+            }
+
+            if (hourlyRate <= 0)
+            {
+                return Json(new { success = false, message = "Hourly cost must be greater than 0." });
+            }
+
+            var newStart = startDate.Date;
+            var newEnd = endDate.Date;
+
+            var hasContainedConflict = await _context.PersonManualRates
+                .Where(r => r.PersonId == personId)
+                .AnyAsync(r =>
+                    (r.StartDate <= newStart && r.EndDate >= newEnd) ||
+                    (newStart <= r.StartDate && newEnd >= r.EndDate));
+
+            if (hasContainedConflict)
+            {
+                return Json(new { success = false, message = "A manual rate already exists with same dates or a fully contained period." });
+            }
+
+            int affId = await ResolveAffiliationForDate(personId, newStart);
+            decimal dedication = await ResolveDedicationForDate(personId, newStart);
+            decimal annualHours = await ResolveAnnualHoursForDate(affId, newStart);
+            decimal annualCost = Math.Round(hourlyRate * dedication * annualHours, 2);
+
+            var rate = new PersonManualRate
+            {
+                PersonId = personId,
+                AffId = affId,
+                StartDate = newStart,
+                EndDate = newEnd,
+                AnnualCost = annualCost,
+                Dedication = dedication,
+                AnnualHours = annualHours,
+                HourlyRate = Math.Round(hourlyRate, 4),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.PersonManualRates.Add(rate);
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Manual external rate added successfully." });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RemoveExternalRate(int id)
+        {
+            var rate = await _context.PersonManualRates.FindAsync(id);
+            if (rate == null)
+            {
+                return Json(new { success = false, message = "Manual external rate not found." });
+            }
+
+            _context.PersonManualRates.Remove(rate);
+            await _context.SaveChangesAsync();
+            return Json(new { success = true, message = "Manual external rate removed successfully." });
+        }
+
+        [HttpGet]
         public async Task<IActionResult> GetDedicationData(int personId)
         {
             var dedicationData = await _context.Dedications
@@ -421,6 +526,55 @@ namespace TRS2._0.Controllers
             await _context.SaveChangesAsync();
 
             return Json(new { success = true, message = "Dedication added successfully." });
+        }
+
+        private async Task<int> ResolveAffiliationForDate(int personId, DateTime date)
+        {
+            var affSegment = await _context.AffxPersons
+                .Where(a => a.PersonId == personId && a.Exist && a.Start <= date && a.End >= date)
+                .OrderByDescending(a => a.Start)
+                .FirstOrDefaultAsync();
+
+            if (affSegment != null)
+                return affSegment.AffId;
+
+            var personAff = await _context.Personnel
+                .Where(p => p.Id == personId)
+                .Select(p => p.Affiliation)
+                .FirstOrDefaultAsync();
+
+            return personAff > 0 ? personAff : 1;
+        }
+
+        private async Task<decimal> ResolveDedicationForDate(int personId, DateTime date)
+        {
+            var reduc = await _context.Dedications
+                .Where(d => d.PersId == personId && d.Exist && d.Type <= 1 && d.Start <= date && d.End >= date)
+                .OrderByDescending(d => d.Start)
+                .Select(d => (decimal?)d.Reduc)
+                .FirstOrDefaultAsync();
+
+            var dedication = 1m - (reduc ?? 0m);
+            if (dedication <= 0m) dedication = 1m;
+            return Math.Round(dedication, 4);
+        }
+
+        private async Task<decimal> ResolveAnnualHoursForDate(int affId, DateTime date)
+        {
+            var dailyHours = await _context.AffHours
+                .Where(ah => ah.AffId == affId && ah.StartDate <= date && ah.EndDate >= date)
+                .OrderByDescending(ah => ah.StartDate)
+                .Select(ah => (decimal?)ah.Hours)
+                .FirstOrDefaultAsync();
+
+            decimal hoursPerDay = dailyHours ?? 8m;
+            int workingDays = 0;
+            for (int m = 1; m <= 12; m++)
+            {
+                workingDays += await _workCalendarService.CalculateWorkingDays(date.Year, m);
+            }
+
+            return Math.Round(hoursPerDay * workingDays, 2);
         }
 
         [HttpPost]
