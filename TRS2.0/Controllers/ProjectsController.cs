@@ -2260,8 +2260,11 @@ namespace TRS2._0.Controllers
 
             var csv = new StringBuilder();
             csv.Append("Name;WP");
-            foreach (var month in months)
-                csv.Append($";{month.ToString("MMM-yyyy", CultureInfo.InvariantCulture)}");
+            for (var i = 0; i < months.Count; i++)
+            {
+                var month = months[i];
+                csv.Append($";M{i + 1} {month.ToString("MMM yyyy", CultureInfo.InvariantCulture)}");
+            }
             csv.AppendLine();
 
             var orderedWps = project.Wps
@@ -2304,7 +2307,7 @@ namespace TRS2._0.Controllers
 
             var utf8WithBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
             var bytes = utf8WithBom.GetBytes(csv.ToString());
-            return File(bytes, "text/csv", $"{filePrefix}_{projectId}_{DateTime.Now:yyyyMMdd}.csv");
+            return File(bytes, "text/csv; charset=utf-8", $"{filePrefix}_{projectId}_{DateTime.Now:yyyyMMdd}.csv");
         }
 
         private async Task<(decimal? EffectiveDailyHours, decimal? BaseDailyHours, decimal ReducUsed)>

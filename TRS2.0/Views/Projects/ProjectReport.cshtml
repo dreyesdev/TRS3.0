@@ -354,8 +354,8 @@
 
 <div id="auditPmsLoadingOverlay" style="display:none;">
     <div class="loading-box">
-        <div class="loading-title">Exporting Audit PMs…</div>
-        <div class="loading-subtitle">
+        <div class="loading-title" id="auditPmsLoadingTitle">Exporting CSV…</div>
+        <div class="loading-subtitle" id="auditPmsLoadingSubtitle">
             Preparing CSV data. This may take some time for large periods.
         </div>
 
@@ -457,8 +457,10 @@
     let periodDetailsProgressTimer = null;
     let auditPmsProgressTimer = null;
 
-    function showAuditPmsLoadingOverlay() {
+    function showAuditPmsLoadingOverlay(title, subtitle) {
         $('#auditPmsLoadingOverlay').css('display', 'flex');
+        $('#auditPmsLoadingTitle').text(title || 'Exporting CSV…');
+        $('#auditPmsLoadingSubtitle').text(subtitle || 'Preparing CSV data. This may take some time for large periods.');
 
         let progress = 0;
         $('#auditPmsProgressBar').css('width', '0%');
@@ -496,7 +498,7 @@
     }
 
     function runClientExportWithOverlay(exportAction) {
-        showAuditPmsLoadingOverlay();
+        showAuditPmsLoadingOverlay('Exporting CSV…');
 
         setTimeout(function () {
             try {
@@ -763,7 +765,7 @@
         console.log("Start Date (ISO):", startDateISO);
         console.log("End Date (ISO):", endDateISO);
 
-        showAuditPmsLoadingOverlay();
+        showAuditPmsLoadingOverlay('Exporting PMs per WP…');
 
         fetch('@Url.Action("ExportPmsperWPtoCSV", "Projects")', {
             method: 'POST',
@@ -809,7 +811,7 @@
         console.log("Start Date (ISO):", startDateISO);
         console.log("End Date (ISO):", endDateISO);
 
-        showAuditPmsLoadingOverlay();
+        showAuditPmsLoadingOverlay('Exporting Audit PMs…');
 
         fetch('@Url.Action("ExportPmsAuditoria", "Projects")', {
             method: 'POST',
@@ -855,7 +857,7 @@
         console.log("Start Date (ISO):", startDateISO);
         console.log("End Date (ISO):", endDateISO);
 
-        showAuditPmsLoadingOverlay();
+        showAuditPmsLoadingOverlay('Exporting Audit PMs per WP…');
 
         fetch('@Url.Action("ExportPmsAuditoriaByWP", "Projects")', {
             method: 'POST',
@@ -896,7 +898,7 @@
         var startDateISO = new Date(startDate.split('-').reverse().join('-')).toISOString().split('T')[0];
         var endDateISO = new Date(endDate.split('-').reverse().join('-')).toISOString().split('T')[0];
 
-        showAuditPmsLoadingOverlay();
+        showAuditPmsLoadingOverlay('Exporting Worked Days…');
 
         fetch('@Url.Action("ExportWorkedDaysToCSV", "Projects")', {
             method: 'POST',
@@ -941,7 +943,7 @@
         var startDateISO = new Date(startDate.split('-').reverse().join('-')).toISOString().split('T')[0];
         var endDateISO   = new Date(endDate.split('-').reverse().join('-')).toISOString().split('T')[0];
 
-        showAuditPmsLoadingOverlay();
+        showAuditPmsLoadingOverlay('Exporting Estimated Days…');
 
         fetch('@Url.Action("ExportEstimatedWorkedDaysToCSV", "Projects")', {
             method: 'POST',
@@ -974,22 +976,22 @@
     }
 
     function exportDeclaredHoursPerWpToCSV() {
-        exportPerWpWithServerEndpoint('@Url.Action("ExportDeclaredHoursPerWPToCSV", "Projects")', 'DeclaredHoursPerWP');
+        exportPerWpWithServerEndpoint('@Url.Action("ExportDeclaredHoursPerWPToCSV", "Projects")', 'DeclaredHoursPerWP', 'Exporting Declared Hours per WP…');
     }
 
     function exportEstimatedHoursPerWpToCSV() {
-        exportPerWpWithServerEndpoint('@Url.Action("ExportEstimatedHoursPerWPToCSV", "Projects")', 'EstimatedHoursPerWP');
+        exportPerWpWithServerEndpoint('@Url.Action("ExportEstimatedHoursPerWPToCSV", "Projects")', 'EstimatedHoursPerWP', 'Exporting Estimated Hours per WP…');
     }
 
     function exportWorkedDaysPerWpToCSV() {
-        exportPerWpWithServerEndpoint('@Url.Action("ExportWorkedDaysPerWPToCSV", "Projects")', 'WorkedDaysPerWP');
+        exportPerWpWithServerEndpoint('@Url.Action("ExportWorkedDaysPerWPToCSV", "Projects")', 'WorkedDaysPerWP', 'Exporting Worked Days per WP…');
     }
 
     function exportEstimatedWorkedDaysPerWpToCSV() {
-        exportPerWpWithServerEndpoint('@Url.Action("ExportEstimatedWorkedDaysPerWPToCSV", "Projects")', 'EstimatedWorkedDaysPerWP');
+        exportPerWpWithServerEndpoint('@Url.Action("ExportEstimatedWorkedDaysPerWPToCSV", "Projects")', 'EstimatedWorkedDaysPerWP', 'Exporting Estimated Days per WP…');
     }
 
-    function exportPerWpWithServerEndpoint(endpointUrl, baseFileName) {
+    function exportPerWpWithServerEndpoint(endpointUrl, baseFileName, loadingTitle) {
         var projectId = @ViewBag.projId;
         var startDate = $('#exportPMSforWPToCSV').data('start-date');
         var endDate = $('#exportPMSforWPToCSV').data('end-date');
@@ -997,7 +999,7 @@
         var startDateISO = new Date(startDate.split('-').reverse().join('-')).toISOString().split('T')[0];
         var endDateISO = new Date(endDate.split('-').reverse().join('-')).toISOString().split('T')[0];
 
-        showAuditPmsLoadingOverlay();
+        showAuditPmsLoadingOverlay(loadingTitle);
 
         fetch(endpointUrl, {
             method: 'POST',
