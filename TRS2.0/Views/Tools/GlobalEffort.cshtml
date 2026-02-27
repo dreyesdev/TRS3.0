@@ -28,7 +28,7 @@
 
             <input type="text" id="searchByPerson" class="form-control bg-white text-dark"
                    placeholder="Search by surname..." style="max-width: 250px;" />
-            <button class="btn btn-success" onclick="downloadCSV()">
+            <button id="exportCsvButton" class="btn btn-success" onclick="downloadCSV()">
                 <i class="bi bi-download"></i> Export CSV
             </button>
         </div>
@@ -107,40 +107,90 @@
             });
         });
 
-        // -------- Exportación CSV (omite filas detalle) --------
-        function downloadCSV() {
+        // -------- Exportación CSV (incluye resumen mensual + detalle por WP) --------
+        async function downloadCSV() {
+            const exportButton = document.getElementById('exportCsvButton');
+            const originalButtonHtml = exportButton.innerHTML;
+            exportButton.disabled = true;
+            exportButton.innerHTML = '<i class="bi bi-hourglass-split"></i> Exporting...';
+
             let csvBody = "";
+            const year = @Model.Year;
+            const monthHeaders = [];
 
             const headerRow = ["Person", "Department", "Group"];
             document.querySelectorAll(".global-hours-table thead th")
                 .forEach((th, index) => {
-                    if (index >= 3) headerRow.push(th.innerText.trim());
+                    if (index >= 3) {
+                        const monthText = th.innerText.trim();
+                        monthHeaders.push(monthText);
+                        headerRow.push(monthText);
+                    }
                 });
             csvBody += headerRow.join(";") + "\r\n";
 
-            document.querySelectorAll(".global-hours-table tbody tr")
-                .forEach(row => {
-                    if (row.classList.contains('person-details')) return; // excluir filas detalle
+            try {
+                const personRows = Array.from(document.querySelectorAll(".global-hours-table tbody tr"))
+                    .filter(row => !row.classList.contains('person-details'));
+
+                for (const row of personRows) {
+                    const personId = row.getAttribute('data-personid');
                     const cols = row.querySelectorAll("td");
                     const rowData = [];
+
                     cols.forEach((td) => {
-                        let value = td.innerText.trim();
-                        if (!isNaN(value) && value.includes(".")) {
-                            value = value.replace(".", ",");
-                        }
-                        value = value.replace(/(\r\n|\n|\r)/gm, "");
-                        rowData.push(value);
+                        rowData.push(normalizeCsvValue(td.innerText.trim()));
                     });
                     csvBody += rowData.join(";") + "\r\n";
-                });
 
-            const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\uFEFF' + csvBody);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "Global_Effort.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+                    const breakdownRows = await fetchBreakdown(personId, year);
+                    breakdownRows.forEach(detail => {
+                        const detailRow = [
+                            "↳",
+                            normalizeCsvValue(detail.projectAcronym ?? ""),
+                            normalizeCsvValue(detail.wpName ?? "")
+                        ];
+
+                        for (let i = 0; i < monthHeaders.length; i++) {
+                            const monthIndex = i + 1;
+                            const monthValue = (detail.monthValues && (detail.monthValues[monthIndex] ?? detail.monthValues[String(monthIndex)])) || 0;
+                            detailRow.push(monthValue > 0 ? normalizeCsvValue(Number(monthValue).toFixed(2)) : "");
+                        }
+
+                        csvBody += detailRow.join(";") + "\r\n";
+                    });
+                }
+
+                const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\uFEFF' + csvBody);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "Global_Effort.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } finally {
+                exportButton.disabled = false;
+                exportButton.innerHTML = originalButtonHtml;
+            }
+        }
+
+        async function fetchBreakdown(personId, year) {
+            try {
+                const url = '@Url.Action("GetPersonEffortBreakdown", "Tools")' + `?personId=${personId}&year=${year}`;
+                const resp = await fetch(url);
+                if (!resp.ok) return [];
+                const data = await resp.json();
+                return data.rows || [];
+            } catch {
+                return [];
+            }
+        }
+
+        function normalizeCsvValue(value) {
+            const cleanValue = String(value ?? "").replace(/(\r\n|\n|\r)/gm, " ").trim();
+            return /^-?\d+(\.\d+)?(\|\d+(\.\d+)?)?$/.test(cleanValue)
+                ? cleanValue.replace(/\./g, ",")
+                : cleanValue;
         }
 
         // -------- Expandible por persona (AJAX) --------
