@@ -296,6 +296,26 @@
                             </button>
                         </div>
                         <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportDeclaredHoursPerWpBtn" onclick="exportDeclaredHoursPerWpToCSV()" style="display:none;">
+                                Export Declared Hours per WP
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportEstimatedHoursPerWpBtn" onclick="exportEstimatedHoursPerWpToCSV()" style="display:none;">
+                                Export Estimated Hours per WP
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportWorkedDaysPerWpBtn" onclick="exportWorkedDaysPerWpToCSV()" style="display:none;">
+                                Export Worked Days per WP
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportEstimatedWorkedDaysPerWpBtn" onclick="exportEstimatedWorkedDaysPerWpToCSV()" style="display:none;">
+                                Export Estimated Days per WP
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
                             <button type="button"
                                     class="btn btn-success btn-block btn-smaller-text"
                                     id="exportEstimatedDaysBtn"
@@ -534,6 +554,10 @@
                     $('#exportPMSforWPToCSVBtn').show();
                     $('#exportWorkedDaysBtn').show();
                     $('#exportEstimatedDaysBtn').show();
+                    $('#exportDeclaredHoursPerWpBtn').show();
+                    $('#exportEstimatedHoursPerWpBtn').show();
+                    $('#exportWorkedDaysPerWpBtn').show();
+                    $('#exportEstimatedWorkedDaysPerWpBtn').show();
 
                     // Guardar fechas del periodo seleccionado
                     $('#exportPMSforWPToCSV').data('start-date', startDate);
@@ -949,6 +973,62 @@
             hideAuditPmsLoadingOverlay(false);
             console.error('Error exporting Estimated Worked Days:', error);
             alert('Error exporting Estimated Worked Days. Please try again.');
+        });
+    }
+
+    function exportDeclaredHoursPerWpToCSV() {
+        exportPerWpWithServerEndpoint('@Url.Action("ExportDeclaredHoursPerWPToCSV", "Projects")', 'DeclaredHoursPerWP');
+    }
+
+    function exportEstimatedHoursPerWpToCSV() {
+        exportPerWpWithServerEndpoint('@Url.Action("ExportEstimatedHoursPerWPToCSV", "Projects")', 'EstimatedHoursPerWP');
+    }
+
+    function exportWorkedDaysPerWpToCSV() {
+        exportPerWpWithServerEndpoint('@Url.Action("ExportWorkedDaysPerWPToCSV", "Projects")', 'WorkedDaysPerWP');
+    }
+
+    function exportEstimatedWorkedDaysPerWpToCSV() {
+        exportPerWpWithServerEndpoint('@Url.Action("ExportEstimatedWorkedDaysPerWPToCSV", "Projects")', 'EstimatedWorkedDaysPerWP');
+    }
+
+    function exportPerWpWithServerEndpoint(endpointUrl, baseFileName) {
+        var projectId = @ViewBag.projId;
+        var startDate = $('#exportPMSforWPToCSV').data('start-date');
+        var endDate = $('#exportPMSforWPToCSV').data('end-date');
+
+        var startDateISO = new Date(startDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+        var endDateISO = new Date(endDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+
+        showAuditPmsLoadingOverlay();
+
+        fetch(endpointUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ProjectId: projectId,
+                StartDate: startDateISO,
+                EndDate: endDateISO
+            })
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.blob();
+        })
+        .then(blob => {
+            var url = window.URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = `${baseFileName}_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            hideAuditPmsLoadingOverlay(true);
+        })
+        .catch(error => {
+            hideAuditPmsLoadingOverlay(false);
+            console.error(`Error exporting ${baseFileName}:`, error);
+            alert(`Error exporting ${baseFileName}. Please try again.`);
         });
     }
 
