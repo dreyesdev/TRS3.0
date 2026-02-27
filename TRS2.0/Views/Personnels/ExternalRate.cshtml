@@ -1,0 +1,199 @@
+@model IEnumerable<TRS2._0.Models.DataModels.Personnel>
+
+@{
+    ViewData["Title"] = "External Rate";
+}
+
+<div class="container personnel-ux personnel-dedication-ux">
+    <h2 class="personnel-page-title">External Rate</h2>
+
+    <div class="personnel-filter-shell">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h2>Person Selection</h2>
+                    <select id="personnelSelect" class="form-control">
+                        <option value="">Please select a person from the list below:</option>
+                        @foreach (var person in Model)
+                        {
+                            <option value="@person.Id">@person.Name @person.Surname</option>
+                        }
+                    </select>
+
+                    <p>Or start typing here the name of the person:</p>
+                    <input type="text" id="searchTerm" class="form-control" placeholder="Start typing..." onkeyup="filterPersonnel()" />
+                    <div id="searchResults"></div>
+                </div>
+
+                <div class="col-md-6">
+                    <h2>Person Details</h2>
+                    <div id="personDetails" class="card"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr />
+    <div id="externalRateTableContainer" class="personnel-data-shell"></div>
+</div>
+
+@section Scripts {
+<script>
+    document.getElementById('personnelSelect').addEventListener('change', function () {
+        const personId = this.value;
+        fetchPersonDetails(personId);
+        loadExternalRateData(personId);
+    });
+
+    function filterPersonnel() {
+        const searchTerm = document.getElementById('searchTerm').value;
+        $.ajax({
+            url: '@Url.Action("GetFilteredPersonnel", "Personnels")',
+            data: { searchTerm: searchTerm },
+            success: function (data) {
+                const resultsDiv = document.getElementById('searchResults');
+                resultsDiv.innerHTML = '';
+                data.forEach(function (person) {
+                    const personDiv = document.createElement('div');
+                    personDiv.className = 'person-result';
+                    personDiv.textContent = person.name + ' ' + person.surname;
+                    personDiv.onclick = function () {
+                        document.querySelectorAll('.person-result').forEach(el => el.classList.remove('active'));
+                        this.classList.add('active');
+                        fetchPersonDetails(person.id);
+                        loadExternalRateData(person.id);
+                    };
+                    resultsDiv.appendChild(personDiv);
+                });
+            }
+        });
+    }
+
+    function fetchPersonDetails(personId) {
+        if (!personId) return;
+        $.ajax({
+            url: '@Url.Action("GetPersonDetails", "Personnels")',
+            data: { id: personId },
+            success: function (response) {
+                const detailsDiv = document.getElementById('personDetails');
+                const searchTermInput = document.getElementById('searchTerm');
+                detailsDiv.innerHTML = '';
+                if (response.success) {
+                    const data = response.data;
+                    searchTermInput.value = data.fullName || '';
+                    detailsDiv.innerHTML = '<div class="card-body">' +
+                        '<h5 class="card-title">' + (data.fullName || '') + '</h5>' +
+                        '<p><span class="card-detail-label">Affiliation:</span> ' + (data.affiliation || '') + '</p>' +
+                        '<p><span class="card-detail-label">Department:</span> ' + (data.departmentName || '') + '</p>' +
+                        '<p><span class="card-detail-label">Group:</span> ' + (data.personnelGroupName || '') + '</p>' +
+                        '<p><span class="card-detail-label">Group Leader:</span> ' + (data.responsiblePerson || '') + '</p>' +
+                        '<p><span class="card-detail-label">Contract Start:</span> ' + (data.startDate || '') + '</p>' +
+                        '<p><span class="card-detail-label">Contract End:</span> ' + (data.endDate || '') + '</p>' +
+                        '</div>';
+                } else {
+                    detailsDiv.innerHTML = '<p>Person details not found.</p>';
+                }
+                document.getElementById('searchResults').style.display = 'none';
+            }
+        });
+    }
+
+    document.getElementById('searchTerm').addEventListener('focus', function () {
+        document.getElementById('searchResults').style.display = 'block';
+    });
+
+    function loadExternalRateData(personId) {
+        if (!personId) {
+            $('#externalRateTableContainer').html('');
+            return;
+        }
+
+        $.ajax({
+            url: '@Url.Action("GetExternalRateData", "Personnels")',
+            data: { personId: personId },
+            success: function (data) {
+                let tableHtml = '<table class="table table-bordered table-striped table-sm">';
+                tableHtml += '<thead class="table-primary"><tr>' +
+                    '<th>#</th><th>Start Date</th><th>End Date</th><th>Hourly Cost (€)</th><th>Annual Cost (€)</th><th>Dedication</th><th>Annual Hours</th><th>Actions</th></tr></thead><tbody>';
+
+                data.forEach((item, idx) => {
+                    tableHtml += `<tr id='row-${item.id}'>`;
+                    tableHtml += `<td>${idx + 1}</td>`;
+                    tableHtml += `<td>${item.startDate}</td>`;
+                    tableHtml += `<td>${item.endDate}</td>`;
+                    tableHtml += `<td>${Number(item.hourlyRate).toFixed(4)}</td>`;
+                    tableHtml += `<td>${Number(item.annualCost).toFixed(2)}</td>`;
+                    tableHtml += `<td>${(Number(item.dedication) * 100).toFixed(2)}%</td>`;
+                    tableHtml += `<td>${Number(item.annualHours).toFixed(2)}</td>`;
+                    tableHtml += `<td><button class='btn btn-danger btn-sm' onclick='removeExternalRate(${item.id}, ${personId})'>Remove</button></td>`;
+                    tableHtml += '</tr>';
+                });
+
+                const nextIndex = data.length + 1;
+                tableHtml += `<tr id='new-row'>` +
+                    `<td>${nextIndex}</td>` +
+                    `<td><input type='date' class='form-control' /></td>` +
+                    `<td><input type='date' class='form-control' /></td>` +
+                    `<td><input type='number' min='0' step='0.0001' class='form-control' placeholder='Hourly cost' /></td>` +
+                    `<td colspan='3' class='text-muted'>Annual fields are auto-calculated</td>` +
+                    `<td><button class='btn btn-success btn-sm' onclick='addExternalRate(${personId})'>Add</button></td>` +
+                    `</tr>`;
+
+                tableHtml += '</tbody></table>';
+                $('#externalRateTableContainer').html(tableHtml);
+            }
+        });
+    }
+
+    function addExternalRate(personId) {
+        const row = $('#new-row');
+        const startDate = row.find("input[type='date']").eq(0).val();
+        const endDate = row.find("input[type='date']").eq(1).val();
+        const hourlyRate = row.find("input[type='number']").val();
+
+        if (!startDate || !endDate || !hourlyRate) {
+            alert('Please fill all fields.');
+            return;
+        }
+
+        $.ajax({
+            url: '@Url.Action("AddExternalRate", "Personnels")',
+            type: 'POST',
+            data: {
+                personId: personId,
+                startDate: startDate,
+                endDate: endDate,
+                hourlyRate: parseFloat(hourlyRate)
+            },
+            success: function (response) {
+                alert(response.message);
+                if (response.success) {
+                    loadExternalRateData(personId);
+                }
+            }
+        });
+    }
+
+    function removeExternalRate(id, personId) {
+        $.ajax({
+            url: '@Url.Action("RemoveExternalRate", "Personnels")',
+            type: 'POST',
+            data: { id: id },
+            success: function (response) {
+                alert(response.message);
+                if (response.success) {
+                    loadExternalRateData(personId);
+                }
+            }
+        });
+    }
+</script>
+}
+
+<style>
+    .person-result { cursor: pointer; padding: 5px; }
+    .person-result:hover { background-color: #eee; }
+    .person-result.active { background-color: #4c87c6; }
+    #searchResults { max-height: 200px; overflow-y: auto; display: none; }
+    .card-detail-label, .card-title { font-weight: bold; }
+</style>

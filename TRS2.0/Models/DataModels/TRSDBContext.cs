@@ -76,6 +76,8 @@ public partial class TRSDBContext : IdentityDbContext<ApplicationUser>
 
     public DbSet<PersonRate> PersonRates { get; set; }
 
+    public DbSet<PersonManualRate> PersonManualRates { get; set; }
+
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -214,6 +216,20 @@ public partial class TRSDBContext : IdentityDbContext<ApplicationUser>
             .WithMany(l => l.Liqdayxprojects) // Asume que Liquidation tiene una propiedad de navegación hacia Liqdayxprojects, especifícala aquí
             .HasForeignKey(l => l.LiqId)
             .OnDelete(DeleteBehavior.NoAction); // Esto previene la eliminación en cascada
+
+
+        modelBuilder.Entity<PersonManualRate>(entity =>
+        {
+            entity.HasOne(e => e.Personnel)
+                .WithMany()
+                .HasForeignKey(e => e.PersonId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Affiliation)
+                .WithMany()
+                .HasForeignKey(e => e.AffId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
 
         // Configuración para Timesheet
         modelBuilder.Entity<Timesheet>().HasKey(t => new { t.WpxPersonId, t.Day }); // Clave compuesta

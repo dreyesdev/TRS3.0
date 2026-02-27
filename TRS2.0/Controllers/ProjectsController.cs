@@ -2475,26 +2475,22 @@ namespace TRS2._0.Controllers
             var periodStart = vm.ReportPeriod.StartDate.Date;
             var periodEnd = vm.ReportPeriod.EndDate.Date;
 
-            // ============================================================
-            // 1) Cargar TODOS los PersonRates de estas personas,
-            //    sin limitar por fecha del periodo.
-            //    Necesitamos también los rates históricos para poder
-            //    usar el "último rate conocido" en años futuros.
-            // ============================================================
             var rates = await _context.PersonRates
+                .Where(r => personIds.Contains(r.PersonId))
+                .ToListAsync();
+
+            var manualRates = await _context.PersonManualRates
                 .Where(r => personIds.Contains(r.PersonId))
                 .ToListAsync();
 
             var ratesByPerson = rates
                 .GroupBy(r => r.PersonId)
-                .ToDictionary(
-                    g => g.Key,
-                    g => g.OrderBy(x => x.StartDate).ToList()
-                );
+                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.StartDate).Select(MapRateSlice).ToList());
 
-            // ============================================================
-            // 2) Effort (PM) de ESTE proyecto por persona/mes a partir de Perseffort
-            // ============================================================
+            var manualRatesByPerson = manualRates
+                .GroupBy(r => r.PersonId)
+                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.StartDate).Select(MapManualRateSlice).ToList());
+
             var wpxForProject = await _context.Wps
                 .Where(wp => wp.ProjId == vm.ProjectId)
                 .SelectMany(wp => wp.Wpxpeople)
@@ -2509,39 +2505,24 @@ namespace TRS2._0.Controllers
                 var wpxToPerson = wpxForProject.ToDictionary(w => w.Id, w => w.Person);
 
                 var efforts = await _context.Persefforts
-                    .Where(pe => wpxIds.Contains(pe.WpxPerson) &&
-                                 pe.Month >= periodStart &&
-                                 pe.Month <= periodEnd)
+                    .Where(pe => wpxIds.Contains(pe.WpxPerson) && pe.Month >= periodStart && pe.Month <= periodEnd)
                     .ToListAsync();
 
                 effortByPersonMonth = efforts
-                    .GroupBy(pe => new
-                    {
-                        PersonId = wpxToPerson[pe.WpxPerson],
-                        Month = new DateTime(pe.Month.Year, pe.Month.Month, 1)
-                    })
-                    .ToDictionary(
-                        g => (g.Key.PersonId, g.Key.Month),
-                        g => g.Sum(x => x.Value)          // Value = PM en ese proyecto/mes
-                    );
+                    .GroupBy(pe => new { PersonId = wpxToPerson[pe.WpxPerson], Month = new DateTime(pe.Month.Year, pe.Month.Month, 1) })
+                    .ToDictionary(g => (g.Key.PersonId, g.Key.Month), g => g.Sum(x => x.Value));
             }
 
-            // ============================================================
-            // 3) Cálculo del coste por persona/mes ajustado por PM del proyecto,
-            //    usando último rate conocido para periodos out-of-contract,
-            //    incluso si el mes está MÁS ALLÁ del último PersonRate.
-            // ============================================================
             foreach (var person in vm.Persons)
             {
-                if (!vm.MonthlyCostsByPerson.TryGetValue(person.Id, out var personDict) ||
-                    personDict == null)
+                if (!vm.MonthlyCostsByPerson.TryGetValue(person.Id, out var personDict) || personDict == null)
                     continue;
 
-                // Rates de esta persona (si no tiene ninguno, no hay nada que hacer)
-                if (!ratesByPerson.TryGetValue(person.Id, out var personRates) ||
-                    personRates == null || !personRates.Any())
+                var autoRates = ratesByPerson.TryGetValue(person.Id, out var personRates) ? personRates : new List<RateSlice>();
+                var manualPersonRates = manualRatesByPerson.TryGetValue(person.Id, out var personManualRates) ? personManualRates : new List<RateSlice>();
+
+                if (!autoRates.Any() && !manualPersonRates.Any())
                 {
-                    // Sin historial de rates -> no podemos calcular coste
                     foreach (var monthStart in vm.Months)
                     {
                         personDict[monthStart] = 0m;
@@ -2549,89 +2530,22 @@ namespace TRS2._0.Controllers
                     continue;
                 }
 
-                // Aseguramos que estén ordenados por fecha de inicio
-                personRates = personRates.OrderBy(r => r.StartDate).ToList();
-
                 foreach (var monthStart in vm.Months)
                 {
-                    // PM de esa persona en ESTE proyecto y MES
-                    if (!effortByPersonMonth.TryGetValue((person.Id, monthStart), out var pmForMonth) ||
-                        pmForMonth <= 0m)
+                    if (!effortByPersonMonth.TryGetValue((person.Id, monthStart), out var pmForMonth) || pmForMonth <= 0m)
                     {
-                        // Tiene 0 PM en este proyecto este mes → coste 0.
                         personDict[monthStart] = 0m;
                         continue;
                     }
 
-                    var monthEnd = new DateTime(
-                        monthStart.Year,
-                        monthStart.Month,
-                        DateTime.DaysInMonth(monthStart.Year, monthStart.Month));
+                    var monthEnd = new DateTime(monthStart.Year, monthStart.Month, DateTime.DaysInMonth(monthStart.Year, monthStart.Month));
+                    var applicableSegments = BuildApplicableRateSegments(monthStart, monthEnd, autoRates, manualPersonRates);
 
-                    // Rates que tocan este mes (contrato activo en ese mes)
-                    var applicable = personRates
-                        .Where(r => r.EndDate >= monthStart &&
-                                    r.StartDate <= monthEnd)
-                        .ToList();
-
-                    // Si no hay ningún rate en este mes, pero la persona tiene historial,
-                    // estamos en un "out of contract" con effort asignado.
-                    // Usamos el último rate conocido (último contrato) como indica el documento.
-                    if (!applicable.Any())
-                    {
-                        var lastBefore = personRates
-                            .Where(r => r.EndDate < monthStart)
-                            .OrderByDescending(r => r.EndDate)
-                            .FirstOrDefault();
-
-                        if (lastBefore != null)
-                        {
-                            applicable.Add(lastBefore);
-                        }
-                    }
-
-                    if (!applicable.Any())
-                    {
-                        // No hay ningún rate ni previo ni solapado → no sabemos coste,
-                        // por seguridad lo dejamos a 0.
-                        personDict[monthStart] = 0m;
-                        continue;
-                    }
-
-                    // Coste mensual "full PM" para este mes, antes de aplicar el effort del proyecto
                     decimal fullMonthCost;
-
-                    if (applicable.Count == 1)
+                    if (applicableSegments.Any())
                     {
-                        // Caso sencillo: un único rate (o el último previo extendido)
-                        var r = applicable[0];
-                        var hoursPerMonth = r.AnnualHours / 12m;
-                        fullMonthCost = hoursPerMonth * r.HourlyRate;
-                    }
-                    else
-                    {
-                        // Varios rates en el mismo mes (cambio de contrato/afiliación).
-                        // Promedio ponderado por días naturales dentro del mes.
-                        var segments = new List<(PersonRate Rate, int Days)>();
-                        int totalDays = 0;
-
-                        foreach (var r in applicable)
-                        {
-                            var segStart = r.StartDate < monthStart ? monthStart : r.StartDate;
-                            var segEnd = r.EndDate > monthEnd ? monthEnd : r.EndDate;
-
-                            if (segStart > segEnd)
-                                continue;
-
-                            int days = (segEnd.Date - segStart.Date).Days + 1;
-                            if (days <= 0)
-                                continue;
-
-                            segments.Add((r, days));
-                            totalDays += days;
-                        }
-
-                        if (totalDays == 0)
+                        var totalDays = applicableSegments.Sum(sg => sg.Days);
+                        if (totalDays <= 0)
                         {
                             personDict[monthStart] = 0m;
                             continue;
@@ -2640,21 +2554,34 @@ namespace TRS2._0.Controllers
                         decimal weightedMonthlyHours = 0m;
                         decimal weightedRate = 0m;
 
-                        foreach (var seg in segments)
+                        foreach (var seg in applicableSegments)
                         {
                             var weight = (decimal)seg.Days / totalDays;
-                            var hoursMonthSegment = seg.Rate.AnnualHours / 12m;
-
+                            var hoursMonthSegment = seg.AnnualHours / 12m;
                             weightedMonthlyHours += hoursMonthSegment * weight;
-                            weightedRate += seg.Rate.HourlyRate * weight;
+                            weightedRate += seg.HourlyRate * weight;
                         }
 
                         fullMonthCost = weightedMonthlyHours * weightedRate;
                     }
+                    else
+                    {
+                        var fallback = manualPersonRates
+                            .Concat(autoRates)
+                            .Where(r => r.EndDate < monthStart)
+                            .OrderByDescending(r => r.EndDate)
+                            .FirstOrDefault();
 
-                    // Ajuste por PM del proyecto en ese mes
+                        if (fallback == null)
+                        {
+                            personDict[monthStart] = 0m;
+                            continue;
+                        }
+
+                        fullMonthCost = (fallback.AnnualHours / 12m) * fallback.HourlyRate;
+                    }
+
                     var finalCost = fullMonthCost * pmForMonth;
-
                     personDict[monthStart] = Math.Round(finalCost, 2);
                 }
             }
@@ -2663,16 +2590,21 @@ namespace TRS2._0.Controllers
 
 
 
-
-        /// <summary>
+        
+/// <summary>
         /// Rellena vm.MonthlyCostsByPerson en modo TIMESHEET (Fase 3).
         /// </summary>
         private async Task FillTimesheetRatesAsync(PeriodRatesGridViewModel vm)
         {
             var personIds = vm.Persons.Select(p => p.Id).ToList();
 
-            // Rates para el rango completo del periodo
             var rates = await _context.PersonRates
+                .Where(r => personIds.Contains(r.PersonId) &&
+                            r.EndDate >= vm.ReportPeriod.StartDate &&
+                            r.StartDate <= vm.ReportPeriod.EndDate)
+                .ToListAsync();
+
+            var manualRates = await _context.PersonManualRates
                 .Where(r => personIds.Contains(r.PersonId) &&
                             r.EndDate >= vm.ReportPeriod.StartDate &&
                             r.StartDate <= vm.ReportPeriod.EndDate)
@@ -2680,9 +2612,12 @@ namespace TRS2._0.Controllers
 
             var ratesByPerson = rates
                 .GroupBy(r => r.PersonId)
-                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.StartDate).ToList());
+                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.StartDate).Select(MapRateSlice).ToList());
 
-            // WpxPersonIds del proyecto
+            var manualRatesByPerson = manualRates
+                .GroupBy(r => r.PersonId)
+                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.StartDate).Select(MapManualRateSlice).ToList());
+
             var wpxPersonIdsForProject = await _context.Wps
                 .Where(wp => wp.ProjId == vm.ProjectId)
                 .SelectMany(wp => wp.Wpxpeople.Select(wpx => wpx.Id))
@@ -2691,7 +2626,6 @@ namespace TRS2._0.Controllers
             if (!wpxPersonIdsForProject.Any())
                 return;
 
-            // Timesheets para ese proyecto y periodo
             var timesheets = await _context.Timesheets
                 .Where(t => wpxPersonIdsForProject.Contains(t.WpxPersonId) &&
                             t.Day >= vm.ReportPeriod.StartDate &&
@@ -2699,7 +2633,6 @@ namespace TRS2._0.Controllers
                 .Include(t => t.WpxPersonNavigation)
                 .ToListAsync();
 
-            // Agrupamos timesheets por persona
             var tsByPerson = timesheets
                 .GroupBy(t => t.WpxPersonNavigation.Person)
                 .ToDictionary(g => g.Key, g => g.ToList());
@@ -2711,9 +2644,13 @@ namespace TRS2._0.Controllers
                 if (!tsByPerson.TryGetValue(person.Id, out var personTs))
                     continue;
 
-                // Si no hay rates para esa persona, no podemos calcular coste
-                if (!ratesByPerson.TryGetValue(person.Id, out var personRates))
-                    continue;
+                var personRates = ratesByPerson.TryGetValue(person.Id, out var autoRates)
+                    ? autoRates
+                    : new List<RateSlice>();
+
+                var personManualRates = manualRatesByPerson.TryGetValue(person.Id, out var manualPersonRates)
+                    ? manualPersonRates
+                    : new List<RateSlice>();
 
                 foreach (var ts in personTs)
                 {
@@ -2721,11 +2658,10 @@ namespace TRS2._0.Controllers
                     var monthStart = new DateTime(day.Year, day.Month, 1);
 
                     if (!personDict.ContainsKey(monthStart))
-                        continue; // Fuera del rango de meses del periodo
+                        continue;
 
-                    // Rate aplicable ese día
-                    var rate = personRates
-                        .FirstOrDefault(r => r.StartDate <= day && r.EndDate >= day);
+                    var rate = personManualRates.FirstOrDefault(r => r.StartDate <= day && r.EndDate >= day)
+                               ?? personRates.FirstOrDefault(r => r.StartDate <= day && r.EndDate >= day);
 
                     if (rate == null)
                         continue;
@@ -2734,17 +2670,141 @@ namespace TRS2._0.Controllers
                     personDict[monthStart] += dailyCost;
                 }
 
-                // Redondeo final por mes
                 var keys = personDict.Keys.ToList();
                 foreach (var key in keys)
                 {
                     personDict[key] = Math.Round(personDict[key], 2);
                 }
             }
-
-
         }
 
+        private static RateSlice MapRateSlice(PersonRate rate)
+        {
+            return new RateSlice
+            {
+                StartDate = rate.StartDate,
+                EndDate = rate.EndDate,
+                AnnualHours = rate.AnnualHours,
+                HourlyRate = rate.HourlyRate
+            };
+        }
+
+        private static RateSlice MapManualRateSlice(PersonManualRate rate)
+        {
+            return new RateSlice
+            {
+                StartDate = rate.StartDate,
+                EndDate = rate.EndDate,
+                AnnualHours = rate.AnnualHours,
+                HourlyRate = rate.HourlyRate
+            };
+        }
+
+        private static List<RateSegment> BuildApplicableRateSegments(
+            DateTime monthStart,
+            DateTime monthEnd,
+            List<RateSlice> autoRates,
+            List<RateSlice> manualRates)
+        {
+            var segments = new List<RateSegment>();
+
+            var manualIntervals = manualRates
+                .Select(r => new { r, Start = MaxDate(r.StartDate, monthStart), End = MinDate(r.EndDate, monthEnd) })
+                .Where(x => x.Start <= x.End)
+                .ToList();
+
+            foreach (var mi in manualIntervals)
+            {
+                segments.Add(new RateSegment
+                {
+                    Days = (mi.End - mi.Start).Days + 1,
+                    AnnualHours = mi.r.AnnualHours,
+                    HourlyRate = mi.r.HourlyRate
+                });
+            }
+
+            foreach (var ar in autoRates)
+            {
+                var start = MaxDate(ar.StartDate, monthStart);
+                var end = MinDate(ar.EndDate, monthEnd);
+                if (start > end)
+                    continue;
+
+                var remaining = new List<(DateTime Start, DateTime End)> { (start, end) };
+
+                foreach (var mi in manualIntervals)
+                {
+                    remaining = remaining
+                        .SelectMany(rng => SubtractInterval(rng.Start, rng.End, mi.Start, mi.End))
+                        .ToList();
+
+                    if (!remaining.Any())
+                        break;
+                }
+
+                foreach (var rng in remaining)
+                {
+                    segments.Add(new RateSegment
+                    {
+                        Days = (rng.End - rng.Start).Days + 1,
+                        AnnualHours = ar.AnnualHours,
+                        HourlyRate = ar.HourlyRate
+                    });
+                }
+            }
+
+            return segments.Where(s => s.Days > 0).ToList();
+        }
+
+        private static IEnumerable<(DateTime Start, DateTime End)> SubtractInterval(
+            DateTime baseStart,
+            DateTime baseEnd,
+            DateTime cutStart,
+            DateTime cutEnd)
+        {
+            if (cutEnd < baseStart || cutStart > baseEnd)
+            {
+                yield return (baseStart, baseEnd);
+                yield break;
+            }
+
+            if (cutStart <= baseStart && cutEnd >= baseEnd)
+            {
+                yield break;
+            }
+
+            if (cutStart > baseStart)
+            {
+                var leftEnd = cutStart.AddDays(-1);
+                if (leftEnd >= baseStart)
+                    yield return (baseStart, leftEnd);
+            }
+
+            if (cutEnd < baseEnd)
+            {
+                var rightStart = cutEnd.AddDays(1);
+                if (rightStart <= baseEnd)
+                    yield return (rightStart, baseEnd);
+            }
+        }
+
+        private static DateTime MaxDate(DateTime a, DateTime b) => a > b ? a : b;
+        private static DateTime MinDate(DateTime a, DateTime b) => a < b ? a : b;
+
+        private class RateSlice
+        {
+            public DateTime StartDate { get; set; }
+            public DateTime EndDate { get; set; }
+            public decimal AnnualHours { get; set; }
+            public decimal HourlyRate { get; set; }
+        }
+
+        private class RateSegment
+        {
+            public int Days { get; set; }
+            public decimal AnnualHours { get; set; }
+            public decimal HourlyRate { get; set; }
+        }
 
         public class ExportRequest
         {
