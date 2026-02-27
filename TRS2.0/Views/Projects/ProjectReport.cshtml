@@ -296,6 +296,26 @@
                             </button>
                         </div>
                         <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportDeclaredHoursPerWpBtn" onclick="exportDeclaredHoursPerWpToCSV()" style="display:none;">
+                                Export Declared Hours per WP
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportEstimatedHoursPerWpBtn" onclick="exportEstimatedHoursPerWpToCSV()" style="display:none;">
+                                Export Estimated Hours per WP
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportWorkedDaysPerWpBtn" onclick="exportWorkedDaysPerWpToCSV()" style="display:none;">
+                                Export Worked Days per WP
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-success btn-block btn-smaller-text" id="exportEstimatedWorkedDaysPerWpBtn" onclick="exportEstimatedWorkedDaysPerWpToCSV()" style="display:none;">
+                                Export Estimated Days per WP
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
                             <button type="button"
                                     class="btn btn-success btn-block btn-smaller-text"
                                     id="exportEstimatedDaysBtn"
@@ -355,16 +375,73 @@
 <script>
       // Helper para limpiar textos de celdas (quita botones/etiquetas UI)
     function cleanCellText(col) {
-        // Texto plano sin saltos
-        let txt = col.innerText.replace(/(\r\n|\n|\r)/gm, ' ').trim();
+        let txt = (col.innerText || '').replace(/(\r\n|\n|\r)/gm, ' ').trim();
 
-        // Quitar etiquetas/botones habituales
         txt = txt
-          .replace(/\b(Lock All|Reopen All|Lock|Reopen|Timesheet)\b/gi, '')
-          .replace(/\s{2,}/g, ' ') // espacios dobles
+          .replace(/\b(Lock All|Reopen All|Lock|Reopen|Timesheet|Actions|Bloquear|Desbloquear|Download Timesheets|Lock Selected|Reopen Selected)\b/gi, '')
+          .replace(/\b(I:|R:|✔|✖)\b/g, '')
+          .replace(/\s{2,}/g, ' ')
           .trim();
 
         return txt;
+    }
+
+    function getExportNameCellText(col) {
+        const exportName = col.getAttribute('data-export-name');
+        const exportLabel = col.getAttribute('data-export-label');
+        if (exportName) return exportName;
+        if (exportLabel) return exportLabel;
+
+        return cleanCellText(col);
+    }
+
+    function getDefaultExportCellText(col, colIdx) {
+        if (colIdx === 0) {
+            return getExportNameCellText(col);
+        }
+
+        return cleanCellText(col);
+    }
+
+    function csvEscape(value) {
+        const text = value == null ? '' : String(value);
+        if (text.includes(';') || text.includes('"') || text.includes('\n') || text.includes('\r')) {
+            return '"' + text.replace(/"/g, '""') + '"';
+        }
+        return text;
+    }
+
+    function downloadCsvRows(fileName, rows) {
+        const csv = rows.map(row => row.map(csvEscape).join(';')).join('\r\n');
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        window.URL.revokeObjectURL(url);
+    }
+
+    function buildPeriodExportRows(cellValueSelector) {
+        const rows = [];
+        const tableRows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+
+        tableRows.forEach(function (row) {
+            const cols = row.querySelectorAll('th, td');
+            const rowData = [];
+
+            cols.forEach(function (col, colIdx) {
+                rowData.push(cellValueSelector(col, colIdx));
+            });
+
+            rows.push(rowData);
+        });
+
+        return rows;
     }
 
 
@@ -534,6 +611,10 @@
                     $('#exportPMSforWPToCSVBtn').show();
                     $('#exportWorkedDaysBtn').show();
                     $('#exportEstimatedDaysBtn').show();
+                    $('#exportDeclaredHoursPerWpBtn').show();
+                    $('#exportEstimatedHoursPerWpBtn').show();
+                    $('#exportWorkedDaysPerWpBtn').show();
+                    $('#exportEstimatedWorkedDaysPerWpBtn').show();
 
                     // Guardar fechas del periodo seleccionado
                     $('#exportPMSforWPToCSV').data('start-date', startDate);
@@ -603,127 +684,67 @@
 
     function exportHoursToCSV() {
         runClientExportWithOverlay(function () {
-            var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-            var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+            const rows = buildPeriodExportRows(function (col, colIdx) {
+                const declaredHours = col.getAttribute('data-declared-hours');
+                const hoursInProject = col.getAttribute('data-hours-in-project');
 
-            rows.forEach(function (row) {
-                var cols = row.querySelectorAll('th, td');
-                var rowData = [];
-                cols.forEach(function (col) {
-                    var declaredHours = col.getAttribute('data-declared-hours');
-                    var hoursInProject = col.getAttribute('data-hours-in-project');
-                    if (declaredHours && hoursInProject) {
-                        rowData.push(`${declaredHours.replace('.', ',')} | ${hoursInProject.replace('.', ',')}`);
-                    } else {
-                        rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
-                    }
-                });
-                csvContent += rowData.join(";") + "\r\n";
+                if (declaredHours && hoursInProject) {
+                    return `${declaredHours.replace('.', ',')} | ${hoursInProject.replace('.', ',')}`;
+                }
+
+                return getDefaultExportCellText(col, colIdx);
             });
 
-            var encodedUri = encodeURI(csvContent);
-            var link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "horas_periodo.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            downloadCsvRows('horas_periodo.csv', rows);
         });
     }
 
       function exportDeclaredHoursToCSV() {
         runClientExportWithOverlay(function () {
-            var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-            var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+            const rows = buildPeriodExportRows(function (col, colIdx) {
+                const declaredHours = col.getAttribute('data-declared-hours');
 
-            rows.forEach(function (row) {
-                var cols = row.querySelectorAll('th, td');
-                var rowData = [];
-                cols.forEach(function (col, colIdx) {
-                    var declaredHours = col.getAttribute('data-declared-hours');
+                if (declaredHours) {
+                    return declaredHours.replace('.', ',');
+                }
 
-                    if (declaredHours) {
-                        // Si hay atributo con el dato limpio, úsalo
-                        rowData.push(declaredHours.replace('.', ','));
-                    } else {
-                        // Si no, limpiamos el texto de la celda (quitando Lock/Reopen/etc.)
-                        var txt = cleanCellText(col);
-
-                        // Si quieres, limita la primera columna a “Nombre Apellidos” sin más adornos:
-                        // if (colIdx === 0) { ... }  // opcional si en la primera columna es donde salen esos botones
-
-                        rowData.push(txt.replace('.', ','));
-                    }
-                });
-                csvContent += rowData.join(";") + "\r\n";
+                return getDefaultExportCellText(col, colIdx);
             });
 
-            var encodedUri = encodeURI(csvContent);
-            var link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "horas_declaradas.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            downloadCsvRows('horas_declaradas.csv', rows);
         });
     }
 
     function exportEstimatedHoursToCSV() {
         runClientExportWithOverlay(function () {
-            var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-            var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+            const rows = buildPeriodExportRows(function (col, colIdx) {
+                const hoursInProject = col.getAttribute('data-hours-in-project');
 
-            rows.forEach(function (row) {
-                var cols = row.querySelectorAll('th, td');
-                var rowData = [];
-                cols.forEach(function (col) {
-                    var hoursInProject = col.getAttribute('data-hours-in-project');
-                    if (hoursInProject) {
-                        rowData.push(hoursInProject.replace('.', ','));
-                    } else {
-                        rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
-                    }
-                });
-                csvContent += rowData.join(";") + "\r\n";
+                if (hoursInProject) {
+                    return hoursInProject.replace('.', ',');
+                }
+
+                return getDefaultExportCellText(col, colIdx);
             });
 
-            var encodedUri = encodeURI(csvContent);
-            var link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "horas_estimadas.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            downloadCsvRows('horas_estimadas.csv', rows);
         });
     }
 
 
     function exportPMsToCSV() {
         runClientExportWithOverlay(function () {
-            var csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-            var rows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+            const rows = buildPeriodExportRows(function (col, colIdx) {
+                const totalEffort = col.getAttribute('data-total-effort');
 
-            rows.forEach(function (row) {
-                var cols = row.querySelectorAll('th, td');
-                var rowData = [];
-                cols.forEach(function (col) {
-                    var totalEffort = col.getAttribute('data-total-effort');
-                    if (totalEffort) {
-                        rowData.push(totalEffort.replace('.', ','));
-                    } else {
-                        rowData.push(col.innerText.replace(/(\r\n|\n|\r)/gm, "").trim().replace('.', ','));
-                    }
-                });
-                csvContent += rowData.join(";") + "\r\n";
+                if (totalEffort) {
+                    return totalEffort.replace('.', ',');
+                }
+
+                return getDefaultExportCellText(col, colIdx);
             });
 
-            var encodedUri = encodeURI(csvContent);
-            var link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "PMs_periodo.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            downloadCsvRows('PMs_periodo.csv', rows);
         });
     }
 
@@ -949,6 +970,62 @@
             hideAuditPmsLoadingOverlay(false);
             console.error('Error exporting Estimated Worked Days:', error);
             alert('Error exporting Estimated Worked Days. Please try again.');
+        });
+    }
+
+    function exportDeclaredHoursPerWpToCSV() {
+        exportPerWpWithServerEndpoint('@Url.Action("ExportDeclaredHoursPerWPToCSV", "Projects")', 'DeclaredHoursPerWP');
+    }
+
+    function exportEstimatedHoursPerWpToCSV() {
+        exportPerWpWithServerEndpoint('@Url.Action("ExportEstimatedHoursPerWPToCSV", "Projects")', 'EstimatedHoursPerWP');
+    }
+
+    function exportWorkedDaysPerWpToCSV() {
+        exportPerWpWithServerEndpoint('@Url.Action("ExportWorkedDaysPerWPToCSV", "Projects")', 'WorkedDaysPerWP');
+    }
+
+    function exportEstimatedWorkedDaysPerWpToCSV() {
+        exportPerWpWithServerEndpoint('@Url.Action("ExportEstimatedWorkedDaysPerWPToCSV", "Projects")', 'EstimatedWorkedDaysPerWP');
+    }
+
+    function exportPerWpWithServerEndpoint(endpointUrl, baseFileName) {
+        var projectId = @ViewBag.projId;
+        var startDate = $('#exportPMSforWPToCSV').data('start-date');
+        var endDate = $('#exportPMSforWPToCSV').data('end-date');
+
+        var startDateISO = new Date(startDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+        var endDateISO = new Date(endDate.split('-').reverse().join('-')).toISOString().split('T')[0];
+
+        showAuditPmsLoadingOverlay();
+
+        fetch(endpointUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ProjectId: projectId,
+                StartDate: startDateISO,
+                EndDate: endDateISO
+            })
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.blob();
+        })
+        .then(blob => {
+            var url = window.URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = `${baseFileName}_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            hideAuditPmsLoadingOverlay(true);
+        })
+        .catch(error => {
+            hideAuditPmsLoadingOverlay(false);
+            console.error(`Error exporting ${baseFileName}:`, error);
+            alert(`Error exporting ${baseFileName}. Please try again.`);
         });
     }
 
