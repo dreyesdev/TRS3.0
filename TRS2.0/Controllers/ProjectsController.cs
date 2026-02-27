@@ -2307,6 +2307,50 @@ namespace TRS2._0.Controllers
             return File(bytes, "text/csv", $"{filePrefix}_{projectId}_{DateTime.Now:yyyyMMdd}.csv");
         }
 
+        private async Task<(decimal? EffectiveDailyHours, decimal? BaseDailyHours, decimal ReducUsed)>
+            GetEffectiveDailyHoursForMonthAsync(int personId, DateTime monthStart, DateTime monthEnd)
+        {
+            var affIds = await _context.AffxPersons
+                .Where(a => a.PersonId == personId && a.Start <= monthEnd && a.End >= monthStart)
+                .Select(a => a.AffId)
+                .Distinct()
+                .ToListAsync();
+
+            if (!affIds.Any())
+                return (null, null, 0m);
+
+            var baseCandidates = await _context.AffHours
+                .Where(ah => affIds.Contains(ah.AffId) &&
+                             ah.StartDate <= monthEnd &&
+                             ah.EndDate >= monthStart &&
+                             ah.Hours > 0)
+                .Select(ah => ah.Hours)
+                .ToListAsync();
+
+            if (!baseCandidates.Any())
+                return (null, null, 0m);
+
+            var baseDailyHours = baseCandidates.Min();
+
+            var dedication = await _context.Dedications
+                .Where(d => d.PersId == personId && d.Start <= monthEnd && d.End >= monthStart)
+                .OrderByDescending(d => d.Type)
+                .ThenByDescending(d => d.Start)
+                .FirstOrDefaultAsync();
+
+            var reduc = dedication?.Reduc ?? 0m;
+            var factor = 1m - reduc;
+            if (factor < 0m) factor = 0m;
+            if (factor > 1m) factor = 1m;
+
+            var effectiveDailyHours = Math.Round(baseDailyHours * factor, 1, MidpointRounding.AwayFromZero);
+
+            if (effectiveDailyHours <= 0m)
+                return (null, baseDailyHours, reduc);
+
+            return (effectiveDailyHours, baseDailyHours, reduc);
+        }
+
         private string RemoveAccents(string text)
         {
             return string.Concat(text.Normalize(NormalizationForm.FormD)
