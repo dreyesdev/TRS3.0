@@ -4,11 +4,14 @@
     ViewData["Title"] = "Admin Dashboard";
 }
 
-<h1 class="text-center my-4">Admin Dashboard</h1>
+<div class="admin-page-hero">
+    <h1 class="admin-page-title">Admin Dashboard</h1>
+    <p class="admin-page-subtitle">Control centralizado de procesos, usuarios y operaciones de mantenimiento.</p>
+</div>
 
-<div class="container">
+<div class="container admin-dashboard">
 
-    <form asp-action="RunDataLoadNow" asp-controller="Admin" method="post">
+    <form asp-action="RunDataLoadNow" asp-controller="Admin" method="post" class="admin-top-action">
         <button type="submit" class="btn btn-primary">
             <i class="fas fa-play"></i> Ejecutar Carga Ahora
         </button>
@@ -78,28 +81,33 @@
         </div>
     </div>
 
-    <h3>Reset User Password</h3>
+    <div class="card mb-4 admin-section-card">
+        <div class="card-header">
+            <h4 class="mb-0">Reset User Password</h4>
+        </div>
+        <div class="card-body">
+            <div class="mb-2 d-flex flex-column flex-md-row gap-2 align-items-md-center">
+                <input type="text" class="form-control" id="userSearchBox" placeholder="Buscar usuario por nombre..." oninput="filterUserSelect()" />
+                <select name="userId" id="userSelect" class="form-control">
+                    @foreach (var user in Model.Users.OrderBy(u => u.Text))
+                    {
+                        <option value="@user.Value">@user.Text</option>
+                    }
+                </select>
+            </div>
 
-    <div class="mb-2 d-flex flex-column flex-md-row gap-2 align-items-md-center">
-        <input type="text" class="form-control" id="userSearchBox" placeholder="Buscar usuario por nombre..." oninput="filterUserSelect()" />
-        <select name="userId" id="userSelect" class="form-control">
-            @foreach (var user in Model.Users.OrderBy(u => u.Text))
-            {
-                <option value="@user.Value">@user.Text</option>
-            }
-        </select>
-    </div>
+            <button type="submit" form="resetPasswordForm" class="btn btn-warning">Reset Password</button>
 
-    <button type="submit" form="resetPasswordForm" class="btn btn-warning">Reset Password</button>
+            <form id="resetPasswordForm"></form>
 
-    <form id="resetPasswordForm"></form>
-
-    <div id="resetResult" class="mt-2 text-info"></div>
-    <div id="passwordContainer" class="mt-2" style="display: none;">
-        <label><strong>New password:</strong></label>
-        <div class="input-group">
-            <input type="text" id="generatedPassword" class="form-control" readonly>
-            <button class="btn btn-outline-secondary" type="button" onclick="copyPassword()">📋 Copy</button>
+            <div id="resetResult" class="mt-2 text-info"></div>
+            <div id="passwordContainer" class="mt-2" style="display: none;">
+                <label><strong>New password:</strong></label>
+                <div class="input-group">
+                    <input type="text" id="generatedPassword" class="form-control" readonly>
+                    <button class="btn btn-outline-secondary" type="button" onclick="copyPassword()">📋 Copy</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -327,33 +335,39 @@
 
 
     <!-- Séptima fila: Ajuste de Esfuerzo -->
-    <div class="container">
-        <h3 class="text-center">Ajuste de Esfuerzo</h3>
-        <form id="effort-adjustment-form">
-            <div class="form-group">
-                <label for="project-select">Proyecto:</label>
-                <select id="project-select" class="form-control" onchange="loadWorkPackages()">
-                    <option value="">Seleccione un proyecto</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="wp-select">Paquete de Trabajo:</label>
-                <select id="wp-select" class="form-control" onchange="loadPersons()" disabled>
-                    <option value="">Seleccione un paquete de trabajo</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="person-select">Persona:</label>
-                <select id="person-select" class="form-control" disabled>
-                    <option value="">Seleccione una persona</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="month-input">Mes:</label>
-                <input type="month" id="month-input" class="form-control" />
-            </div>
-            <button type="button" class="btn btn-primary" onclick="adjustEffort()">Ajustar Esfuerzo</button>
-        </form>
+    <div class="card mb-4 admin-section-card">
+        <div class="card-header">
+            <h4 class="mb-0">Ajuste de Esfuerzo</h4>
+        </div>
+        <div class="card-body">
+            <form id="effort-adjustment-form" class="row g-3">
+                <div class="col-md-6">
+                    <label for="project-select" class="form-label">Proyecto:</label>
+                    <select id="project-select" class="form-control" onchange="loadWorkPackages()">
+                        <option value="">Seleccione un proyecto</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="wp-select" class="form-label">Paquete de Trabajo:</label>
+                    <select id="wp-select" class="form-control" onchange="loadPersons()" disabled>
+                        <option value="">Seleccione un paquete de trabajo</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="person-select" class="form-label">Persona:</label>
+                    <select id="person-select" class="form-control" disabled>
+                        <option value="">Seleccione una persona</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="month-input" class="form-label">Mes:</label>
+                    <input type="month" id="month-input" class="form-control" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="button" class="btn btn-primary w-100" onclick="adjustEffort()">Ajustar</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Octava fila: Ajustar Timesheets por Rango de Fechas -->
@@ -440,9 +454,8 @@
             </div>
         </div>
     </div>
-</div>
 
-    <div class="card mb-4">
+    <div class="card mb-4 admin-section-card">
         <div class="card-header bg-danger text-white">
             <h4>Prueba de Envío de Recordatorio Timesheet (Prueba individual por correo)</h4>
         </div>
@@ -468,6 +481,98 @@
         </div>
     </div>
 
+</div>
+
+<style>
+    .admin-page-hero {
+        text-align: center;
+        margin: 14px 0 18px;
+        padding: 14px 18px;
+        border: 1px solid #d7e6f3;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #0e4f86 0%, #1b6dac 100%);
+        color: #fff;
+        box-shadow: 0 10px 24px rgba(11, 53, 92, .18);
+    }
+
+    .admin-page-title {
+        margin: 0;
+        font-weight: 700;
+    }
+
+    .admin-page-subtitle {
+        margin: 6px 0 0;
+        opacity: .95;
+    }
+
+    .admin-dashboard .card {
+        border: 1px solid #d7e6f3;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(14, 57, 98, 0.08);
+        overflow: hidden;
+    }
+
+    .admin-dashboard .card-header {
+        background: linear-gradient(180deg, #154f82 0%, #0f3f6a 100%) !important;
+        color: #fff !important;
+        border-bottom: 0;
+        padding: .8rem 1rem;
+    }
+
+    .admin-dashboard .card-header h4 {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 700;
+    }
+
+    .admin-top-action {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 12px;
+    }
+
+    .admin-top-action .btn {
+        border-radius: 10px;
+        box-shadow: 0 5px 14px rgba(27,110,194,.25);
+    }
+
+    .admin-dashboard h3 {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #114b7f;
+        margin-bottom: .8rem;
+    }
+
+    #logContent {
+        border: 1px solid #d9e3ee !important;
+        border-radius: 10px;
+        background: #f7fbff !important;
+    }
+
+    #fixRolesForm {
+        margin-bottom: 8px;
+    }
+
+    #fixRolesForm .btn {
+        border-radius: 10px;
+    }
+
+    .admin-dashboard .table thead th {
+        background: #123f68;
+        color: #fff;
+        vertical-align: middle;
+    }
+
+    @@media (max-width: 768px) {
+        .admin-top-action {
+            justify-content: stretch;
+        }
+
+        .admin-top-action .btn {
+            width: 100%;
+        }
+    }
+</style>
 
 @section Scripts {
     <script>
