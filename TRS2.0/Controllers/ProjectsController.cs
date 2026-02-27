@@ -2231,6 +2231,82 @@ namespace TRS2._0.Controllers
         }
         
         
+
+        private async Task<IActionResult> ExportWpBreakdownCsv(
+            ExportRequest model,
+            string filePrefix,
+            Func<int, int, DateTime, DateTime, Task<decimal>> valueSelector)
+        {
+            var projectId = model.ProjectId;
+
+            if (!DateTime.TryParse(model.StartDate, out var startDate) || !DateTime.TryParse(model.EndDate, out var endDate))
+                return BadRequest("Invalid date format.");
+
+            var periodStart = new DateTime(startDate.Year, startDate.Month, 1);
+            var periodEnd = new DateTime(endDate.Year, endDate.Month, DateTime.DaysInMonth(endDate.Year, endDate.Month));
+
+            var project = await _context.Projects
+                .Include(p => p.Wps)
+                    .ThenInclude(wp => wp.Wpxpeople)
+                        .ThenInclude(wpx => wpx.PersonNavigation)
+                .FirstOrDefaultAsync(p => p.ProjId == projectId);
+
+            if (project == null)
+                return NotFound();
+
+            var months = new List<DateTime>();
+            for (var current = periodStart; current <= periodEnd; current = current.AddMonths(1))
+                months.Add(new DateTime(current.Year, current.Month, 1));
+
+            var csv = new StringBuilder();
+            csv.Append("Name;WP");
+            foreach (var month in months)
+                csv.Append($";{month.ToString("MMM-yyyy", CultureInfo.InvariantCulture)}");
+            csv.AppendLine();
+
+            var orderedWps = project.Wps
+                .OrderBy(wp => GetWpSortKey(wp.Name).groupKey)
+                .ThenBy(wp => GetWpSortKey(wp.Name).numericKey)
+                .ThenBy(wp => GetWpSortKey(wp.Name).tieBreak)
+                .ToList();
+
+            foreach (var wp in orderedWps)
+            {
+                var persons = wp.Wpxpeople
+                    .Where(wpx => wpx.PersonNavigation != null)
+                    .Select(wpx => wpx.PersonNavigation)
+                     .GroupBy(p => p.Id)
+                    .Select(g => g.First())
+                    .OrderBy(p => p.Surname)
+                    .ThenBy(p => p.Name)
+                    .ToList();
+
+                foreach (var person in persons)
+                {
+                    csv.Append($"{person.Surname}, {person.Name};{wp.Name}");
+
+                    foreach (var month in months)
+                    {
+                        var monthStart = new DateTime(month.Year, month.Month, 1);
+                        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
+                        var value = await valueSelector(person.Id, wp.Id, monthStart, monthEnd);
+
+                        if (value == -1m)
+                            csv.Append(";SIN AFILIACIÓN");
+                        else
+                            csv.Append($";{value.ToString("0.0", new CultureInfo("es-ES"))}");
+                    }
+
+                    csv.AppendLine();
+                }
+            }
+
+            var utf8WithBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+            var bytes = utf8WithBom.GetBytes(csv.ToString());
+            return File(bytes, "text/csv", $"{filePrefix}_{projectId}_{DateTime.Now:yyyyMMdd}.csv");
+        }
+
         private string RemoveAccents(string text)
         {
             return string.Concat(text.Normalize(NormalizationForm.FormD)
@@ -2362,6 +2438,96 @@ namespace TRS2._0.Controllers
 
             return File(bytes, "text/csv", $"EstimatedWorkedDays_{projectId}_{DateTime.Now:yyyyMMdd}.csv");
         }
+
+
+        [HttpPost]
+        public async Task<IActionResult> ExportDeclaredHoursPerWPToCSV([FromBody] ExportRequest model)
+        {
+            return await ExportWpBreakdownCsv(model, "DeclaredHoursPerWP", async (personId, wpId, monthStart, monthEnd) =>
+            {
+                return await _context.Timesheets
+                    .Where(t => t.WpxPersonNavigation.Person == personId &&
+                                t.WpxPersonNavigation.Wp == wpId &&
+                                t.Day >= monthStart && t.Day <= monthEnd)
+                    .Select(t => (decimal?)t.Hours)
+                    .SumAsync() ?? 0m;
+            });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ExportEstimatedHoursPerWPToCSV([FromBody] ExportRequest model)
+        {
+            return await ExportWpBreakdownCsv(model, "EstimatedHoursPerWP", async (personId, wpId, monthStart, monthEnd) =>
+            {
+                var effort = await _context.Persefforts
+                    .Where(pe => pe.WpxPersonNavigation.Person == personId &&
+                                 pe.WpxPersonNavigation.Wp == wpId &&
+                                 pe.Month == monthStart)
+                    .Select(pe => (decimal?)pe.Value)
+                    .FirstOrDefaultAsync() ?? 0m;
+
+                if (effort <= 0m)
+                    return 0m;
+
+                var totalHoursForMonth = await _workCalendarService.CalculateTotalHoursForPersonV2(personId, monthStart, monthStart);
+                var monthHours = totalHoursForMonth.TryGetValue(monthStart, out var value) ? value : 0m;
+                return Math.Round(monthHours * effort, 1, MidpointRounding.AwayFromZero);
+            });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ExportWorkedDaysPerWPToCSV([FromBody] ExportRequest model)
+        {
+            return await ExportWpBreakdownCsv(model, "WorkedDaysPerWP", async (personId, wpId, monthStart, monthEnd) =>
+            {
+                var declaredHours = await _context.Timesheets
+                    .Where(t => t.WpxPersonNavigation.Person == personId &&
+                                t.WpxPersonNavigation.Wp == wpId &&
+                                t.Day >= monthStart && t.Day <= monthEnd)
+                    .Select(t => (decimal?)t.Hours)
+                    .SumAsync() ?? 0m;
+
+                if (declaredHours <= 0m)
+                    return 0m;
+
+                var effectiveDaily = await GetEffectiveDailyHoursForMonthAsync(personId, monthStart, monthEnd);
+                if (!effectiveDaily.EffectiveDailyHours.HasValue || effectiveDaily.EffectiveDailyHours.Value <= 0m)
+                    return -1m;
+
+                return Math.Round(declaredHours / effectiveDaily.EffectiveDailyHours.Value, 1, MidpointRounding.AwayFromZero);
+            });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ExportEstimatedWorkedDaysPerWPToCSV([FromBody] ExportRequest model)
+        {
+            return await ExportWpBreakdownCsv(model, "EstimatedWorkedDaysPerWP", async (personId, wpId, monthStart, monthEnd) =>
+            {
+                var effort = await _context.Persefforts
+                    .Where(pe => pe.WpxPersonNavigation.Person == personId &&
+                                 pe.WpxPersonNavigation.Wp == wpId &&
+                                 pe.Month == monthStart)
+                    .Select(pe => (decimal?)pe.Value)
+                    .FirstOrDefaultAsync() ?? 0m;
+
+                if (effort <= 0m)
+                    return 0m;
+
+                var totalHoursForMonth = await _workCalendarService.CalculateTotalHoursForPersonV2(personId, monthStart, monthStart);
+                var monthHours = totalHoursForMonth.TryGetValue(monthStart, out var total) ? total : 0m;
+                var estimatedHours = Math.Round(monthHours * effort, 1, MidpointRounding.AwayFromZero);
+
+                if (estimatedHours <= 0m)
+                    return 0m;
+
+                var effectiveDaily = await GetEffectiveDailyHoursForMonthAsync(personId, monthStart, monthEnd);
+                if (!effectiveDaily.EffectiveDailyHours.HasValue || effectiveDaily.EffectiveDailyHours.Value <= 0m)
+                    return -1m;
+
+                return Math.Round(estimatedHours / effectiveDaily.EffectiveDailyHours.Value, 1, MidpointRounding.AwayFromZero);
+            });
+        }
+
 
         // =================== Helper de orden WP ===================
         // Grupo 0: "WP<number>" (orden por número)
