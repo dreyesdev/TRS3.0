@@ -970,13 +970,27 @@ namespace TRS2._0.Controllers
 
             if (selectedDate.HasValue)
             {
-                var investigatorDateValidation = await ValidateManualDateAsync(personId, selectedDate.Value);
-                if (!investigatorDateValidation.IsValid)
+                var investigatorExistingDate = await GetLastLoginDateForNextMonth(personId, year, month);
+                string responsibleExistingDate = string.Empty;
+                var hasDifferentResponsible = responsibleId != 0 && responsibleId != personId;
+                if (hasDifferentResponsible)
                 {
-                    return BadRequest(investigatorDateValidation.Message);
+                    responsibleExistingDate = await GetLastLoginDateForNextMonth(responsibleId, year, month);
                 }
 
-                if (responsibleId != 0 && responsibleId != personId)
+                var shouldInsertInvestigator = string.IsNullOrWhiteSpace(investigatorExistingDate);
+                var shouldInsertResponsible = hasDifferentResponsible && string.IsNullOrWhiteSpace(responsibleExistingDate);
+
+                if (shouldInsertInvestigator)
+                {
+                    var investigatorDateValidation = await ValidateManualDateAsync(personId, selectedDate.Value);
+                    if (!investigatorDateValidation.IsValid)
+                    {
+                        return BadRequest(investigatorDateValidation.Message);
+                    }
+                }
+
+                if (shouldInsertResponsible)
                 {
                     var responsibleDateValidation = await ValidateManualDateAsync(responsibleId, selectedDate.Value);
                     if (!responsibleDateValidation.IsValid)
@@ -985,10 +999,36 @@ namespace TRS2._0.Controllers
                     }
                 }
 
-                await SaveManualLoginDateAsync(personId, year, month, selectedDate.Value);
-                if (responsibleId != 0 && responsibleId != personId)
+                if (shouldInsertInvestigator)
+                {
+                    await SaveManualLoginDateAsync(personId, year, month, selectedDate.Value);
+                }
+
+                if (shouldInsertResponsible)
                 {
                     await SaveManualLoginDateAsync(responsibleId, year, month, selectedDate.Value);
+                }
+
+                if (!shouldInsertInvestigator || (hasDifferentResponsible && !shouldInsertResponsible))
+                {
+                    var warningParts = new List<string>();
+
+                    if (!shouldInsertInvestigator)
+                    {
+                        warningParts.Add($"Investigador ya tenía fecha ({investigatorExistingDate}).");
+                    }
+
+                    if (hasDifferentResponsible && !shouldInsertResponsible)
+                    {
+                        warningParts.Add($"Responsable ya tenía fecha ({responsibleExistingDate}).");
+                    }
+
+                    if (shouldInsertInvestigator || shouldInsertResponsible)
+                        warningParts.Add("Se ha insertado fecha manual solo para quien no tenía fecha previa.");
+                    else
+                        warningParts.Add("No se ha insertado ninguna fecha manual porque ambos ya tenían fecha.");
+
+                    Response.Headers["X-Timesheet-Warning"] = string.Join(" ", warningParts);
                 }
             }
 
@@ -1012,22 +1052,14 @@ namespace TRS2._0.Controllers
             DateTime? finalDateInvestigator = null;
             DateTime? finalDateResponsible = null;
 
-            if (selectedDate.HasValue)
+            if (!string.IsNullOrEmpty(lastLoginDateInvestigator))
             {
-                finalDateInvestigator = selectedDate;
-                finalDateResponsible = selectedDate;
+                finalDateInvestigator = DateTime.ParseExact(lastLoginDateInvestigator, "dd/MM/yyyy", CultureInfo.InvariantCulture);
             }
-            else
-            {
-                if (!string.IsNullOrEmpty(lastLoginDateInvestigator))
-                {
-                    finalDateInvestigator = DateTime.Parse(lastLoginDateInvestigator);
-                }
 
-                if (!string.IsNullOrEmpty(lastLoginDateResponsible))
-                {
-                    finalDateResponsible = DateTime.Parse(lastLoginDateResponsible);
-                }
+            if (!string.IsNullOrEmpty(lastLoginDateResponsible))
+            {
+                finalDateResponsible = DateTime.ParseExact(lastLoginDateResponsible, "dd/MM/yyyy", CultureInfo.InvariantCulture);
             }
 
             var document = Document.Create(document =>
@@ -1448,13 +1480,9 @@ namespace TRS2._0.Controllers
                     LoginTime = new DateTime(signatureYear, signatureMonth, 1),
                     ManualLoginDate = selectedDate.Date
                 });
-            }
-            else
-            {
-                samePeriodLogin.ManualLoginDate = selectedDate.Date;
-            }
 
-            await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync();
+            }
         }
 
         // Método auxiliar para redondear al entero o .5 más cercano
