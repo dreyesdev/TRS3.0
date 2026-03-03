@@ -1521,8 +1521,8 @@ namespace TRS2._0.Controllers
                             respId = fallbackRespInt;
                         }
 
-                        if (peopleRespCache.TryGetValue(pid, out var frInt) && frInt > 0)
-                            candidateResponsibleIds.Add(frInt);
+                        if (respId.HasValue && respId.Value > 0)
+                            candidateResponsibleIds.Add(respId.Value);
                     }
                 }
 
