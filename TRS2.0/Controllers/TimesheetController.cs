@@ -970,6 +970,20 @@ namespace TRS2._0.Controllers
 
             if (selectedDate.HasValue)
             {
+                var investigatorExistingDate = await GetLastLoginDateForNextMonth(personId, year, month);
+                string responsibleExistingDate = string.Empty;
+                if (responsibleId != 0 && responsibleId != personId)
+                {
+                    responsibleExistingDate = await GetLastLoginDateForNextMonth(responsibleId, year, month);
+                }
+
+                if (!string.IsNullOrWhiteSpace(investigatorExistingDate) || !string.IsNullOrWhiteSpace(responsibleExistingDate))
+                {
+                    var invInfo = string.IsNullOrWhiteSpace(investigatorExistingDate) ? "sin fecha" : investigatorExistingDate;
+                    var respInfo = string.IsNullOrWhiteSpace(responsibleExistingDate) ? "sin fecha" : responsibleExistingDate;
+                    return BadRequest($"Ya existen fechas de login para el mes siguiente. Investigador: {invInfo}. Responsable: {respInfo}. No se han insertado fechas manuales.");
+                }
+
                 var investigatorDateValidation = await ValidateManualDateAsync(personId, selectedDate.Value);
                 if (!investigatorDateValidation.IsValid)
                 {
@@ -1012,22 +1026,14 @@ namespace TRS2._0.Controllers
             DateTime? finalDateInvestigator = null;
             DateTime? finalDateResponsible = null;
 
-            if (selectedDate.HasValue)
+            if (!string.IsNullOrEmpty(lastLoginDateInvestigator))
             {
-                finalDateInvestigator = selectedDate;
-                finalDateResponsible = selectedDate;
+                finalDateInvestigator = DateTime.ParseExact(lastLoginDateInvestigator, "dd/MM/yyyy", CultureInfo.InvariantCulture);
             }
-            else
-            {
-                if (!string.IsNullOrEmpty(lastLoginDateInvestigator))
-                {
-                    finalDateInvestigator = DateTime.Parse(lastLoginDateInvestigator);
-                }
 
-                if (!string.IsNullOrEmpty(lastLoginDateResponsible))
-                {
-                    finalDateResponsible = DateTime.Parse(lastLoginDateResponsible);
-                }
+            if (!string.IsNullOrEmpty(lastLoginDateResponsible))
+            {
+                finalDateResponsible = DateTime.ParseExact(lastLoginDateResponsible, "dd/MM/yyyy", CultureInfo.InvariantCulture);
             }
 
             var document = Document.Create(document =>
@@ -1448,13 +1454,9 @@ namespace TRS2._0.Controllers
                     LoginTime = new DateTime(signatureYear, signatureMonth, 1),
                     ManualLoginDate = selectedDate.Date
                 });
-            }
-            else
-            {
-                samePeriodLogin.ManualLoginDate = selectedDate.Date;
-            }
 
-            await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync();
+            }
         }
 
         // Método auxiliar para redondear al entero o .5 más cercano
