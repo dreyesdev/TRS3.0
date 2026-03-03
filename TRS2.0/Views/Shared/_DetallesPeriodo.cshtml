@@ -485,6 +485,11 @@
                     return;
                 }
 
+                const warningMessage = response.headers.get('X-Timesheet-Warning');
+                if (warningMessage) {
+                    alert(warningMessage);
+                }
+
                 const blob = await response.blob();
                 const objectUrl = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');

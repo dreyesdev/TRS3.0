@@ -972,25 +972,25 @@ namespace TRS2._0.Controllers
             {
                 var investigatorExistingDate = await GetLastLoginDateForNextMonth(personId, year, month);
                 string responsibleExistingDate = string.Empty;
-                if (responsibleId != 0 && responsibleId != personId)
+                var hasDifferentResponsible = responsibleId != 0 && responsibleId != personId;
+                if (hasDifferentResponsible)
                 {
                     responsibleExistingDate = await GetLastLoginDateForNextMonth(responsibleId, year, month);
                 }
 
-                if (!string.IsNullOrWhiteSpace(investigatorExistingDate) || !string.IsNullOrWhiteSpace(responsibleExistingDate))
+                var shouldInsertInvestigator = string.IsNullOrWhiteSpace(investigatorExistingDate);
+                var shouldInsertResponsible = hasDifferentResponsible && string.IsNullOrWhiteSpace(responsibleExistingDate);
+
+                if (shouldInsertInvestigator)
                 {
-                    var invInfo = string.IsNullOrWhiteSpace(investigatorExistingDate) ? "sin fecha" : investigatorExistingDate;
-                    var respInfo = string.IsNullOrWhiteSpace(responsibleExistingDate) ? "sin fecha" : responsibleExistingDate;
-                    return BadRequest($"Ya existen fechas de login para el mes siguiente. Investigador: {invInfo}. Responsable: {respInfo}. No se han insertado fechas manuales.");
+                    var investigatorDateValidation = await ValidateManualDateAsync(personId, selectedDate.Value);
+                    if (!investigatorDateValidation.IsValid)
+                    {
+                        return BadRequest(investigatorDateValidation.Message);
+                    }
                 }
 
-                var investigatorDateValidation = await ValidateManualDateAsync(personId, selectedDate.Value);
-                if (!investigatorDateValidation.IsValid)
-                {
-                    return BadRequest(investigatorDateValidation.Message);
-                }
-
-                if (responsibleId != 0 && responsibleId != personId)
+                if (shouldInsertResponsible)
                 {
                     var responsibleDateValidation = await ValidateManualDateAsync(responsibleId, selectedDate.Value);
                     if (!responsibleDateValidation.IsValid)
@@ -999,10 +999,36 @@ namespace TRS2._0.Controllers
                     }
                 }
 
-                await SaveManualLoginDateAsync(personId, year, month, selectedDate.Value);
-                if (responsibleId != 0 && responsibleId != personId)
+                if (shouldInsertInvestigator)
+                {
+                    await SaveManualLoginDateAsync(personId, year, month, selectedDate.Value);
+                }
+
+                if (shouldInsertResponsible)
                 {
                     await SaveManualLoginDateAsync(responsibleId, year, month, selectedDate.Value);
+                }
+
+                if (!shouldInsertInvestigator || (hasDifferentResponsible && !shouldInsertResponsible))
+                {
+                    var warningParts = new List<string>();
+
+                    if (!shouldInsertInvestigator)
+                    {
+                        warningParts.Add($"Investigador ya tenía fecha ({investigatorExistingDate}).");
+                    }
+
+                    if (hasDifferentResponsible && !shouldInsertResponsible)
+                    {
+                        warningParts.Add($"Responsable ya tenía fecha ({responsibleExistingDate}).");
+                    }
+
+                    if (shouldInsertInvestigator || shouldInsertResponsible)
+                        warningParts.Add("Se ha insertado fecha manual solo para quien no tenía fecha previa.");
+                    else
+                        warningParts.Add("No se ha insertado ninguna fecha manual porque ambos ya tenían fecha.");
+
+                    Response.Headers["X-Timesheet-Warning"] = string.Join(" ", warningParts);
                 }
             }
 
