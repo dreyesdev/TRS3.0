@@ -31,10 +31,10 @@
             <button id="exportCsvButton" class="btn btn-success" onclick="downloadCSV()">
                 <i class="bi bi-download"></i> Export CSV
             </button>
-            <button id="exportAssignedCsvButton" class="btn btn-outline-success" onclick="downloadAssignedCSV()">
+            <button id="exportAssignedCsvButton" class="btn btn-success" onclick="downloadAssignedCSV()">
                 <i class="bi bi-download"></i> Export Assigned CSV
             </button>
-            <button id="exportMaxCsvButton" class="btn btn-outline-success" onclick="downloadMaxCSV()">
+            <button id="exportMaxCsvButton" class="btn btn-success" onclick="downloadMaxCSV()">
                 <i class="bi bi-download"></i> Export Max CSV
             </button>
         </div>
@@ -114,15 +114,22 @@
         });
 
         // -------- Exportaciones CSV --------
+        function parseEffortNumber(value) {
+            const normalized = String(value ?? "")
+                .replace(/\s+/g, '')
+                .replace(',', '.');
+
+            const parsed = Number(normalized);
+            return Number.isFinite(parsed) ? parsed : 0;
+        }
+
         function splitEffortSummary(value) {
             const raw = String(value ?? "");
             const parts = raw.split('|').map(p => p.trim());
-            const assigned = Number(parts[0] ?? 0);
-            const max = Number(parts[1] ?? 0);
 
             return {
-                assigned: Number.isFinite(assigned) ? assigned : 0,
-                max: Number.isFinite(max) ? max : 0
+                assigned: parseEffortNumber(parts[0] ?? 0),
+                max: parseEffortNumber(parts[1] ?? 0)
             };
         }
 
