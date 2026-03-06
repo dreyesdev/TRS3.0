@@ -31,6 +31,12 @@
             <button id="exportCsvButton" class="btn btn-success" onclick="downloadCSV()">
                 <i class="bi bi-download"></i> Export CSV
             </button>
+            <button id="exportAssignedCsvButton" class="btn btn-success" onclick="downloadAssignedCSV()">
+                <i class="bi bi-download"></i> Export Assigned CSV
+            </button>
+            <button id="exportMaxCsvButton" class="btn btn-success" onclick="downloadMaxCSV()">
+                <i class="bi bi-download"></i> Export Max CSV
+            </button>
         </div>
     </h2>
 
@@ -106,6 +112,90 @@
                 }
             });
         });
+
+        // -------- Exportaciones CSV --------
+        function parseEffortNumber(value) {
+            const normalized = String(value ?? "")
+                .replace(/\s+/g, '')
+                .replace(',', '.');
+
+            const parsed = Number(normalized);
+            return Number.isFinite(parsed) ? parsed : 0;
+        }
+
+        function splitEffortSummary(value) {
+            const raw = String(value ?? "");
+            const parts = raw.split('|').map(p => p.trim());
+
+            return {
+                assigned: parseEffortNumber(parts[0] ?? 0),
+                max: parseEffortNumber(parts[1] ?? 0)
+            };
+        }
+
+        async function downloadAssignedCSV() {
+            await downloadSummaryOnlyCsv('assigned');
+        }
+
+        async function downloadMaxCSV() {
+            await downloadSummaryOnlyCsv('max');
+        }
+
+        async function downloadSummaryOnlyCsv(mode) {
+            const exportButton = mode === 'assigned'
+                ? document.getElementById('exportAssignedCsvButton')
+                : document.getElementById('exportMaxCsvButton');
+
+            const originalButtonHtml = exportButton.innerHTML;
+            exportButton.disabled = true;
+            exportButton.innerHTML = '<i class="bi bi-hourglass-split"></i> Exporting...';
+
+            try {
+                const headerRow = ["Person", "Department", "Group"];
+
+                document.querySelectorAll(".global-hours-table thead th")
+                    .forEach((th, index) => {
+                        if (index >= 3) {
+                            headerRow.push(th.innerText.trim());
+                        }
+                    });
+
+                let csvBody = headerRow.join(";") + "\r\n";
+
+                const personRows = Array.from(document.querySelectorAll(".global-hours-table tbody tr"))
+                    .filter(row => !row.classList.contains('person-details'));
+
+                for (const row of personRows) {
+                    const cols = row.querySelectorAll("td");
+                    const rowData = [];
+
+                    cols.forEach((td, index) => {
+                        if (index < 3) {
+                            rowData.push(normalizeCsvValue(td.innerText.trim()));
+                            return;
+                        }
+
+                        const effort = splitEffortSummary(td.innerText.trim());
+                        const value = mode === 'assigned' ? effort.assigned : effort.max;
+                        rowData.push(normalizeCsvValue(Number(value).toFixed(2)));
+                    });
+
+                    csvBody += rowData.join(";") + "\r\n";
+                }
+
+                const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\uFEFF' + csvBody);
+                const link = document.createElement("a");
+                const fileSuffix = mode === 'assigned' ? 'Assigned' : 'Max';
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `Global_Effort_${fileSuffix}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } finally {
+                exportButton.disabled = false;
+                exportButton.innerHTML = originalButtonHtml;
+            }
+        }
 
         // -------- Exportación CSV (incluye resumen mensual + detalle por WP) --------
         async function downloadCSV() {
