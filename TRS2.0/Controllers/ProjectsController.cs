@@ -1544,12 +1544,22 @@ namespace TRS2._0.Controllers
                     .ToDictionary(
                         g => (g.Key.PersonId, g.Key.Year, g.Key.Month),
                         g => {
-                            var best = g.OrderByDescending(x => x.ManualLoginDate.HasValue)
-                                        .ThenByDescending(x => x.ManualLoginDate)
+                            var best = g.OrderByDescending(x => x.ManualLoginDate.HasValue
+                                                            && x.ManualLoginDate.Value.Year == x.LoginTime.Year
+                                                            && x.ManualLoginDate.Value.Month == x.LoginTime.Month)
+                                        .ThenByDescending(x => (x.ManualLoginDate.HasValue
+                                                                && x.ManualLoginDate.Value.Year == x.LoginTime.Year
+                                                                && x.ManualLoginDate.Value.Month == x.LoginTime.Month)
+                                                                ? x.ManualLoginDate
+                                                                : x.LoginTime)
                                         .ThenByDescending(x => x.LoginTime)
                                         .First();
 
-                            var effectiveDate = best.ManualLoginDate ?? best.LoginTime;
+                            var isManualAligned = best.ManualLoginDate.HasValue
+                                && best.ManualLoginDate.Value.Year == best.LoginTime.Year
+                                && best.ManualLoginDate.Value.Month == best.LoginTime.Month;
+
+                            var effectiveDate = isManualAligned ? best.ManualLoginDate.Value : best.LoginTime;
                             return effectiveDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
                         }
                     );
@@ -3074,6 +3084,5 @@ namespace TRS2._0.Controllers
 
 
 }
-
 
 

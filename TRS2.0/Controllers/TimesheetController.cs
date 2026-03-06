@@ -970,6 +970,14 @@ namespace TRS2._0.Controllers
 
             if (selectedDate.HasValue)
             {
+                var signatureYear = month == 12 ? year + 1 : year;
+                var signatureMonth = month == 12 ? 1 : month + 1;
+
+                if (selectedDate.Value.Year != signatureYear || selectedDate.Value.Month != signatureMonth)
+                {
+                    return BadRequest($"Manual Date must belong to {signatureMonth:00}/{signatureYear} for this timesheet export.");
+                }
+
                 var investigatorExistingDate = await GetLastLoginDateForNextMonth(personId, year, month);
                 string responsibleExistingDate = string.Empty;
                 var hasDifferentResponsible = responsibleId != 0 && responsibleId != personId;
@@ -1462,10 +1470,29 @@ namespace TRS2._0.Controllers
             return (true, string.Empty);
         }
 
+        private static bool IsManualDateAlignedWithLoginMonth(DateTime loginTime, DateTime? manualDate)
+        {
+            return manualDate.HasValue
+                && manualDate.Value.Year == loginTime.Year
+                && manualDate.Value.Month == loginTime.Month;
+        }
+
+        private static DateTime GetEffectiveLoginDate(UserLoginHistory entry)
+        {
+            return IsManualDateAlignedWithLoginMonth(entry.LoginTime, entry.ManualLoginDate)
+                ? entry.ManualLoginDate!.Value
+                : entry.LoginTime;
+        }
+
         private async Task SaveManualLoginDateAsync(int personId, int year, int month, DateTime selectedDate)
         {
             var signatureYear = month == 12 ? year + 1 : year;
             var signatureMonth = month == 12 ? 1 : month + 1;
+
+            if (selectedDate.Year != signatureYear || selectedDate.Month != signatureMonth)
+            {
+                throw new InvalidOperationException($"Manual Date {selectedDate:dd/MM/yyyy} must belong to {signatureMonth:00}/{signatureYear}.");
+            }
 
             var samePeriodLogin = await _context.UserLoginHistories
                 .Where(x => x.PersonId == personId && x.LoginTime.Year == signatureYear && x.LoginTime.Month == signatureMonth)
@@ -1494,14 +1521,17 @@ namespace TRS2._0.Controllers
         //}
         public async Task<string> GetLastLoginDateForPerson(int personId, int year, int month)
         {
-            var lastLoginEntry = await _context.UserLoginHistories
+            var loginEntries = await _context.UserLoginHistories
                 .Where(x => x.PersonId == personId && x.LoginTime.Year == year && x.LoginTime.Month == month)
-                .OrderByDescending(x => x.ManualLoginDate.HasValue)
-                .ThenByDescending(x => x.ManualLoginDate)
-                .ThenByDescending(x => x.LoginTime)
-                .FirstOrDefaultAsync();
+                .ToListAsync();
 
-            var effectiveDate = lastLoginEntry?.ManualLoginDate ?? lastLoginEntry?.LoginTime;
+            var lastLoginEntry = loginEntries
+                .OrderByDescending(x => IsManualDateAlignedWithLoginMonth(x.LoginTime, x.ManualLoginDate))
+                .ThenByDescending(GetEffectiveLoginDate)
+                .ThenByDescending(x => x.LoginTime)
+                .FirstOrDefault();
+
+            var effectiveDate = lastLoginEntry != null ? GetEffectiveLoginDate(lastLoginEntry) : (DateTime?)null;
             return effectiveDate.HasValue ? effectiveDate.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
         }
 
@@ -1515,14 +1545,17 @@ namespace TRS2._0.Controllers
                 year++;
             }
 
-            var lastLoginEntry = await _context.UserLoginHistories
+            var loginEntries = await _context.UserLoginHistories
                 .Where(x => x.PersonId == personId && x.LoginTime.Year == year && x.LoginTime.Month == month)
-                .OrderByDescending(x => x.ManualLoginDate.HasValue)
-                .ThenByDescending(x => x.ManualLoginDate)
-                .ThenByDescending(x => x.LoginTime)
-                .FirstOrDefaultAsync();
+                .ToListAsync();
 
-            var effectiveDate = lastLoginEntry?.ManualLoginDate ?? lastLoginEntry?.LoginTime;
+            var lastLoginEntry = loginEntries
+                .OrderByDescending(x => IsManualDateAlignedWithLoginMonth(x.LoginTime, x.ManualLoginDate))
+                .ThenByDescending(GetEffectiveLoginDate)
+                .ThenByDescending(x => x.LoginTime)
+                .FirstOrDefault();
+
+            var effectiveDate = lastLoginEntry != null ? GetEffectiveLoginDate(lastLoginEntry) : (DateTime?)null;
             return effectiveDate.HasValue ? effectiveDate.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
         }
 
