@@ -409,28 +409,36 @@ namespace TRS2._0.Controllers
                 return Json(new { success = false, message = "A manual rate already exists with same dates or a fully contained period." });
             }
 
-            int affId = await ResolveAffiliationForDate(personId, newStart);
-            decimal dedication = await ResolveDedicationForDate(personId, newStart);
-            decimal annualHours = await ResolveAnnualHoursForDate(affId, newStart);
-            decimal annualCost = Math.Round(hourlyRate * dedication * annualHours, 2);
-
-            var rate = new PersonManualRate
+            var segmentBuild = await BuildManualExternalRateSegmentsAsync(personId, newStart, newEnd, Math.Round(hourlyRate, 4));
+            if (!segmentBuild.Success)
             {
-                PersonId = personId,
-                AffId = affId,
-                StartDate = newStart,
-                EndDate = newEnd,
-                AnnualCost = annualCost,
-                Dedication = dedication,
-                AnnualHours = annualHours,
-                HourlyRate = Math.Round(hourlyRate, 4),
-                CreatedAt = DateTime.UtcNow
-            };
+                return Json(new { success = false, message = segmentBuild.Message });
+            }
 
-            _context.PersonManualRates.Add(rate);
+            var createdAt = DateTime.UtcNow;
+            foreach (var segment in segmentBuild.Segments)
+            {
+                _context.PersonManualRates.Add(new PersonManualRate
+                {
+                    PersonId = personId,
+                    AffId = segment.AffId,
+                    StartDate = segment.StartDate,
+                    EndDate = segment.EndDate,
+                    AnnualCost = segment.AnnualCost,
+                    Dedication = segment.Dedication,
+                    AnnualHours = segment.AnnualHours,
+                    HourlyRate = segment.HourlyRate,
+                    CreatedAt = createdAt
+                });
+            }
+
             await _context.SaveChangesAsync();
 
-            return Json(new { success = true, message = "Manual external rate added successfully." });
+            var message = segmentBuild.Segments.Count == 1
+                ? "Manual external rate added successfully."
+                : $"Manual external rate added successfully. {segmentBuild.Segments.Count} segments were created to reflect affiliation/dedication changes within the selected period.";
+
+            return Json(new { success = true, message });
         }
 
         [HttpPost]
@@ -528,55 +536,274 @@ namespace TRS2._0.Controllers
             return Json(new { success = true, message = "Dedication added successfully." });
         }
 
-        private async Task<int> ResolveAffiliationForDate(int personId, DateTime date)
+        private async Task<ManualRateBuildResult> BuildManualExternalRateSegmentsAsync(int personId, DateTime startDate, DateTime endDate, decimal baseHourlyRate)
         {
-            var affSegment = await _context.AffxPersons
-                .Where(a => a.PersonId == personId && a.Exist && a.Start <= date && a.End >= date)
-                .OrderByDescending(a => a.Start)
-                .FirstOrDefaultAsync();
+            var affSegments = await _context.AffxPersons
+                .Where(a => a.PersonId == personId && a.Exist && a.Start <= endDate && a.End >= startDate)
+                .ToListAsync();
 
-            if (affSegment != null)
-                return affSegment.AffId;
+            var dedications = await _context.Dedications
+                .Where(d => d.PersId == personId && d.Exist && d.Type <= 1 && d.Start <= endDate && d.End >= startDate)
+                .ToListAsync();
 
-            var personAff = await _context.Personnel
-                .Where(p => p.Id == personId)
-                .Select(p => p.Affiliation)
-                .FirstOrDefaultAsync();
+            var affIds = affSegments
+                .Where(a => a.AffId > 0)
+                .Select(a => a.AffId)
+                .Distinct()
+                .ToList();
 
-            return (int)(personAff > 0 ? personAff : 1);
+            var affHours = affIds.Any()
+                ? await _context.AffHours
+                    .Where(ah => affIds.Contains(ah.AffId) && ah.StartDate <= endDate && ah.EndDate >= startDate)
+                    .ToListAsync()
+                : new List<AffHours>();
+
+            var existingAffiliationIds = await _context.Affiliations
+                .Select(a => a.Id)
+                .ToListAsync();
+
+            if (!existingAffiliationIds.Any())
+            {
+                return new ManualRateBuildResult
+                {
+                    Success = false,
+                    Message = "No affiliations are configured in the system, so the external rate could not be generated."
+                };
+            }
+
+            var validAffiliationIds = existingAffiliationIds.ToHashSet();
+            var storageFallbackAffId = existingAffiliationIds.OrderBy(id => id).First();
+            var boundaries = BuildManualRateBoundaries(startDate, endDate, affSegments, dedications, affHours);
+            var workingDaysByYear = new Dictionary<int, int>();
+            var segments = new List<ManualRateSegmentDefinition>();
+
+            async Task<int> GetWorkingDaysInYearAsync(int year)
+            {
+                if (workingDaysByYear.TryGetValue(year, out var cached))
+                {
+                    return cached;
+                }
+
+                var total = 0;
+                for (var month = 1; month <= 12; month++)
+                {
+                    total += await _workCalendarService.CalculateWorkingDays(year, month);
+                }
+
+                workingDaysByYear[year] = total;
+                return total;
+            }
+
+            for (var index = 0; index < boundaries.Count - 1; index++)
+            {
+                var segmentStart = boundaries[index];
+                var segmentEnd = boundaries[index + 1].AddDays(-1);
+                if (segmentStart > segmentEnd)
+                {
+                    continue;
+                }
+
+                var activeAffiliation = affSegments
+                    .Where(a => a.Start.Date <= segmentStart && a.End.Date >= segmentStart)
+                    .OrderByDescending(a => a.Start)
+                    .ThenByDescending(a => a.Id)
+                    .FirstOrDefault();
+
+                var activeDedication = dedications
+                    .Where(d => d.Start.Date <= segmentStart && d.End.Date >= segmentStart)
+                    .OrderByDescending(d => d.Type)
+                    .ThenByDescending(d => d.Start)
+                    .ThenByDescending(d => d.Id)
+                    .FirstOrDefault();
+
+                var dedication = GetDedicationFraction(activeDedication?.Reduc);
+                var actualAffId = activeAffiliation?.AffId;
+                var storageAffId = actualAffId.HasValue && validAffiliationIds.Contains(actualAffId.Value)
+                    ? actualAffId.Value
+                    : storageFallbackAffId;
+
+                if (!actualAffId.HasValue || actualAffId.Value <= 0)
+                {
+                    segments.Add(new ManualRateSegmentDefinition
+                    {
+                        AffId = storageAffId,
+                        StartDate = segmentStart,
+                        EndDate = segmentEnd,
+                        Dedication = dedication,
+                        AnnualHours = 0m,
+                        HourlyRate = 0m,
+                        AnnualCost = 0m
+                    });
+                    continue;
+                }
+
+                var dailyHours = affHours
+                    .Where(ah => ah.AffId == actualAffId.Value &&
+                                 ah.StartDate.Date <= segmentStart &&
+                                 ah.EndDate.Date >= segmentStart &&
+                                 ah.Hours > 0)
+                    .OrderByDescending(ah => ah.StartDate)
+                    .ThenByDescending(ah => ah.Id)
+                    .Select(ah => (decimal?)ah.Hours)
+                    .FirstOrDefault();
+
+                if (!dailyHours.HasValue)
+                {
+                    return new ManualRateBuildResult
+                    {
+                        Success = false,
+                        Message = $"No daily hours configuration was found for affiliation {actualAffId.Value} on one or more dates within the selected period. Please configure AffHours for every positive affiliation/date before adding the external rate."
+                    };
+                }
+
+                var annualHours = Math.Round(dailyHours.Value * await GetWorkingDaysInYearAsync(segmentStart.Year), 2);
+                var appliedHourlyRate = dedication > 0m && annualHours > 0m ? baseHourlyRate : 0m;
+
+                segments.Add(new ManualRateSegmentDefinition
+                {
+                    AffId = storageAffId,
+                    StartDate = segmentStart,
+                    EndDate = segmentEnd,
+                    Dedication = dedication,
+                    AnnualHours = annualHours,
+                    HourlyRate = appliedHourlyRate,
+                    AnnualCost = Math.Round(appliedHourlyRate * dedication * annualHours, 2)
+                });
+            }
+
+            if (!segments.Any())
+            {
+                return new ManualRateBuildResult
+                {
+                    Success = false,
+                    Message = "No external rate segments could be generated for the selected period."
+                };
+            }
+
+            return new ManualRateBuildResult
+            {
+                Success = true,
+                Segments = MergeManualRateSegments(segments)
+            };
         }
 
-        private async Task<decimal> ResolveDedicationForDate(int personId, DateTime date)
+        private static List<DateTime> BuildManualRateBoundaries(
+            DateTime periodStart,
+            DateTime periodEnd,
+            IEnumerable<AffxPerson> affSegments,
+            IEnumerable<Dedication> dedications,
+            IEnumerable<AffHours> affHours)
         {
-            var reduc = await _context.Dedications
-                .Where(d => d.PersId == personId && d.Exist && d.Type <= 1 && d.Start <= date && d.End >= date)
-                .OrderByDescending(d => d.Start)
-                .Select(d => (decimal?)d.Reduc)
-                .FirstOrDefaultAsync();
+            var boundaries = new SortedSet<DateTime>
+            {
+                periodStart.Date,
+                periodEnd.Date.AddDays(1)
+            };
 
+            foreach (var affSegment in affSegments)
+            {
+                AddBoundary(boundaries, periodStart, periodEnd, affSegment.Start, affSegment.End);
+            }
+
+            foreach (var dedication in dedications)
+            {
+                AddBoundary(boundaries, periodStart, periodEnd, dedication.Start, dedication.End);
+            }
+
+            foreach (var affHour in affHours)
+            {
+                AddBoundary(boundaries, periodStart, periodEnd, affHour.StartDate, affHour.EndDate);
+            }
+
+            for (var year = periodStart.Year + 1; year <= periodEnd.Year; year++)
+            {
+                boundaries.Add(new DateTime(year, 1, 1));
+            }
+
+            return boundaries.OrderBy(d => d).ToList();
+        }
+
+        private static void AddBoundary(SortedSet<DateTime> boundaries, DateTime periodStart, DateTime periodEnd, DateTime sourceStart, DateTime sourceEnd)
+        {
+            var boundedStart = MaxDate(periodStart.Date, sourceStart.Date);
+            var boundedEnd = MinDate(periodEnd.Date, sourceEnd.Date);
+            if (boundedStart > boundedEnd)
+            {
+                return;
+            }
+
+            boundaries.Add(boundedStart);
+            if (boundedEnd < periodEnd.Date)
+            {
+                boundaries.Add(boundedEnd.AddDays(1));
+            }
+        }
+
+        private static decimal GetDedicationFraction(decimal? reduc)
+        {
             var dedication = 1m - (reduc ?? 0m);
-            if (dedication <= 0m) dedication = 1m;
+            if (dedication < 0m)
+            {
+                dedication = 0m;
+            }
+            else if (dedication > 1m)
+            {
+                dedication = 1m;
+            }
+
             return Math.Round(dedication, 4);
         }
 
-        private async Task<decimal> ResolveAnnualHoursForDate(int affId, DateTime date)
+        private static List<ManualRateSegmentDefinition> MergeManualRateSegments(IEnumerable<ManualRateSegmentDefinition> segments)
         {
-            var dailyHours = await _context.AffHours
-                .Where(ah => ah.AffId == affId && ah.StartDate <= date && ah.EndDate >= date)
-                .OrderByDescending(ah => ah.StartDate)
-                .Select(ah => (decimal?)ah.Hours)
-                .FirstOrDefaultAsync();
+            var orderedSegments = segments
+                .OrderBy(s => s.StartDate)
+                .ThenBy(s => s.EndDate)
+                .ToList();
 
-            decimal hoursPerDay = dailyHours ?? 8m;
-            int workingDays = 0;
-            for (int m = 1; m <= 12; m++)
+            var mergedSegments = new List<ManualRateSegmentDefinition>();
+            foreach (var segment in orderedSegments)
             {
-                workingDays += await _workCalendarService.CalculateWorkingDays(date.Year, m);
+                var previous = mergedSegments.LastOrDefault();
+                if (previous != null &&
+                    previous.EndDate.AddDays(1) == segment.StartDate &&
+                    previous.AffId == segment.AffId &&
+                    previous.Dedication == segment.Dedication &&
+                    previous.AnnualHours == segment.AnnualHours &&
+                    previous.HourlyRate == segment.HourlyRate &&
+                    previous.AnnualCost == segment.AnnualCost)
+                {
+                    previous.EndDate = segment.EndDate;
+                    continue;
+                }
+
+                mergedSegments.Add(segment);
             }
 
-            return Math.Round(hoursPerDay * workingDays, 2);
+            return mergedSegments;
         }
 
+        private static DateTime MaxDate(DateTime a, DateTime b) => a > b ? a : b;
+
+        private static DateTime MinDate(DateTime a, DateTime b) => a < b ? a : b;
+
+        private sealed class ManualRateBuildResult
+        {
+            public bool Success { get; set; }
+            public string Message { get; set; }
+            public List<ManualRateSegmentDefinition> Segments { get; set; } = new();
+        }
+
+        private sealed class ManualRateSegmentDefinition
+        {
+            public int AffId { get; set; }
+            public DateTime StartDate { get; set; }
+            public DateTime EndDate { get; set; }
+            public decimal AnnualCost { get; set; }
+            public decimal Dedication { get; set; }
+            public decimal AnnualHours { get; set; }
+            public decimal HourlyRate { get; set; }
+        }
         [HttpPost]
         public async Task<IActionResult> CalculateMonthlyPM(int personId, int year, int month)
         {
