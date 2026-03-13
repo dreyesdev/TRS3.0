@@ -102,6 +102,27 @@
         document.getElementById('searchResults').style.display = 'block';
     });
 
+    function parseLocalizedDecimal(value) {
+        if (!value) {
+            return Number.NaN;
+        }
+
+        let normalized = value.replace(/\s+/g, '').trim();
+        const lastComma = normalized.lastIndexOf(',');
+        const lastDot = normalized.lastIndexOf('.');
+
+        if (lastComma !== -1 && lastDot !== -1) {
+            const decimalSeparator = lastComma > lastDot ? ',' : '.';
+            const thousandsPattern = decimalSeparator === ',' ? /\./g : /,/g;
+            normalized = normalized.replace(thousandsPattern, '');
+            normalized = normalized.replace(decimalSeparator, '.');
+        } else {
+            normalized = normalized.replace(',', '.');
+        }
+
+        return Number(normalized);
+    }
+
     function loadExternalRateData(personId) {
         if (!personId) {
             $('#externalRateTableContainer').html('');
@@ -134,7 +155,7 @@
                     `<td>${nextIndex}</td>` +
                     `<td><input type='date' class='form-control' /></td>` +
                     `<td><input type='date' class='form-control' /></td>` +
-                    `<td><input type='number' min='0' step='0.0001' class='form-control' placeholder='Hourly cost' /></td>` +
+                    `<td><input type='text' inputmode='decimal' class='form-control' placeholder='Hourly cost (e.g. 47,52)' /></td>` +
                     `<td colspan='3' class='text-muted'>Annual fields are auto-calculated</td>` +
                     `<td><button class='btn btn-success btn-sm' onclick='addExternalRate(${personId})'>Add</button></td>` +
                     `</tr>`;
@@ -149,10 +170,17 @@
         const row = $('#new-row');
         const startDate = row.find("input[type='date']").eq(0).val();
         const endDate = row.find("input[type='date']").eq(1).val();
-        const hourlyRate = row.find("input[type='number']").val();
+        const hourlyRateRaw = row.find("input[type='text']").val();
+        const hourlyRateText = hourlyRateRaw ? hourlyRateRaw.trim() : '';
+        const hourlyRateValue = parseLocalizedDecimal(hourlyRateText);
 
-        if (!startDate || !endDate || !hourlyRate) {
+        if (!startDate || !endDate || !hourlyRateText) {
             alert('Please fill all fields.');
+            return;
+        }
+
+        if (!Number.isFinite(hourlyRateValue) || hourlyRateValue <= 0) {
+            alert('Please enter a valid hourly cost greater than 0. You can use comma (e.g. 47,52).');
             return;
         }
 
@@ -163,7 +191,7 @@
                 personId: personId,
                 startDate: startDate,
                 endDate: endDate,
-                hourlyRate: parseFloat(hourlyRate)
+                hourlyRate: hourlyRateText
             },
             success: function (response) {
                 alert(response.message);

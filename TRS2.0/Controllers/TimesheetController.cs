@@ -15,6 +15,7 @@ using System.Security.Claims;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.AspNetCore.Authorization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Identity;
 using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
 using TRS2._0.Models;
@@ -328,6 +329,13 @@ namespace TRS2._0.Controllers
                 });
             }
 
+            workPackagesList = workPackagesList
+                .OrderBy(wp => wp.ProjectName)
+                .ThenBy(wp => GetTimesheetWpSortKey(wp.WpName).groupKey)
+                .ThenBy(wp => GetTimesheetWpSortKey(wp.WpName).numericKey)
+                .ThenBy(wp => GetTimesheetWpSortKey(wp.WpName).tieBreak)
+                .ToList();
+
             // Preparación del ViewModel
             var viewModel = new TimesheetViewModel
             {
@@ -523,7 +531,12 @@ namespace TRS2._0.Controllers
                         EstimatedHours = estimatedHours,
                         Timesheets = timesheets.Where(ts => ts.WpxPersonId == wpx.Id).ToList()
                     };
-                }).ToList(),
+                })
+                .OrderBy(wp => wp.ProjectName)
+                .ThenBy(wp => GetTimesheetWpSortKey(wp.WpName).groupKey)
+                .ThenBy(wp => GetTimesheetWpSortKey(wp.WpName).numericKey)
+                .ThenBy(wp => GetTimesheetWpSortKey(wp.WpName).tieBreak)
+                .ToList(),
                 HoursUsed = hoursUsed,
                 HoursForOtherProjects = hoursForOtherProjects,
                 TotalHoursForOtherProjects = totalHoursForOtherProjects // Añadir la suma total de horas para otros proyectos
@@ -1484,6 +1497,21 @@ namespace TRS2._0.Controllers
                 : entry.LoginTime;
         }
 
+        private static bool IsAutomaticLogin(UserLoginHistory entry)
+            => !IsManualDateAlignedWithLoginMonth(entry.LoginTime, entry.ManualLoginDate);
+
+        private static (int groupKey, int numericKey, string tieBreak) GetTimesheetWpSortKey(string name)
+        {
+            if (string.Equals(name, "TRAVELS", StringComparison.OrdinalIgnoreCase))
+                return (2, int.MaxValue, "TRAVELS");
+
+            var m = Regex.Match(name ?? "", @"^\s*WP\s*(\d+)\s*$", RegexOptions.IgnoreCase);
+            if (m.Success && int.TryParse(m.Groups[1].Value, out var n))
+                return (0, n, name ?? "");
+
+            return (1, int.MaxValue - 1, name ?? "");
+        }
+
         private async Task SaveManualLoginDateAsync(int personId, int year, int month, DateTime selectedDate)
         {
             var signatureYear = month == 12 ? year + 1 : year;
@@ -1526,7 +1554,7 @@ namespace TRS2._0.Controllers
                 .ToListAsync();
 
             var lastLoginEntry = loginEntries
-                .OrderByDescending(x => IsManualDateAlignedWithLoginMonth(x.LoginTime, x.ManualLoginDate))
+                .OrderByDescending(IsAutomaticLogin)
                 .ThenByDescending(GetEffectiveLoginDate)
                 .ThenByDescending(x => x.LoginTime)
                 .FirstOrDefault();
@@ -1550,7 +1578,7 @@ namespace TRS2._0.Controllers
                 .ToListAsync();
 
             var lastLoginEntry = loginEntries
-                .OrderByDescending(x => IsManualDateAlignedWithLoginMonth(x.LoginTime, x.ManualLoginDate))
+                .OrderByDescending(IsAutomaticLogin)
                 .ThenByDescending(GetEffectiveLoginDate)
                 .ThenByDescending(x => x.LoginTime)
                 .FirstOrDefault();

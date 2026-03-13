@@ -770,6 +770,16 @@ namespace TRS2._0.Controllers
 
             ViewBag.PersonnelInfos = personnelInfos;
 
+            var partialDedicationPersonIds = await _context.Dedications
+                .Where(d => personIds.Contains(d.PersId)
+                    && d.Reduc > 0m
+                    && d.Start <= adjustedProjectEndDate
+                    && d.End >= adjustedProjectStartDate)
+                .Select(d => d.PersId)
+                .Distinct()
+                .ToListAsync();
+
+            ViewBag.PartialDedicationPersonIds = partialDedicationPersonIds;
 
             return View(viewModel);
         }
@@ -1107,6 +1117,13 @@ namespace TRS2._0.Controllers
 
                 ViewBag.ProjectMonths = projectMonths;
 
+                var hasPartialDedication = await _context.Dedications
+                    .AnyAsync(d => d.PersId == personId
+                        && d.Reduc > 0m
+                        && d.Start <= adjustedProjectEndDate
+                        && d.End >= adjustedProjectStartDate);
+
+                ViewBag.HasPartialDedication = hasPartialDedication;
 
                 return View(viewModel);
             }
@@ -1544,9 +1561,9 @@ namespace TRS2._0.Controllers
                     .ToDictionary(
                         g => (g.Key.PersonId, g.Key.Year, g.Key.Month),
                         g => {
-                            var best = g.OrderByDescending(x => x.ManualLoginDate.HasValue
+                            var best = g.OrderByDescending(x => !(x.ManualLoginDate.HasValue
                                                             && x.ManualLoginDate.Value.Year == x.LoginTime.Year
-                                                            && x.ManualLoginDate.Value.Month == x.LoginTime.Month)
+                                                            && x.ManualLoginDate.Value.Month == x.LoginTime.Month))
                                         .ThenByDescending(x => (x.ManualLoginDate.HasValue
                                                                 && x.ManualLoginDate.Value.Year == x.LoginTime.Year
                                                                 && x.ManualLoginDate.Value.Month == x.LoginTime.Month)

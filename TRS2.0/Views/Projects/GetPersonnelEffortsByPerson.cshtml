@@ -4,6 +4,7 @@
 
 @{
     string personName = Model.ProjectsPersonnelEfforts.FirstOrDefault()?.WorkPackages.FirstOrDefault()?.PersonnelEfforts.FirstOrDefault()?.PersonName ?? "Selected Person";
+    bool hasPartialDedication = (bool?)ViewBag.HasPartialDedication ?? false;
 }
 
 <div class="container-fluid projects-ux projects-person-per-ux">
@@ -86,7 +87,7 @@
                                     <td>
                                         <a href="@Url.Action("PersonnelEffortPlan", "Projects", new { projId = projectEffort.ProjectId })">@projectEffort.ProjectName</a>
                                     </td>
-                                    <td>@personnelEffort.PersonName</td>
+                                    <td style="@(hasPartialDedication ? "background-color: #f3e7d3;" : string.Empty)">@personnelEffort.PersonName</td>
                                     <td>
                                         <a href="@Url.Action("PersonnelEffortPlan", "Projects", new { projId = projectEffort.ProjectId, wpId = wp.WpId })">@wp.WpName</a>
                                     </td>

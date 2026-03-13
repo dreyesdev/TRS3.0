@@ -383,14 +383,19 @@ namespace TRS2._0.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> AddExternalRate(int personId, DateTime startDate, DateTime endDate, decimal hourlyRate)
+        public async Task<IActionResult> AddExternalRate(int personId, DateTime startDate, DateTime endDate, string hourlyRate)
         {
             if (startDate.Date > endDate.Date)
             {
                 return Json(new { success = false, message = "Start date cannot be later than end date." });
             }
 
-            if (hourlyRate <= 0)
+            if (!TryParseFlexibleDecimal(hourlyRate, out var parsedHourlyRate))
+            {
+                return Json(new { success = false, message = "Hourly cost format is invalid." });
+            }
+
+            if (parsedHourlyRate <= 0)
             {
                 return Json(new { success = false, message = "Hourly cost must be greater than 0." });
             }
@@ -409,7 +414,7 @@ namespace TRS2._0.Controllers
                 return Json(new { success = false, message = "A manual rate already exists with same dates or a fully contained period." });
             }
 
-            var segmentBuild = await BuildManualExternalRateSegmentsAsync(personId, newStart, newEnd, Math.Round(hourlyRate, 4));
+            var segmentBuild = await BuildManualExternalRateSegmentsAsync(personId, newStart, newEnd, Math.Round(parsedHourlyRate, 4));
             if (!segmentBuild.Success)
             {
                 return Json(new { success = false, message = segmentBuild.Message });
@@ -752,6 +757,37 @@ namespace TRS2._0.Controllers
             }
 
             return Math.Round(dedication, 4);
+        }
+
+        private static bool TryParseFlexibleDecimal(string input, out decimal value)
+        {
+            value = 0m;
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return false;
+            }
+
+            var normalized = string.Concat(input.Where(c => !char.IsWhiteSpace(c)));
+            var lastComma = normalized.LastIndexOf(',');
+            var lastDot = normalized.LastIndexOf('.');
+
+            if (lastComma >= 0 && lastDot >= 0)
+            {
+                var decimalSeparator = lastComma > lastDot ? ',' : '.';
+                var thousandsSeparator = decimalSeparator == ',' ? "." : ",";
+                normalized = normalized.Replace(thousandsSeparator, string.Empty);
+                normalized = normalized.Replace(decimalSeparator, '.');
+            }
+            else
+            {
+                normalized = normalized.Replace(',', '.');
+            }
+
+            return decimal.TryParse(
+                normalized,
+                NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture,
+                out value);
         }
 
         private static List<ManualRateSegmentDefinition> MergeManualRateSegments(IEnumerable<ManualRateSegmentDefinition> segments)
