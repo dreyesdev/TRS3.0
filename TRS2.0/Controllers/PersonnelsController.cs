@@ -563,6 +563,13 @@ namespace TRS2._0.Controllers
                     .ToListAsync()
                 : new List<AffHours>();
 
+            var years = Enumerable.Range(startDate.Year, endDate.Year - startDate.Year + 1).ToList();
+            var affGlobalHours = affIds.Any()
+                ? await _context.AffGlobalHours
+                    .Where(agh => affIds.Contains(agh.Aff) && years.Contains(agh.Year))
+                    .ToListAsync()
+                : new List<AffGlobalHours>();
+
             var existingAffiliationIds = await _context.Affiliations
                 .Select(a => a.Id)
                 .ToListAsync();
@@ -579,8 +586,8 @@ namespace TRS2._0.Controllers
             var validAffiliationIds = existingAffiliationIds.ToHashSet();
             var storageFallbackAffId = existingAffiliationIds.OrderBy(id => id).First();
             var boundaries = BuildManualRateBoundaries(startDate, endDate, affSegments, dedications, affHours);
-            var workingDaysByYear = new Dictionary<int, int>();
             var segments = new List<ManualRateSegmentDefinition>();
+            var workingDaysByYear = new Dictionary<int, int>();
 
             async Task<int> GetWorkingDaysInYearAsync(int year)
             {
@@ -661,7 +668,19 @@ namespace TRS2._0.Controllers
                     };
                 }
 
-                var annualHours = Math.Round(dailyHours.Value * await GetWorkingDaysInYearAsync(segmentStart.Year), 2);
+                var maxAnnualHours = affGlobalHours
+                    .Where(agh => agh.Aff == actualAffId.Value &&
+                                  agh.Year == segmentStart.Year &&
+                                  agh.Hours > 0)
+                    .OrderByDescending(agh => agh.Id)
+                    .Select(agh => (decimal?)agh.Hours)
+                    .FirstOrDefault();
+
+                var computedAnnualHours = dailyHours.Value * await GetWorkingDaysInYearAsync(segmentStart.Year);
+                var annualHours = maxAnnualHours.HasValue
+                    ? Math.Min(computedAnnualHours, maxAnnualHours.Value)
+                    : computedAnnualHours;
+                annualHours = Math.Round(annualHours, 2);
                 var appliedHourlyRate = dedication > 0m && annualHours > 0m ? baseHourlyRate : 0m;
 
                 segments.Add(new ManualRateSegmentDefinition
