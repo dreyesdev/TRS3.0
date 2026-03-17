@@ -2872,6 +2872,9 @@ namespace TRS2._0.Services
                     .Include(ah => ah.Affiliation)
                     .ToListAsync();
 
+                var affGlobalHoursList = await _context.AffGlobalHours
+                    .ToListAsync();
+
                 int createdRates = 0;
 
                 foreach (var ded in dedications)
@@ -2971,8 +2974,19 @@ namespace TRS2._0.Services
 
                             // Para calcular las horas anuales usamos:
                             // Horas anuales = horas/día * días laborables del año de rateStart
+                            // y aplicamos el tope máximo anual configurado en AffGlobalHours (Aff + Year), si existe.
                             int workingDaysYear = await GetWorkingDaysInYearAsync(rateStart.Year);
-                            decimal annualHours = dailyHours * workingDaysYear;
+                            decimal computedAnnualHours = dailyHours * workingDaysYear;
+
+                            var maxAnnualHours = affGlobalHoursList
+                                .Where(agh => agh.Aff == affId && agh.Year == rateStart.Year && agh.Hours > 0)
+                                .OrderByDescending(agh => agh.Id)
+                                .Select(agh => (decimal?)agh.Hours)
+                                .FirstOrDefault();
+
+                            decimal annualHours = maxAnnualHours.HasValue
+                                ? Math.Min(computedAnnualHours, maxAnnualHours.Value)
+                                : computedAnnualHours;
 
                             if (annualHours <= 0m)
                             {
