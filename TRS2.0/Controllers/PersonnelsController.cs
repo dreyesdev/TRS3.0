@@ -676,12 +676,12 @@ namespace TRS2._0.Controllers
                     .Select(agh => (decimal?)agh.Hours)
                     .FirstOrDefault();
 
-                var computedAnnualHours = dailyHours.Value * await GetWorkingDaysInYearAsync(segmentStart.Year);
+                var computedAnnualHours = dailyHours.Value * await GetWorkingDaysInYearAsync(segmentStart.Year) * dedication;
                 var annualHours = maxAnnualHours.HasValue
                     ? Math.Min(computedAnnualHours, maxAnnualHours.Value)
                     : computedAnnualHours;
                 annualHours = Math.Round(annualHours, 2);
-                var appliedHourlyRate = dedication > 0m && annualHours > 0m ? baseHourlyRate : 0m;
+                var appliedHourlyRate = annualHours > 0m ? baseHourlyRate : 0m;
 
                 segments.Add(new ManualRateSegmentDefinition
                 {
@@ -691,7 +691,7 @@ namespace TRS2._0.Controllers
                     Dedication = dedication,
                     AnnualHours = annualHours,
                     HourlyRate = appliedHourlyRate,
-                    AnnualCost = Math.Round(appliedHourlyRate * dedication * annualHours, 2)
+                    AnnualCost = Math.Round(appliedHourlyRate * annualHours, 2)
                 });
             }
 
