@@ -369,8 +369,8 @@
     </div>
 </div>
 
-<div id="detallesPeriodoContainer" class="table-container-period"></div>
-
+<div id="periodDetailsContainer" class="table-container-period"></div>
+<div id="periodRatesContainer" class="table-container-period mt-3"></div>
 
 <script>
       // Helper para limpiar textos de celdas (quita botones/etiquetas UI)
@@ -428,7 +428,7 @@
 
     function buildPeriodExportRows(cellValueSelector) {
         const rows = [];
-        const tableRows = document.querySelectorAll('#detallesPeriodoContainer table tr');
+        const tableRows = document.querySelectorAll('#periodDetailsContainer table tr');
 
         tableRows.forEach(function (row) {
             const cols = row.querySelectorAll('th, td');
@@ -601,8 +601,9 @@
 
                 success: function (data) {
                     // Pintar parcial
-                    $('#detallesPeriodoContainer').html(data);
-                    $('#detallesPeriodoContainer').show();
+                    $('#periodDetailsContainer').html(data);
+                    $('#periodDetailsContainer').show();
+                    $('#periodRatesContainer').empty().hide();
 
                     // Mostrar botones (conservamos lo que ya hacías)
                     $('#exportPMsBtn').show();
@@ -1017,8 +1018,8 @@
             },
             success: function (data) {
                 // Cargamos la parcial _PeriodRates en el mismo contenedor
-                $('#detallesPeriodoContainer').html(data);
-                $('#detallesPeriodoContainer').show();
+                $('#periodRatesContainer').html(data);
+                $('#periodRatesContainer').show();
 
                 // Si quieres, aquí puedes ocultar los botones de export asociados al grid antiguo:
                 // $('#exportPMsBtn').hide();
