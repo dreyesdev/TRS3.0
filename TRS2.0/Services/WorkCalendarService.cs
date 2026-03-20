@@ -2440,10 +2440,21 @@ public class WorkCalendarService
             // 9) Calcular horas estimadas del proyecto
             var estimatedProjectHours = Math.Round(totalMonthlyHours * effort, 1, MidpointRounding.AwayFromZero);
 
+            if (effectiveDailyHours <= 0m || estimatedProjectHours <= 0m)
+            {
+                result[cursor] = 0.0m;
+
+                _logger.LogInformation(
+                  "EST-DEBUG | P{PersonId} | Proj{ProjectId} | {Year}-{Month:D2} | Effort={Effort:P1} | BaseDaily={BaseDaily:F2} | Reduc={Reduc:P1} | EffDaily={EffDaily:F2} | TotalMonth={Total:F1} | EstHours={EstH:F1} | EstDays={EstD:F1}",
+                  personId, projectId, cursor.Year, cursor.Month,
+                  effort, baseDailyHours, reduc, effectiveDailyHours, totalMonthlyHours, estimatedProjectHours, 0.0m
+                );
+
+                continue;
+            }
+
             // 10) Convertir a días estimados (redondeo a 1 decimal)
-            decimal estimatedDays = estimatedProjectHours > 0
-                ? Math.Round(estimatedProjectHours / effectiveDailyHours, 1, MidpointRounding.AwayFromZero)
-                : 0.0m;
+            decimal estimatedDays = Math.Round(estimatedProjectHours / effectiveDailyHours, 1, MidpointRounding.AwayFromZero);
 
             // Guardar resultado
             result[cursor] = estimatedDays;

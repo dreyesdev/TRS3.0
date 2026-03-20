@@ -751,6 +751,45 @@
     }
 
 
+    async function getCsvExportBlob(response, exportName) {
+        if (!response.ok) {
+            var errorText = await response.text();
+            throw new Error(errorText || `Network response was not ok while exporting ${exportName}.`);
+        }
+
+        var responseUrl = response.url || '';
+        var contentType = (response.headers.get('content-type') || '').toLowerCase();
+        var isHtmlResponse = contentType.indexOf('text/html') !== -1;
+        var redirectedToLogin = response.redirected && responseUrl.indexOf('/Account/Login') !== -1;
+
+        if (redirectedToLogin || (isHtmlResponse && responseUrl.indexOf('/Account/Login') !== -1)) {
+            if (responseUrl) {
+                window.location.href = responseUrl;
+            }
+
+            throw new Error(`Session expired while exporting ${exportName}.`);
+        }
+
+        if (isHtmlResponse) {
+            var htmlText = await response.text();
+            console.error(`Unexpected HTML response while exporting ${exportName}.`, htmlText);
+            throw new Error(`Unexpected HTML response while exporting ${exportName}.`);
+        }
+
+        return response.blob();
+    }
+
+    function downloadCsvBlob(blob, fileName) {
+        var url = window.URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    }
+
     function exportPMSforWPToCSV() {
         var projectId = @ViewBag.projId;
         var startDate = $('#exportPMSforWPToCSV').data('start-date');
@@ -774,20 +813,9 @@
             },
             body: JSON.stringify({ ProjectId: projectId, StartDate: startDateISO, EndDate: endDateISO })
         })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.blob();
-            })
+            .then(response => getCsvExportBlob(response, 'PMs per WP'))
             .then(blob => {
-                var url = window.URL.createObjectURL(blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = `PMsPerWP_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
+                downloadCsvBlob(blob, `PMsPerWP_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`);
                 hideAuditPmsLoadingOverlay(true);
             })
             .catch(error => {
@@ -820,20 +848,9 @@
             },
             body: JSON.stringify({ ProjectId: projectId, StartDate: startDateISO, EndDate: endDateISO })
         })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.blob();
-            })
+            .then(response => getCsvExportBlob(response, 'Audit PMs'))
             .then(blob => {
-                var url = window.URL.createObjectURL(blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = `PMsAuditoria_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
+                downloadCsvBlob(blob, `PMsAuditoria_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`);
                 hideAuditPmsLoadingOverlay(true);
             })
             .catch(error => {
@@ -866,20 +883,9 @@
             },
             body: JSON.stringify({ ProjectId: projectId, StartDate: startDateISO, EndDate: endDateISO })
         })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.blob();
-            })
+            .then(response => getCsvExportBlob(response, 'Audit PMs per WP'))
             .then(blob => {
-                var url = window.URL.createObjectURL(blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = `PMsAuditByWP_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
+                downloadCsvBlob(blob, `PMsAuditByWP_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`);
                 hideAuditPmsLoadingOverlay(true);
             })
             .catch(error => {
@@ -911,20 +917,9 @@
                 EndDate: endDateISO
             })
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.blob();
-        })
+        .then(response => getCsvExportBlob(response, 'Worked Days'))
         .then(blob => {
-            var url = window.URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = `WorkedDays_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
+            downloadCsvBlob(blob, `WorkedDays_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`);
             hideAuditPmsLoadingOverlay(true);
         })
         .catch(error => {
@@ -954,18 +949,9 @@
                 EndDate: endDateISO
             })
         })
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.blob();
-        })
+        .then(response => getCsvExportBlob(response, 'Estimated Worked Days'))
         .then(blob => {
-            var url = window.URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = `EstimatedWorkedDays_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
+            downloadCsvBlob(blob, `EstimatedWorkedDays_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`);
             hideAuditPmsLoadingOverlay(true);
         })
         .catch(error => {
@@ -1010,18 +996,9 @@
                 EndDate: endDateISO
             })
         })
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.blob();
-        })
+        .then(response => getCsvExportBlob(response, baseFileName))
         .then(blob => {
-            var url = window.URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = `${baseFileName}_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
+            downloadCsvBlob(blob, `${baseFileName}_${projectId}_${new Date().toISOString().slice(0, 10)}.csv`);
             hideAuditPmsLoadingOverlay(true);
         })
         .catch(error => {
