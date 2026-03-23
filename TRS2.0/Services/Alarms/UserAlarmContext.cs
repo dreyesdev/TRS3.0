@@ -1,10 +1,14 @@
-using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
+﻿using TRS2._0.Models.DataModels;
 
 namespace TRS2._0.Services.Alarms
 {
+    /// <summary>
+    /// Evaluation context shared across alarm rules for a single user.
+    /// </summary>
     public sealed class UserAlarmContext
     {
         public ApplicationUser User { get; init; } = default!;
+
         public IReadOnlyCollection<string> Roles { get; init; } = Array.Empty<string>();
 
         public bool IsInAnyRole(params string[] roleNames)

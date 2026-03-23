@@ -1,9 +1,12 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using TRS2._0.Models.DataModels;
 using TRS2._0.Models.ViewModels;
 
 namespace TRS2._0.Services.Alarms
 {
+    /// <summary>
+    /// Warns researchers who have current-month effort assigned but still have no declared hours.
+    /// </summary>
     public class CurrentMonthNoHoursAlarmRule : IUserAlarmRule
     {
         private readonly TRSDBContext _context;
@@ -19,13 +22,7 @@ namespace TRS2._0.Services.Alarms
 
         public async Task<UserAlarmViewModel?> EvaluateAsync(UserAlarmContext context)
         {
-            if (context.User.PersonnelId == null)
-            {
-                return null;
-            }
-
-            // Primer escenario de prueba: esta alarma aplica solo a Researcher.
-            if (!context.IsInAnyRole("Researcher"))
+            if (context.User.PersonnelId is null || !context.IsInAnyRole("Researcher"))
             {
                 return null;
             }
@@ -50,7 +47,7 @@ namespace TRS2._0.Services.Alarms
             }
 
             var declared = await _workCalendarService.GetDeclaredHoursPerMonthForPerson(personId, currentMonth, currentMonth);
-            declared.TryGetValue(currentMonth, out decimal declaredHours);
+            declared.TryGetValue(currentMonth, out var declaredHours);
 
             if (declaredHours > 0m)
             {

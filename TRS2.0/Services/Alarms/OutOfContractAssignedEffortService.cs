@@ -1,8 +1,11 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using TRS2._0.Models.DataModels;
 
 namespace TRS2._0.Services.Alarms
 {
+    /// <summary>
+    /// Builds the list of effort assignments that fall outside a valid contract window.
+    /// </summary>
     public class OutOfContractAssignedEffortService
     {
         private readonly TRSDBContext _context;
@@ -12,7 +15,12 @@ namespace TRS2._0.Services.Alarms
             _context = context;
         }
 
-        public async Task<IReadOnlyList<OutOfContractAssignment>> GetOutOfContractAssignmentsAsync(int viewerPersonId, IReadOnlyCollection<string> roles)
+        /// <summary>
+        /// Returns out-of-contract assignments visible to the requesting viewer.
+        /// </summary>
+        public async Task<IReadOnlyList<OutOfContractAssignment>> GetOutOfContractAssignmentsAsync(
+            int viewerPersonId,
+            IReadOnlyCollection<string> roles)
         {
             var isAdmin = roles.Contains("Admin");
             var isProjectManager = roles.Contains("ProjectManager");
@@ -27,8 +35,8 @@ namespace TRS2._0.Services.Alarms
             var months = new[] { previousMonth, currentMonth };
 
             var scopedProjectIds = await _context.Projects
-                .Where(p => isAdmin || p.Pm == viewerPersonId || p.Fm == viewerPersonId)
-                .Select(p => p.ProjId)
+                .Where(project => isAdmin || project.Pm == viewerPersonId || project.Fm == viewerPersonId)
+                .Select(project => project.ProjId)
                 .ToListAsync();
 
             if (scopedProjectIds.Count == 0)
@@ -37,33 +45,33 @@ namespace TRS2._0.Services.Alarms
             }
 
             var assignments = await _context.Persefforts
-                .Where(e => e.Value > 0m
-                            && months.Contains(e.Month)
-                            && scopedProjectIds.Contains(e.WpxPersonNavigation.WpNavigation.ProjId))
-                .GroupBy(e => new
+                .Where(effort => effort.Value > 0m
+                                 && months.Contains(effort.Month)
+                                 && scopedProjectIds.Contains(effort.WpxPersonNavigation.WpNavigation.ProjId))
+                .GroupBy(effort => new
                 {
-                    e.Month,
-                    ProjectId = e.WpxPersonNavigation.WpNavigation.ProjId,
-                    ProjectAcronym = e.WpxPersonNavigation.WpNavigation.Proj != null
-                        ? e.WpxPersonNavigation.WpNavigation.Proj.Acronim
+                    effort.Month,
+                    ProjectId = effort.WpxPersonNavigation.WpNavigation.ProjId,
+                    ProjectAcronym = effort.WpxPersonNavigation.WpNavigation.Proj != null
+                        ? effort.WpxPersonNavigation.WpNavigation.Proj.Acronim
                         : null,
-                    ProjectTitle = e.WpxPersonNavigation.WpNavigation.Proj != null
-                        ? e.WpxPersonNavigation.WpNavigation.Proj.Title
+                    ProjectTitle = effort.WpxPersonNavigation.WpNavigation.Proj != null
+                        ? effort.WpxPersonNavigation.WpNavigation.Proj.Title
                         : null,
-                    PersonId = e.WpxPersonNavigation.Person,
-                    PersonName = e.WpxPersonNavigation.PersonNavigation.Name,
-                    PersonSurname = e.WpxPersonNavigation.PersonNavigation.Surname
+                    PersonId = effort.WpxPersonNavigation.Person,
+                    PersonName = effort.WpxPersonNavigation.PersonNavigation.Name,
+                    PersonSurname = effort.WpxPersonNavigation.PersonNavigation.Surname
                 })
-                .Select(g => new OutOfContractAssignment
+                .Select(group => new OutOfContractAssignment
                 {
-                    Month = g.Key.Month,
-                    ProjectId = g.Key.ProjectId,
-                    ProjectAcronym = g.Key.ProjectAcronym,
-                    ProjectTitle = g.Key.ProjectTitle,
-                    PersonId = g.Key.PersonId,
-                    PersonName = g.Key.PersonName,
-                    PersonSurname = g.Key.PersonSurname,
-                    AssignedEffort = g.Sum(x => x.Value)
+                    Month = group.Key.Month,
+                    ProjectId = group.Key.ProjectId,
+                    ProjectAcronym = group.Key.ProjectAcronym,
+                    ProjectTitle = group.Key.ProjectTitle,
+                    PersonId = group.Key.PersonId,
+                    PersonName = group.Key.PersonName,
+                    PersonSurname = group.Key.PersonSurname,
+                    AssignedEffort = group.Sum(item => item.Value)
                 })
                 .ToListAsync();
 
@@ -72,49 +80,53 @@ namespace TRS2._0.Services.Alarms
                 return Array.Empty<OutOfContractAssignment>();
             }
 
-            var monthRanges = months
-                .Select(m => new
-                {
-                    Month = m,
-                    Start = m,
-                    End = new DateTime(m.Year, m.Month, DateTime.DaysInMonth(m.Year, m.Month))
-                })
-                .ToDictionary(x => x.Month, x => (x.Start, x.End));
+            var monthRanges = months.ToDictionary(
+                month => month,
+                month => (
+                    Start: month,
+                    End: new DateTime(month.Year, month.Month, DateTime.DaysInMonth(month.Year, month.Month))));
 
-            var personIds = assignments
-                .Select(x => x.PersonId)
-                .Distinct()
-                .ToList();
+            var personIds = assignments.Select(item => item.PersonId).Distinct().ToList();
 
             var contracts = await _context.Dedications
-                .Where(d => personIds.Contains(d.PersId)
-                            && d.Start <= monthRanges[currentMonth].End
-                            && d.End >= monthRanges[previousMonth].Start)
-                .Select(d => new { d.PersId, d.Start, d.End })
+                .Where(dedication => personIds.Contains(dedication.PersId)
+                                     && dedication.Start <= monthRanges[currentMonth].End
+                                     && dedication.End >= monthRanges[previousMonth].Start)
+                .Select(dedication => new { dedication.PersId, dedication.Start, dedication.End })
                 .ToListAsync();
 
             return assignments
-                .Where(a => !contracts.Any(c =>
-                    c.PersId == a.PersonId
-                    && c.Start <= monthRanges[a.Month].End
-                    && c.End >= monthRanges[a.Month].Start))
-                .OrderByDescending(a => a.Month)
-                .ThenBy(a => a.ProjectAcronym)
-                .ThenBy(a => a.PersonSurname)
-                .ThenBy(a => a.PersonName)
+                .Where(assignment => !contracts.Any(contract =>
+                    contract.PersId == assignment.PersonId &&
+                    contract.Start <= monthRanges[assignment.Month].End &&
+                    contract.End >= monthRanges[assignment.Month].Start))
+                .OrderByDescending(assignment => assignment.Month)
+                .ThenBy(assignment => assignment.ProjectAcronym)
+                .ThenBy(assignment => assignment.PersonSurname)
+                .ThenBy(assignment => assignment.PersonName)
                 .ToList();
         }
     }
 
+    /// <summary>
+    /// Read model used by the out-of-contract alarms and screens.
+    /// </summary>
     public class OutOfContractAssignment
     {
         public DateTime Month { get; set; }
+
         public int ProjectId { get; set; }
+
         public string? ProjectAcronym { get; set; }
+
         public string? ProjectTitle { get; set; }
+
         public int PersonId { get; set; }
+
         public string? PersonName { get; set; }
+
         public string? PersonSurname { get; set; }
+
         public decimal AssignedEffort { get; set; }
     }
 }

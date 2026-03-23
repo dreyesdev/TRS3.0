@@ -1,29 +1,26 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TRS2._0.Models.DataModels;
 using Microsoft.Extensions.Options;
+using System.Text;
+using TRS2._0.Models.DataModels;
 
 namespace TRS2._0.Services
 {
+    /// <summary>
+    /// Centralizes the monthly and weekly reminder workflow for incomplete timesheets.
+    /// </summary>
     public class ReminderService
     {
+        private const string TrsAppUrl = "https://opstrs03.bsc.es/Account/Login";
+        private const string GuidePdfPath = "wwwroot/docs/BSC_TRS_Guide_v1.pdf";
+        private const string GuidePdfContentType = "application/pdf";
+
         private readonly TRSDBContext _context;
         private readonly WorkCalendarService _workCalendarService;
         private readonly IEmailSender _emailSender;
         private readonly ILogger<ReminderService> _logger;
         private readonly LoadDataService _loadDataService;
-        private readonly ReminderEmailOptions _options; 
-
-        private const string TrsAppUrl = "https://opstrs03.bsc.es/Account/Login"; // del manual
-        private const string GuidePdfPath = "wwwroot/docs/BSC_TRS_Guide_v1.pdf"; // coloca el PDF aquí en tu app
-        private const string GuidePdfContentType = "application/pdf";
-
+        private readonly ReminderEmailOptions _options;
 
         public ReminderService(
             TRSDBContext context,
@@ -41,32 +38,30 @@ namespace TRS2._0.Services
             _options = options.Value;
         }
 
-        // ====== ENTRADA PRINCIPAL (llamada desde el Job) ======
+        /// <summary>
+        /// Executes the reminder workflow for the previous month.
+        /// </summary>
         public async Task SendTimesheetRemindersAsync(bool firstMondayOfMonth)
         {
-            // Siempre se trabaja con el MES ANTERIOR
-            var today = DateTime.Today;
-            int year = (today.Month == 1) ? today.Year - 1 : today.Year;
-            int prevMonth = (today.Month == 1) ? 12 : today.Month - 1;
-            var targetMonth = new DateTime(year, prevMonth, 1);
+            var targetMonth = GetPreviousMonthStart(DateTime.Today);
 
             if (firstMondayOfMonth)
             {
-                await SendInitialMonthlyEmailToAllAsync(targetMonth);
+                await SendInitialMonthlyEmailToAllAsync();
+                return;
             }
-            else
-            {
-                await SendReminderToPendingUsersAsync(targetMonth);
-            }
+
+            await SendReminderToPendingUsersAsync(targetMonth);
         }
 
-        // ====== 2.1) PRIMER LUNES: INICIAL A TODO EL MUNDO + ADJUNTO ======
-        private async Task SendInitialMonthlyEmailToAllAsync(DateTime targetMonth)
+        /// <summary>
+        /// Sends the initial monthly communication to all active personnel with pending months.
+        /// </summary>
+        private async Task SendInitialMonthlyEmailToAllAsync()
         {
-            var today = DateTime.Today; // fecha de envío
+            var today = DateTime.Today;
             var cutoffFirstOfCurrentMonth = new DateTime(today.Year, today.Month, 1);
 
-            // Solo personas con email y contrato ACTIVO hoy
             var personnelList = await _context.Personnel
                 .Where(p => !string.IsNullOrEmpty(p.Email) &&
                             _context.Dedications.Any(d =>
@@ -82,9 +77,11 @@ namespace TRS2._0.Services
             {
                 try
                 {
-                    // Meses pendientes: año >= 2025, effort>0 en WP activo, required-threshold>0 y declared<threshold
                     var pendingMonths = await GetPendingMonthsAsync(person.Id, cutoffFirstOfCurrentMonth);
-                    if (pendingMonths.Count == 0) continue;
+                    if (pendingMonths.Count == 0)
+                    {
+                        continue;
+                    }
 
                     var body = BuildInitialEmailBodyHtml(pendingMonths);
 
@@ -98,15 +95,13 @@ namespace TRS2._0.Services
             }
         }
 
-
-
-
-        // ====== 2.2) LUNES SIGUIENTES: RECORDATORIO SOLO A PENDIENTES ======
+        /// <summary>
+        /// Sends weekly follow-up reminders only to users that remain below the required threshold.
+        /// </summary>
         private async Task SendReminderToPendingUsersAsync(DateTime targetMonth)
         {
-            var today = DateTime.Today; // fecha de envío
+            var today = DateTime.Today;
 
-            // Solo personas con email y contrato ACTIVO hoy
             var personnelList = await _context.Personnel
                 .Where(p => !string.IsNullOrEmpty(p.Email) &&
                             _context.Dedications.Any(d =>
@@ -120,7 +115,6 @@ namespace TRS2._0.Services
             {
                 try
                 {
-                    // Debe tener assignment + effort>0 en WP activo ese mes
                     var assignedWithEffort = await HasActiveAssignmentWithEffortAsync(
                         person.Id, targetMonth.Year, targetMonth.Month);
 
@@ -131,21 +125,17 @@ namespace TRS2._0.Services
                         continue;
                     }
 
-                    // HORAS declaradas
                     var declaredDict = await _workCalendarService
                         .GetDeclaredHoursPerMonthForPerson(person.Id, targetMonth, targetMonth);
                     declaredDict.TryGetValue(targetMonth, out decimal declaredHours);
 
-                    // HORAS requeridas base (dedicación, festivos, bajas…)
                     var dailyHours = await _workCalendarService
                         .CalculateDailyWorkHoursWithDedicationAndLeaves(person.Id, targetMonth.Year, targetMonth.Month);
                     var requiredHoursBase = dailyHours.Values.Sum();
 
-                    // Umbral final (aplica "cap" si el flag está ON)
                     var requiredThreshold = await GetRequiredThresholdAsync(
                         person.Id, targetMonth.Year, targetMonth.Month, requiredHoursBase);
 
-                    // Si el umbral resultante es 0 (sin asignación utilizable), no avisamos
                     if (requiredThreshold <= 0m)
                     {
                         _logger.LogInformation("[REMINDER] Saltado {Email}: threshold=0 (sin asignación utilizable) en {Month:MM/yyyy}",
@@ -167,7 +157,6 @@ namespace TRS2._0.Services
                     var body = BuildTimesheetFocusedReminderEmail(
                         person.Name, targetMonth.ToString("MMMM yyyy"), declaredHours, requiredThreshold);
 
-                    // Adjunta guía también en los recordatorios semanales (con Reply-To configurado)
                     await SendEmailWithGuideAsync(person.Email, subject, body);
 
                     _logger.LogInformation("[REMINDER] Email enviado a {Email}", person.Email);
@@ -182,6 +171,9 @@ namespace TRS2._0.Services
 
 
 
+        /// <summary>
+        /// Sends the reminder workflow to a single user for validation purposes.
+        /// </summary>
         public async Task SendTimesheetRemindersToSingleUserAsync(int personId, bool firstWeekOfMonth)
         {
             var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == personId);
@@ -205,51 +197,51 @@ namespace TRS2._0.Services
                 _logger.LogInformation("[TEST-INITIAL] Email de prueba enviado a {Email}", person.Email);
                 return;
             }
+            var declared = await _workCalendarService
+                .GetDeclaredHoursPerMonthForPerson(person.Id, targetMonth, targetMonth);
+            declared.TryGetValue(targetMonth, out decimal declaredHours);
+
+            var dailyHours = await _workCalendarService
+                .CalculateDailyWorkHoursWithDedicationAndLeaves(person.Id, targetMonth.Year, targetMonth.Month);
+            var requiredHoursBase = dailyHours.Values.Sum();
+
+            var requiredThreshold = await GetRequiredThresholdAsync(
+                person.Id, targetMonth.Year, targetMonth.Month, requiredHoursBase);
+
+            if (requiredThreshold > 0m && declaredHours < requiredThreshold)
+            {
+                var body = BuildTimesheetFocusedReminderEmail(
+                    person.Name, targetMonth.ToString("MMMM yyyy"), declaredHours, requiredThreshold);
+
+                await SendEmailWithGuideAsync(
+                    person.Email, $"TEST - Reminder for {targetMonth:MMMM yyyy}", body, "david.reyes@bsc.es");
+
+                _logger.LogInformation("[TEST-REMINDER] Email focalizado de prueba enviado a {Email}", person.Email);
+            }
             else
             {
-                var declared = await _workCalendarService
-                    .GetDeclaredHoursPerMonthForPerson(person.Id, targetMonth, targetMonth);
-                declared.TryGetValue(targetMonth, out decimal declaredHours);
-
-                // Usa el mismo cálculo base que el reminder masivo
-                var dailyHours = await _workCalendarService
-                    .CalculateDailyWorkHoursWithDedicationAndLeaves(person.Id, targetMonth.Year, targetMonth.Month);
-                var requiredHoursBase = dailyHours.Values.Sum();
-
-                var requiredThreshold = await GetRequiredThresholdAsync(
-                    person.Id, targetMonth.Year, targetMonth.Month, requiredHoursBase);
-
-                if (requiredThreshold > 0m && declaredHours < requiredThreshold)
-                {
-                    var body = BuildTimesheetFocusedReminderEmail(
-                        person.Name, targetMonth.ToString("MMMM yyyy"), declaredHours, requiredThreshold);
-
-                    await SendEmailWithGuideAsync(
-                        person.Email, $"TEST - Reminder for {targetMonth:MMMM yyyy}", body, "david.reyes@bsc.es");
-
-                    _logger.LogInformation("[TEST-REMINDER] Email focalizado de prueba enviado a {Email}", person.Email);
-                }
-                else
-                {
-                    _logger.LogInformation("[TEST-REMINDER] No se envía: declared={Declared}h, threshold={Threshold}h",
-                        declaredHours, requiredThreshold);
-                }
+                _logger.LogInformation("[TEST-REMINDER] No se envía: declared={Declared}h, threshold={Threshold}h",
+                    declaredHours, requiredThreshold);
             }
         }
 
+        /// <summary>
+        /// Projection used by dry-run scenarios and alarm evaluation.
+        /// </summary>
         public record ReminderCandidate(
-    int PersonId,
-    string PersonName,
-    string Email,
-    DateTime TargetMonth,
-    decimal DeclaredHours,
-    decimal RequiredBaseHours,
-    decimal AssignedFraction,
-    decimal RequiredThresholdHours,
-    bool WillSend
-);
+            int PersonId,
+            string PersonName,
+            string Email,
+            DateTime TargetMonth,
+            decimal DeclaredHours,
+            decimal RequiredBaseHours,
+            decimal AssignedFraction,
+            decimal RequiredThresholdHours,
+            bool WillSend);
 
-
+        /// <summary>
+        /// Computes the reminder decision for a single person and target month.
+        /// </summary>
         public async Task<ReminderCandidate?> ComputeWeeklyReminderCandidateForPersonAsync(int personId, DateTime targetMonth)
         {
             var today = DateTime.Today;
@@ -300,26 +292,27 @@ namespace TRS2._0.Services
                 willSend);
         }
 
+        /// <summary>
+        /// Returns the dry-run list, optionally filtering to the candidates that would receive an email.
+        /// </summary>
         public async Task<List<ReminderCandidate>> ComputeWeeklyReminderCandidatesAsync(
-    DateTime targetMonth,
-    bool onlyWillSend)
+            DateTime targetMonth,
+            bool onlyWillSend)
         {
-            var all = await ComputeWeeklyReminderCandidatesAsync(targetMonth); // tu método actual
+            var all = await ComputeWeeklyReminderCandidatesAsync(targetMonth);
             return onlyWillSend ? all.Where(x => x.WillSend).ToList() : all;
         }
 
 
 
         /// <summary>
-        /// Dry-run del recordatorio semanal para un mes objetivo (normalmente el mes anterior).
-        /// NO envía emails. Devuelve la lista de candidatos y el motivo.
+        /// Computes all reminder candidates for a target month without sending any emails.
         /// </summary>
         public async Task<List<ReminderCandidate>> ComputeWeeklyReminderCandidatesAsync(DateTime targetMonth)
         {
             var results = new List<ReminderCandidate>();
-            var today = DateTime.Today; // la regla es "contrato activo en el día del envío"
+            var today = DateTime.Today;
 
-            // Solo candidatos con email; el filtro de contrato lo aplicamos por persona (evita subqueries pesadas en la lista)
             var personnelList = await _context.Personnel
                 .Where(p => !string.IsNullOrEmpty(p.Email))
                 .Select(p => new { p.Id, p.Name, p.Email })
@@ -329,7 +322,6 @@ namespace TRS2._0.Services
             {
                 try
                 {
-                    //  Si no tiene contrato ACTIVO hoy, ni lo evaluamos: no se envía
                     var hasContractToday = await IsContractActiveAsync(person.Id, today);
                     if (!hasContractToday)
                     {
@@ -344,8 +336,6 @@ namespace TRS2._0.Services
                         continue;
                     }
 
-
-                    // ¿Tiene asignación activa con effort>0 ese mes?
                     var assignedWithEffort = await HasActiveAssignmentWithEffortAsync(
                         person.Id, targetMonth.Year, targetMonth.Month);
 
@@ -362,17 +352,14 @@ namespace TRS2._0.Services
                         continue;
                     }
 
-                    // Declaradas
                     var declaredDict = await _workCalendarService
                         .GetDeclaredHoursPerMonthForPerson(person.Id, targetMonth, targetMonth);
                     declaredDict.TryGetValue(targetMonth, out decimal declaredHours);
 
-                    // Requeridas base
                     var dailyHours = await _workCalendarService
                         .CalculateDailyWorkHoursWithDedicationAndLeaves(person.Id, targetMonth.Year, targetMonth.Month);
                     var requiredBase = dailyHours.Values.Sum();
 
-                    // Fracción asignada y umbral
                     var assignedFraction = _options.UseAssignmentCap
                         ? await GetAssignedFractionAsync(person.Id, targetMonth.Year, targetMonth.Month)
                         : 1m;
@@ -380,7 +367,6 @@ namespace TRS2._0.Services
                     var requiredThreshold = await GetRequiredThresholdAsync(
                         person.Id, targetMonth.Year, targetMonth.Month, requiredBase);
 
-                    // Reglas finales
                     bool willSend = requiredThreshold > 0m && declaredHours < requiredThreshold;
 
                     results.Add(new ReminderCandidate(
@@ -407,16 +393,6 @@ namespace TRS2._0.Services
 
 
 
-        private string BuildTimesheetGeneralReminderEmail(string name, List<string> pending)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine($"<p>Hi {name},</p>");
-            sb.AppendLine("<p>This is a friendly reminder to complete your timesheets for the following months:</p><ul>");
-            pending.ForEach(p => sb.AppendLine($"<li>{p}</li>"));
-            sb.AppendLine("</ul><p>Thank you.</p>");
-            return sb.ToString();
-        }
-
         private string BuildTimesheetFocusedReminderEmail(string name, string monthName, decimal declared, decimal requiredThreshold)
         {
             return $@"
@@ -428,31 +404,8 @@ namespace TRS2._0.Services
         }
 
 
-        // ====== 2.4) PLANTILLAS HTML ======
-        private string BuildInitialEmailBodyHtml()
-        {
-            // Basado en “email INICIAL TRS VF” + enlace a TRS y nota de adjunto.
-            // (los <br> son para compactarlo en un string)
-            return $@"
-            <p><strong>ACTION REQUIRED – Monthly Completion and Validation of Your TIMESHEET</strong></p>
-            <p>Dear all,</p>
-            <p>As a BSC member, you are required to complete and validate your working hours each month for the projects you are involved in. This process is essential for project financial reporting.</p>
-            <p>Starting now, this process must be done personally through the new BSC Time Recording System App.</p>
-            <p>⏰ You will receive an automatic reminder every Monday if your timesheet for the previous month has not been completed.</p>
-            <p><strong>Important information:</strong></p>
-            <ul>
-              <li>Upon logging into the platform, the system will automatically record your access date.</li>
-              <li>Make sure to click the “Save All” button to successfully complete and confirm your hours.</li>
-              <li>It's fundamental that you track your holidays and leaves in Woffu because this system gets that data from Woffu database. Woffu does not track the assignment to projects.</li>
-            </ul>
-            <p>⚠️ Please note:<br/>A detailed user guide is attached to this email for your reference.</p>
-            <p>👉 <a href=""{TrsAppUrl}"">Click here to access the TRS App</a></p>
-            <p>Thank you for your cooperation.<br/>Best regards,<br/>Finance Projects Team</p>";
-        }
-
         private string BuildInitialEmailBodyHtml(List<(DateTime Month, decimal Declared, decimal Required)> pending)
         {
-            // Lista en HTML de los meses pendientes “Mes yyyy: Xh / Yh”
             var sbList = new StringBuilder();
             sbList.Append("<ul>");
             foreach (var (Month, Declared, Required) in pending.OrderBy(x => x.Month))
@@ -462,11 +415,11 @@ namespace TRS2._0.Services
             sbList.Append("</ul>");
 
             return $@"
-                <p><strong>ACTION REQUIRED – Monthly Completion and Validation of Your TIMESHEET</strong></p>
+                <p><strong>ACTION REQUIRED - Monthly Completion and Validation of Your TIMESHEET</strong></p>
                 <p>Dear all,</p>
                 <p>As a BSC member, you are required to complete and validate your working hours each month for the projects you are involved in. This process is essential for project financial reporting.</p>
                 <p>Starting now, this process must be done personally through the new BSC Time Recording System App.</p>
-                <p>⏰ You will receive an automatic reminder every Monday if your timesheet for the previous month has not been completed.</p>
+                <p>You will receive an automatic reminder every Monday if your timesheet for the previous month has not been completed.</p>
 
                 <p><strong>You currently have pending timesheets for:</strong></p>
                 {sbList}
@@ -477,69 +430,45 @@ namespace TRS2._0.Services
                   <li>Make sure to click the “Save All” button to successfully complete and confirm your hours.</li>
                   <li>It's fundamental that you track your holidays and leaves in Woffu because this system gets that data from Woffu database. Woffu does not track the assignment to projects.</li>
                 </ul>
-                <p>⚠️ Please note:<br/>A detailed user guide is attached to this email for your reference.</p>
-                <p>👉 <a href=""{TrsAppUrl}"">Click here to access the TRS App</a></p>
+                <p>Please note:<br/>A detailed user guide is attached to this email for your reference.</p>
+                <p><a href=""{TrsAppUrl}"">Click here to access the TRS App</a></p>
                 <p>Thank you for your cooperation.<br/>Best regards,<br/>Finance Projects Team</p>";
         }
 
-        private string BuildReminderEmailBodyHtml()
-        {
-            // Basado en “email recordatorio TRS”
-            return $@"
-            <p>Dear all,</p>
-            <p>This is a friendly reminder to complete and validate your TIMESHEET for the previous month in the BSC Time Recording System App.</p>
-            <p>As communicated previously, recording your working hours is mandatory for project financial reporting. Please make sure to:</p>
-            <ul>
-              <li>Log in to the TRS App.</li>
-              <li>Enter and validate your hours for the previous month.</li>
-              <li>Click “Save All” to confirm completion.</li>
-            </ul>
-            <p>⚠️ Kindly complete this process as soon as possible to ensure compliance with reporting requirements.</p>
-            <p>👉 <a href=""{TrsAppUrl}"">Access the TRS App here</a></p>
-            <p>Thank you for your prompt attention.<br/>Best regards,<br/>Finance Projects Team</p>";
-        }
-
-        
-        // Devuelve la lista de meses < cutoff (primer día del mes actual) en los que declared < threshold (y threshold>0)
+        /// <summary>
+        /// Returns the pending historical months that remain below the required threshold.
+        /// </summary>
         private async Task<List<(DateTime Month, decimal Declared, decimal Pm)>> GetPendingMonthsAsync(
             int personId, DateTime cutoffFirstOfCurrentMonth)
         {
             var pending = new List<(DateTime, decimal, decimal)>();
-
-            // Meses candidatos (anteriores al primer día del mes actual)
             var months = await _loadDataService.RelevantMonths(personId);
 
             foreach (var month in months
-                .Where(m => m < cutoffFirstOfCurrentMonth && m.Year >= 2025)   // solo desde 2025 en adelante
+                .Where(m => m < cutoffFirstOfCurrentMonth && m.Year >= 2025)
                 .OrderBy(m => m))
             {
-                // Requisito: ese mes tuvo effort>0 en algún WP ACTIVO
                 var hasEffortInActiveWp = await HasActiveAssignmentWithEffortAsync(personId, month.Year, month.Month);
                 if (!hasEffortInActiveWp) continue;
 
-                // HORAS requeridas base (según dedicación, festivos, bajas…)
-                var dailyHours = await _workCalendarService.CalculateDailyWorkHoursWithDedicationAndLeaves(personId, month.Year, month.Month);
+                var dailyHours = await _workCalendarService
+                    .CalculateDailyWorkHoursWithDedicationAndLeaves(personId, month.Year, month.Month);
                 var requiredHoursBase = dailyHours.Values.Sum();
 
-                // HORAS declaradas
                 var declaredDict = await _workCalendarService.GetDeclaredHoursPerMonthForPerson(personId, month, month);
                 declaredDict.TryGetValue(month, out decimal declared);
 
-                // Umbral final (aplica "cap" si el flag está ON)
                 var requiredThreshold = await GetRequiredThresholdAsync(personId, month.Year, month.Month, requiredHoursBase);
 
-                // Añadir a la lista solo si hay umbral > 0 y está incompleto
                 if (requiredThreshold > 0m && declared < requiredThreshold)
                 {
-                    pending.Add((month, declared, requiredThreshold)); // guardamos el threshold como “Required”
+                    pending.Add((month, declared, requiredThreshold));
                 }
             }
 
             return pending;
         }
 
-
-        // Comprueba si la persona tenía al menos un WP activo ese mes Y effort > 0 en ese mes
         private async Task<bool> HasActiveAssignmentWithEffortAsync(int personId, int year, int month)
         {
             var first = new DateTime(year, month, 1);
@@ -549,7 +478,6 @@ namespace TRS2._0.Services
                 e.Value > 0 &&
                 e.Month >= first && e.Month <= last &&
                 e.WpxPersonNavigation.Person == personId &&
-                // Asegura que el WP de esa asignación estaba activo ese mes:
                 e.WpxPersonNavigation.WpNavigation.StartDate <= last &&
                 e.WpxPersonNavigation.WpNavigation.EndDate >= first
             );
@@ -581,8 +509,8 @@ namespace TRS2._0.Services
                     htmlBody: htmlBody,
                     attachments: attachment,
                     copyTo: copyTo,
-                    replyTo: _options.ReplyTo,                 // 👈 Reply-To desde opciones
-                    fromDisplayName: _options.FromDisplayName  // 👈 Nombre visible
+                    replyTo: _options.ReplyTo,
+                    fromDisplayName: _options.FromDisplayName
                 );
             }
             else
@@ -595,8 +523,8 @@ namespace TRS2._0.Services
                     email: to,
                     subject: subject,
                     message: bodyWithLink,
-                    replyTo: _options.ReplyTo,                 // 👈 Reply-To
-                    fromDisplayName: _options.FromDisplayName  // 👈 Nombre visible
+                    replyTo: _options.ReplyTo,
+                    fromDisplayName: _options.FromDisplayName
                 );
             }
         }
@@ -627,14 +555,19 @@ namespace TRS2._0.Services
 
             var assignedFraction = await GetAssignedFractionAsync(personId, year, month);
 
-            // Si no hay asignación (>0) ese mes, no avisamos
             if (assignedFraction <= 0m)
                 return 0m;
 
             var threshold = requiredHoursBase * assignedFraction;
 
-            // Redondeo suave para evitar falsos positivos por decimales
             return Math.Round(threshold, 1, MidpointRounding.AwayFromZero);
+        }
+
+
+        private static DateTime GetPreviousMonthStart(DateTime referenceDate)
+        {
+            var currentMonthStart = new DateTime(referenceDate.Year, referenceDate.Month, 1);
+            return currentMonthStart.AddMonths(-1);
         }
 
         private async Task<bool> IsContractActiveAsync(int personId, DateTime onDate)
@@ -642,8 +575,7 @@ namespace TRS2._0.Services
             return await _context.Dedications.AnyAsync(d =>
                 d.PersId == personId &&
                 d.Start <= onDate &&
-                d.End >= onDate
-            );
+                d.End >= onDate);
         }
 
     }

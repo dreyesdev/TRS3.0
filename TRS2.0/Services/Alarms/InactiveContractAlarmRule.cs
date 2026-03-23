@@ -1,9 +1,12 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using TRS2._0.Models.DataModels;
 using TRS2._0.Models.ViewModels;
 
 namespace TRS2._0.Services.Alarms
 {
+    /// <summary>
+    /// Alerts administrative roles when their linked personnel record has no active dedication.
+    /// </summary>
     public class InactiveContractAlarmRule : IUserAlarmRule
     {
         private readonly TRSDBContext _context;
@@ -15,12 +18,7 @@ namespace TRS2._0.Services.Alarms
 
         public async Task<UserAlarmViewModel?> EvaluateAsync(UserAlarmContext context)
         {
-            if (context.User.PersonnelId == null)
-            {
-                return null;
-            }
-
-            if (!context.IsInAnyRole("Admin", "ProjectManager"))
+            if (context.User.PersonnelId is null || !context.IsInAnyRole("Admin", "ProjectManager"))
             {
                 return null;
             }

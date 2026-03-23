@@ -1,7 +1,10 @@
-using TRS2._0.Models.ViewModels;
+﻿using TRS2._0.Models.ViewModels;
 
 namespace TRS2._0.Services.Alarms
 {
+    /// <summary>
+    /// Exposes pending travel approvals as a user alarm for admin and project manager roles.
+    /// </summary>
     public class PendingTravelApprovalAlarmRule : IUserAlarmRule
     {
         private readonly PendingTravelApprovalService _pendingTravelApprovalService;
@@ -13,12 +16,7 @@ namespace TRS2._0.Services.Alarms
 
         public async Task<UserAlarmViewModel?> EvaluateAsync(UserAlarmContext context)
         {
-            if (context.User.PersonnelId == null)
-            {
-                return null;
-            }
-
-            if (!context.IsInAnyRole("Admin", "ProjectManager"))
+            if (context.User.PersonnelId is null || !context.IsInAnyRole("Admin", "ProjectManager"))
             {
                 return null;
             }
@@ -31,10 +29,10 @@ namespace TRS2._0.Services.Alarms
                 return null;
             }
 
-            var peopleCount = items.Select(x => x.PersonId).Distinct().Count();
+            var peopleCount = items.Select(item => item.PersonId).Distinct().Count();
             var projectCodes = items
-                .SelectMany(x => new[] { x.ProjectCode1, x.ProjectCode2 })
-                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .SelectMany(item => new[] { item.ProjectCode1, item.ProjectCode2 })
+                .Where(code => !string.IsNullOrWhiteSpace(code))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 

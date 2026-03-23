@@ -1,7 +1,10 @@
-using TRS2._0.Models.ViewModels;
+﻿using TRS2._0.Models.ViewModels;
 
 namespace TRS2._0.Services.Alarms
 {
+    /// <summary>
+    /// Publishes an alarm when there are effort assignments outside an active contract.
+    /// </summary>
     public class OutOfContractAssignedEffortAlarmRule : IUserAlarmRule
     {
         private readonly OutOfContractAssignedEffortService _outOfContractAssignedEffortService;
@@ -13,7 +16,7 @@ namespace TRS2._0.Services.Alarms
 
         public async Task<UserAlarmViewModel?> EvaluateAsync(UserAlarmContext context)
         {
-            if (context.User.PersonnelId == null)
+            if (context.User.PersonnelId is null)
             {
                 return null;
             }
@@ -26,21 +29,13 @@ namespace TRS2._0.Services.Alarms
                 return null;
             }
 
-            var uniquePeople = assignments
-                .Select(x => x.PersonId)
-                .Distinct()
-                .Count();
-
-            var uniqueProjects = assignments
-                .Select(x => x.ProjectId)
-                .Distinct()
-                .Count();
-
+            var uniquePeople = assignments.Select(item => item.PersonId).Distinct().Count();
+            var uniqueProjects = assignments.Select(item => item.ProjectId).Distinct().Count();
             var monthLabels = assignments
-                .Select(x => x.Month)
+                .Select(item => item.Month)
                 .Distinct()
-                .OrderBy(x => x)
-                .Select(x => x.ToString("MMMM yyyy"))
+                .OrderBy(month => month)
+                .Select(month => month.ToString("MMMM yyyy"))
                 .ToList();
 
             return new UserAlarmViewModel

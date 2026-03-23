@@ -13,17 +13,26 @@ using Serilog;
 using System.Text;
 namespace TRS2._0.Services;
 
+/// <summary>
+/// Provides working-calendar, dedication, leave and effort calculations used across timesheets and planning.
+/// </summary>
 public class WorkCalendarService
 {
         private readonly TRSDBContext _context;
         private readonly ILogger<WorkCalendarService> _logger;
 
+    /// <summary>
+    /// Creates a calendar service backed by the TRS domain data.
+    /// </summary>
     public WorkCalendarService(TRSDBContext context, ILogger<WorkCalendarService> logger)
     {
             _context = context;
             _logger = logger;
     }
 
+        /// <summary>
+        /// Calculates the business days in a month excluding weekends and national holidays.
+        /// </summary>
         public async Task<int> CalculateWorkingDays(int year, int month)
         {
             // Obtiene el número de días en el mes
@@ -51,6 +60,9 @@ public class WorkCalendarService
             return workingDays;
         }
 
+    /// <summary>
+    /// Calculates the PM contribution for a specific day after applying dedication and leave reductions.
+    /// </summary>
     public async Task<decimal> CalculateDailyPM(int personId, DateTime date)
     {
         // Comprobar si hay una ausencia registrada en la tabla 'Leave'
@@ -76,6 +88,9 @@ public class WorkCalendarService
         return dailyPmValue * (1 - applicableDedication); // Aplicar reducción
     }
 
+    /// <summary>
+    /// Calculates the monthly PM for a person by aggregating all eligible working days in the month.
+    /// </summary>
     public async Task<decimal> CalculateMonthlyPM(int personId, int year, int month)
     {
         // Obtener todos los contratos (dedicaciones) para el mes y año especificados

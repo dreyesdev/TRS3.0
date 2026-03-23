@@ -1,7 +1,10 @@
-using TRS2._0.Models.ViewModels;
+﻿using TRS2._0.Models.ViewModels;
 
 namespace TRS2._0.Services.Alarms
 {
+    /// <summary>
+    /// Reuses the reminder logic to display an alarm for an incomplete previous-month timesheet.
+    /// </summary>
     public class PendingPreviousMonthTimesheetAlarmRule : IUserAlarmRule
     {
         private readonly ReminderService _reminderService;
@@ -13,12 +16,7 @@ namespace TRS2._0.Services.Alarms
 
         public async Task<UserAlarmViewModel?> EvaluateAsync(UserAlarmContext context)
         {
-            if (context.User.PersonnelId == null)
-            {
-                return null;
-            }
-
-            if (!context.IsInAnyRole("Researcher", "ProjectManager", "Leader", "User"))
+            if (context.User.PersonnelId is null || !context.IsInAnyRole("Researcher", "ProjectManager", "Leader", "User"))
             {
                 return null;
             }

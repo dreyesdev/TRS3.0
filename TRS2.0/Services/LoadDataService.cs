@@ -22,8 +22,11 @@ using ILogger = Serilog.ILogger;
 
 namespace TRS2._0.Services
 {
+    /// <summary>
+    /// Executes the data ingestion, synchronization and maintenance processes that feed the TRS domain.
+    /// </summary>
     public class LoadDataService : IJob
-    {        
+    {
         private readonly TRSDBContext _context;
         private readonly WorkCalendarService _workCalendarService;
         private readonly ILogger<LoadDataService> _logger;
@@ -39,6 +42,9 @@ namespace TRS2._0.Services
                                                 .CreateLogger();
 
 
+        /// <summary>
+        /// Initializes the service and restores the bearer token lifecycle used by external integrations.
+        /// </summary>
         public LoadDataService(TRSDBContext context, WorkCalendarService workCalendarService, ILogger<LoadDataService> logger)
         {
             _context = context;
@@ -59,7 +65,9 @@ namespace TRS2._0.Services
         }
 
 
-        // Método para actualizar los valores mensuales de PM
+        /// <summary>
+        /// Recalculates and persists monthly PM values for every person based on the current calendar rules.
+        /// </summary>
         public async Task UpdateMonthlyPMs()
         {
             // Ruta del archivo de logs para registrar el proceso
@@ -133,7 +141,9 @@ namespace TRS2._0.Services
             }
         }
 
-        // Método para calcular los meses relevantes de una persona
+        /// <summary>
+        /// Returns the month range that must be considered for a person based on the contract history.
+        /// </summary>
         public async Task<List<DateTime>> RelevantMonths(int personId)
         {
             // Obtener las fechas de inicio y fin de los contratos de la persona
@@ -3238,6 +3248,5 @@ namespace TRS2._0.Services
         }
     }
 }
-
 
 

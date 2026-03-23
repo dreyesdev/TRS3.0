@@ -1,27 +1,37 @@
 ﻿using Microsoft.Extensions.Options;
 using System.Net;
 using System.Net.Mail;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.IO;
 
 namespace TRS2._0.Services
 {
-    // ✅ Nuevo contrato con adjuntos
+    /// <summary>
+    /// Extends the base email sender contract with support for attachments and common SMTP headers.
+    /// </summary>
     public interface IEmailSenderWithAttachments : IEmailSender
     {
-        Task SendEmailAsync(string to, string subject, string htmlBody,
-                            IEnumerable<EmailAttachment>? attachments,
-                            string? copyTo = null,
-                            string? replyTo = null,
-                            string? fromDisplayName = null);
+        Task SendEmailAsync(
+            string to,
+            string subject,
+            string htmlBody,
+            IEnumerable<EmailAttachment>? attachments,
+            string? copyTo = null,
+            string? replyTo = null,
+            string? fromDisplayName = null);
     }
 
-    // ✅ DTO adjunto reutilizable
-    public record EmailAttachment(string FileName, byte[] Content, string ContentType);
+    /// <summary>
+    /// Represents an email attachment to be sent through SMTP.
+    /// </summary>
+    public sealed record EmailAttachment(string FileName, byte[] Content, string ContentType);
 
+    /// <summary>
+    /// Sends transactional emails through the configured SMTP server.
+    /// </summary>
     public class EmailSender : IEmailSenderWithAttachments
     {
+        private const string AutoResponseSuppressHeader = "X-Auto-Response-Suppress";
+        private const string AutoSubmittedHeader = "Auto-Submitted";
+
         private readonly SmtpSettings _smtpSettings;
 
         public EmailSender(IOptions<SmtpSettings> smtpSettings)
@@ -29,24 +39,29 @@ namespace TRS2._0.Services
             _smtpSettings = smtpSettings.Value;
         }
 
-        
-        // Método "simple" redirige al completo con parámetros opcionales
-        public async Task SendEmailAsync(string email, string subject, string message,
-                                         string? replyTo = null, string? fromDisplayName = null)
+        /// <summary>
+        /// Sends an HTML email without attachments.
+        /// </summary>
+        public Task SendEmailAsync(
+            string email,
+            string subject,
+            string message,
+            string? replyTo = null,
+            string? fromDisplayName = null)
         {
-            await SendEmailAsync(
+            return SendEmailAsync(
                 to: email,
                 subject: subject,
                 htmlBody: message,
                 attachments: null,
                 copyTo: null,
                 replyTo: replyTo,
-                fromDisplayName: fromDisplayName
-            );
+                fromDisplayName: fromDisplayName);
         }
 
-        // ✅ Nuevo: envío con adjuntos
-        // Método completo (con adjuntos + Reply-To + DisplayName)
+        /// <summary>
+        /// Sends an HTML email with optional attachments, BCC recipient and reply-to address.
+        /// </summary>
         public async Task SendEmailAsync(
             string to,
             string subject,
@@ -56,16 +71,36 @@ namespace TRS2._0.Services
             string? replyTo = null,
             string? fromDisplayName = null)
         {
-            using var client = new SmtpClient(_smtpSettings.Host, _smtpSettings.Port)
+            using var client = CreateSmtpClient();
+            using var mail = CreateMailMessage(to, subject, htmlBody, copyTo, replyTo, fromDisplayName);
+
+            AddAttachments(mail, attachments);
+
+            await client.SendMailAsync(mail);
+        }
+
+        private SmtpClient CreateSmtpClient()
+        {
+            return new SmtpClient(_smtpSettings.Host, _smtpSettings.Port)
             {
                 Credentials = new NetworkCredential(_smtpSettings.Username, _smtpSettings.Password),
                 EnableSsl = true
             };
+        }
 
-            var from = new MailAddress($"{_smtpSettings.Username}@bsc.es",
+        private MailMessage CreateMailMessage(
+            string to,
+            string subject,
+            string htmlBody,
+            string? copyTo,
+            string? replyTo,
+            string? fromDisplayName)
+        {
+            var from = new MailAddress(
+                $"{_smtpSettings.Username}@bsc.es",
                 string.IsNullOrWhiteSpace(fromDisplayName) ? null : fromDisplayName);
 
-            using var mail = new MailMessage
+            var mail = new MailMessage
             {
                 From = from,
                 Subject = subject,
@@ -76,42 +111,60 @@ namespace TRS2._0.Services
             mail.To.Add(to);
 
             if (!string.IsNullOrWhiteSpace(copyTo))
-                mail.Bcc.Add(copyTo); // usa CC si quieres que sea visible
-
-            if (!string.IsNullOrWhiteSpace(replyTo))
-                mail.ReplyToList.Add(new MailAddress(replyTo));
-
-            // Cabeceras útiles (opcional)
-            mail.Headers.Add("X-Auto-Response-Suppress", "All");
-            mail.Headers.Add("Auto-Submitted", "auto-generated");
-
-            if (attachments != null)
             {
-                foreach (var a in attachments)
-                {
-                    var stream = new MemoryStream(a.Content);
-                    var att = new Attachment(stream, a.FileName, a.ContentType);
-                    mail.Attachments.Add(att);
-                }
+                mail.Bcc.Add(copyTo);
             }
 
-            await client.SendMailAsync(mail);
+            if (!string.IsNullOrWhiteSpace(replyTo))
+            {
+                mail.ReplyToList.Add(new MailAddress(replyTo));
+            }
+
+            mail.Headers.Add(AutoResponseSuppressHeader, "All");
+            mail.Headers.Add(AutoSubmittedHeader, "auto-generated");
+
+            return mail;
         }
-       
+
+        private static void AddAttachments(MailMessage mail, IEnumerable<EmailAttachment>? attachments)
+        {
+            if (attachments is null)
+            {
+                return;
+            }
+
+            foreach (var attachment in attachments)
+            {
+                var stream = new MemoryStream(attachment.Content);
+                mail.Attachments.Add(new Attachment(stream, attachment.FileName, attachment.ContentType));
+            }
+        }
     }
 
+    /// <summary>
+    /// SMTP configuration used by <see cref="EmailSender"/>.
+    /// </summary>
     public class SmtpSettings
     {
-        public string Host { get; set; }
+        public string Host { get; set; } = string.Empty;
+
         public int Port { get; set; }
-        public string Username { get; set; }
-        public string Password { get; set; }
+
+        public string Username { get; set; } = string.Empty;
+
+        public string Password { get; set; } = string.Empty;
     }
 
+    /// <summary>
+    /// Minimal contract used by the application to send HTML emails.
+    /// </summary>
     public interface IEmailSender
     {
-        Task SendEmailAsync(string email, string subject, string message,
-                            string? replyTo = null, string? fromDisplayName = null);
+        Task SendEmailAsync(
+            string email,
+            string subject,
+            string message,
+            string? replyTo = null,
+            string? fromDisplayName = null);
     }
 }
-
