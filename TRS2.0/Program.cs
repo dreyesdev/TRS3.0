@@ -26,16 +26,14 @@ Log.Logger = new LoggerConfiguration()
 // - Production (IIS): NO tocamos Kestrel; IIS (ANCM) gestiona el hosting y el HTTPS del sitio.
 if (builder.Environment.IsDevelopment())
 {
-    builder.WebHost.ConfigureKestrel(serverOptions =>
+    builder.WebHost.ConfigureKestrel((context, serverOptions) =>
     {
-        serverOptions.ListenAnyIP(5000); // HTTP (local)
-        serverOptions.ListenAnyIP(5001, listenOptions =>
-        {
-            // Certificado local para desarrollo
-            listenOptions.UseHttps(
-                "C:\\Users\\dreyes\\Source\\Repos\\trs3.0\\TRS2.0\\Resources\\opstrs03.bsc.es.pfx",
-                "seidor");
-        });
+        // Carga la configuración de Kestrel desde la sección "Kestrel"
+        // definida en appsettings.Development.json.
+        serverOptions.Configure(context.Configuration.GetSection("Kestrel"));
+
+        // Endpoint HTTP adicional para pruebas locales si se quiere mantener.
+        serverOptions.ListenAnyIP(5000);
     });
 }
 
