@@ -22,6 +22,9 @@ using static TRS2._0.Services.WorkCalendarService;
 
 namespace TRS2._0.Controllers
 {
+    /// <summary>
+    /// Concentrates the administration tools used to maintain PM values, launch operational processes and inspect corrective workflows.
+    /// </summary>
     [Authorize(Roles = "Admin")]
     public class AdminController : Controller
     {
@@ -50,6 +53,9 @@ namespace TRS2._0.Controllers
             _emailSender = emailSender;
         }
 
+        /// <summary>
+        /// Displays the administration dashboard with PM values, recent process logs and user-role tooling.
+        /// </summary>
         public async Task<IActionResult> Index()
         {
             var pmValues = await _context.DailyPMValues.ToListAsync();
@@ -88,6 +94,9 @@ namespace TRS2._0.Controllers
             return View(model);
         }
 
+        /// <summary>
+        /// Replaces the current role set of a user with the selected role.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> AssignRole(string userId, string role)
         {
@@ -102,6 +111,9 @@ namespace TRS2._0.Controllers
             return RedirectToAction("Index");
         }
 
+        /// <summary>
+        /// Generates the PM-per-day value for a specific month.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> GeneratePMValues(int year, int month)
         {
@@ -129,6 +141,9 @@ namespace TRS2._0.Controllers
             }
         }
 
+        /// <summary>
+        /// Generates or refreshes the PM-per-day values of a full year.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> GenerateYearlyPMValues(int year)
         {
@@ -199,6 +214,9 @@ namespace TRS2._0.Controllers
             return Json(monthlyPM);
         }
 
+        /// <summary>
+        /// Imports timesheets from a folder of Excel files and records the processing issues in a dedicated log.
+        /// </summary>
         [HttpPost]
         public IActionResult ProcessFolder([FromBody] FolderPathModel model)
         {
@@ -592,6 +610,9 @@ namespace TRS2._0.Controllers
             return Json(new { message = result });
         }
 
+        /// <summary>
+        /// Launches the automatic timesheet completion workflow for a date range.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> AutoFillTimesheetsByDateRange([FromBody] DateRangeModel dateRange)
         {
@@ -610,24 +631,26 @@ namespace TRS2._0.Controllers
             }
         }
 
+        /// <summary>
+        /// Generates the CSV report used to review automatic timesheet adjustments before applying them.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> GenerateAdjustmentReport([FromBody] DateRangeModel dateRange)
         {
             try
             {
-                _logger.LogInformation($"✅ Iniciando generación del informe para fechas: {dateRange.StartDate} - {dateRange.EndDate}");
+                _logger.LogInformation("Iniciando generación del informe para fechas {StartDate} - {EndDate}.", dateRange.StartDate, dateRange.EndDate);
 
                 var employeesToAdjust = await _loadDataService.GetAdjustmentData(dateRange.StartDate, dateRange.EndDate);
 
                 if (employeesToAdjust == null || employeesToAdjust.Count == 0)
                 {
-                    _logger.LogWarning("⚠️ No hay empleados con ajustes en este período.");
+                    _logger.LogWarning("No hay empleados con ajustes en este período.");
                     return StatusCode(500, new { success = false, message = "No se encontraron empleados para ajustar." });
                 }
 
                 _logger.LogInformation($"🔍 Se encontraron {employeesToAdjust.Count} empleados para procesar.");
 
-                // **Crear el CSV con separadores adecuados (; en lugar de ,)**
                 var csvBuilder = new StringBuilder();
                 csvBuilder.AppendLine("ID Persona;Nombre;Apellido;Departamento;Grupo;Mes;Work Package;Proyecto;Effort Asignado;Effort Esperado;Días Laborables;Días Ajustados;Estado");
 
@@ -637,7 +660,6 @@ namespace TRS2._0.Controllers
                     csvBuilder.AppendLine($"{employee.PersonId};{employee.Nombre};{employee.Apellido};{employee.Departamento};{employee.Grupo};{employee.Mes};{employee.WorkPackage};{employee.Proyecto};{employee.EffortAsignado};{employee.EffortEsperado};{employee.DiasLaborables};{employee.DiasAjustados};{estado}");
                 }
 
-                // **Forzar UTF-8 con BOM para que Excel detecte bien el archivo**
                 byte[] bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csvBuilder.ToString())).ToArray();
                 var stream = new MemoryStream(bytes);
 
@@ -645,11 +667,14 @@ namespace TRS2._0.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"❌ Error en GenerateAdjustmentReport: {ex.Message} - {ex.StackTrace}");
+                _logger.LogError(ex, "Error en GenerateAdjustmentReport.");
                 return StatusCode(500, new { success = false, message = "Error interno al generar el informe." });
             }
         }
 
+        /// <summary>
+        /// Executes the scheduled data-load sequence on demand.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> RunDataLoadNow([FromServices] LoadDataService loadDataService)
         {
@@ -672,6 +697,9 @@ namespace TRS2._0.Controllers
             return Json(results);
         }
 
+        /// <summary>
+        /// Automatically fills a monthly timesheet for a single person from the admin tools.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> AutoFillTimesheetForPersonAndMonth([FromBody] AutoFillRequest model)
         {
@@ -680,7 +708,6 @@ namespace TRS2._0.Controllers
 
             var monthStart = new DateTime(model.TargetMonth.Year, model.TargetMonth.Month, 1);
 
-            // Validación de condiciones
             var cumpleCondiciones = await (from pf in _context.Persefforts
                                            join wxp in _context.Wpxpeople on pf.WpxPerson equals wxp.Id
                                            where pf.Value != 0 &&
@@ -749,6 +776,9 @@ namespace TRS2._0.Controllers
             return View();
         }
 
+        /// <summary>
+        /// Applies the monthly overload adjustment for a single person when an overload is detected.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> AjustarOverloadManual(int personId, int year, int month)
         {
@@ -767,35 +797,41 @@ namespace TRS2._0.Controllers
 
             if (!isOverloaded)
             {
-                ViewBag.Message = $"✅ La persona seleccionada no está overload en {month:00}/{year}.";
+                ViewBag.Message = $"La persona seleccionada no está overload en {month:00}/{year}.";
                 return View();
             }
 
             var result = await _workCalendarService.AdjustMonthlyOverloadAsync(personId, year, month);
 
             ViewBag.Message = result.Success
-                ? $"✅ Ajuste completado correctamente para la persona en {month:00}/{year}."
-                : $"❌ Ajuste fallido. Motivo: {result.Message}";
+                ? $"Ajuste completado correctamente para la persona en {month:00}/{year}."
+                : $"Ajuste fallido. Motivo: {result.Message}";
 
             return View();
         }
 
+        /// <summary>
+        /// Launches the global overload adjustment process from the specified start date.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> LanzarAjusteDesdeFecha(DateTime fechaInicio)
         {
             try
             {
                 await _loadDataService.AdjustOverloadsFromDateAsync(fechaInicio);
-                TempData["GlobalAjusteMensaje"] = $"✅ Proceso de ajuste lanzado desde {fechaInicio:yyyy-MM-dd}.";
+                TempData["GlobalAjusteMensaje"] = $"Proceso de ajuste lanzado desde {fechaInicio:yyyy-MM-dd}.";
             }
             catch (Exception ex)
             {
-                TempData["GlobalAjusteMensaje"] = $"❌ Error al lanzar el ajuste: {ex.Message}";
+                TempData["GlobalAjusteMensaje"] = $"Error al lanzar el ajuste: {ex.Message}";
             }
 
             return RedirectToAction("AjustarOverloadManual");
         }
 
+        /// <summary>
+        /// Assigns the default researcher role to users that currently have no roles.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> FixUsersWithoutRole()
         {
@@ -821,10 +857,13 @@ namespace TRS2._0.Controllers
             return Json(new
             {
                 success = true,
-                message = $"✅ Rol 'Researcher' asignado a {fixedCount} usuario(s) sin rol. Otros {alreadyOk} ya estaban correctamente configurados."
+                message = $"Rol 'Researcher' asignado a {fixedCount} usuario(s) sin rol. Otros {alreadyOk} ya estaban correctamente configurados."
             });
         }
 
+        /// <summary>
+        /// Sends a reminder email to a single user to validate the reminder pipeline.
+        /// </summary>
         [HttpPost]        
         public async Task<IActionResult> SendTimesheetReminderTest(string email, bool firstWeek)
         {
@@ -868,6 +907,9 @@ namespace TRS2._0.Controllers
 
 
 
+        /// <summary>
+        /// Sends a smoke test email to verify Reply-To behavior of the configured mail sender.
+        /// </summary>
         [HttpPost]
         [Authorize(Policy = "AdminPolicy")]
         public async Task<IActionResult> SendReplyToSmokeTest(string to)
@@ -944,6 +986,9 @@ namespace TRS2._0.Controllers
             return View("RemindersWeeklyDryRunView", data);
         }
 
+        /// <summary>
+        /// Generates the PersonRates table on demand and records the outcome in the process execution log.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> GeneratePersonRates()
         {

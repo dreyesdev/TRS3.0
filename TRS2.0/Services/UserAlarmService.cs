@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using TRS2._0.Models.DataModels;
+using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
 using TRS2._0.Models.ViewModels;
 using TRS2._0.Services.Alarms;
 

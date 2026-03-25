@@ -1,41 +1,54 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using TRS2._0.Models;
 
 namespace TRS2._0.Controllers
 {
+    /// <summary>
+    /// Serves the public landing pages and shared MVC views that are not tied to a specific business area.
+    /// </summary>
     public class HomeController : Controller
     {
-        private readonly ILogger<HomeController> _logger;
-
-        public HomeController(ILogger<HomeController> logger)
-        {
-            _logger = logger;
-        }
-
+        /// <summary>
+        /// Displays the application home page.
+        /// </summary>
         public IActionResult Index()
         {
             return View();
         }
 
+        /// <summary>
+        /// Displays the privacy information page.
+        /// </summary>
         public IActionResult Privacy()
         {
             return View();
         }
 
+        /// <summary>
+        /// Renders the standard error view with the current request identifier.
+        /// </summary>
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {
-            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+            return View(new ErrorViewModel
+            {
+                RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier
+            });
         }
 
+        /// <summary>
+        /// Displays the application welcome page.
+        /// </summary>
         public IActionResult Welcome()
         {
             return View();
         }
-
     }
 
+    /// <summary>
+    /// Exposes simple diagnostic endpoints used to validate runtime infrastructure configuration.
+    /// </summary>
     [Route("diagnostic")]
     public class DiagnosticController : Controller
     {
@@ -46,6 +59,9 @@ namespace TRS2._0.Controllers
             _configuration = configuration;
         }
 
+        /// <summary>
+        /// Returns the configured default connection string so support teams can verify the active database target.
+        /// </summary>
         [HttpGet("db")]
         public IActionResult GetDatabaseConnection()
         {

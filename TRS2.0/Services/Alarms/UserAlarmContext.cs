@@ -1,4 +1,5 @@
-﻿using TRS2._0.Models.DataModels;
+using TRS2._0.Models.DataModels;
+using TRS2._0.Models.DataModels.TRS2._0.Models.DataModels;
 
 namespace TRS2._0.Services.Alarms
 {

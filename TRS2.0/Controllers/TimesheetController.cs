@@ -26,6 +26,9 @@ using TRS2._0.Models;
 
 namespace TRS2._0.Controllers
 {
+    /// <summary>
+    /// Manages monthly timesheet capture, PDF generation, signature dates and automatic completion workflows.
+    /// </summary>
     [Authorize]
     public class TimesheetController : Controller
     {
@@ -42,6 +45,9 @@ namespace TRS2._0.Controllers
             _userManager = userManager;
         }
 
+        /// <summary>
+        /// Displays the personnel selector used by admins and project managers to open timesheets for any person.
+        /// </summary>
         [Authorize(Roles = "Admin, ProjectManager")]
         public async Task<IActionResult> IndexAsync()
         {
@@ -50,10 +56,12 @@ namespace TRS2._0.Controllers
             return View(await tRSDBContext.ToListAsync());
         }
 
+        /// <summary>
+        /// Builds the monthly timesheet view for the requested person after validating role-based access.
+        /// </summary>
         [Authorize(Roles = "Admin, ProjectManager, Leader, Researcher")]
         public async Task<IActionResult> GetTimeSheetsForPerson(int? personId, int? year, int? month)
         {
-            // Obtener usuario autenticado y roles
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var user = await _context.Users.Include(u => u.Personnel).FirstOrDefaultAsync(u => u.Id == userId);
             var userRoles = await _userManager.GetRolesAsync(user);
@@ -73,13 +81,6 @@ namespace TRS2._0.Controllers
 
             int validPersonId = personId.Value;
 
-            // DEBUG: ¿A qué servidor/BD está conectando EF ahora mismo?
-            var conn = _context.Database.GetDbConnection();
-            _logger.LogInformation("DB DEBUG | DataSource={DataSource} | Database={Database} | ConnStr={ConnStr}",
-                conn.DataSource, conn.Database, conn.ConnectionString);
-
-
-            // Validar si tiene permiso para acceder a esa ficha
             bool isOwner = user?.PersonnelId == validPersonId;
             bool isLeader = userRoles.Contains("Leader");
 
@@ -89,11 +90,8 @@ namespace TRS2._0.Controllers
                 return Forbid();
             }
 
-            // Decide si se permite editar
             ViewBag.AllowEdit = isAdminOrPM || isOwner;
 
-
-            // Determina el año y mes actual si no se proporcionan
             var currentYear = year ?? DateTime.Now.Year;
             var currentMonth = month ?? DateTime.Now.Month;
 
@@ -112,7 +110,6 @@ namespace TRS2._0.Controllers
 
             bool isPastMonth = new DateTime(currentYear, currentMonth, 1) < new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
 
-            // Obtener el único WpxPerson.Id del mes (para saber el proyecto a chequear)
             var unicoWpxId = await (from pe in _context.Persefforts
                                     join wpx in _context.Wpxpeople on pe.WpxPerson equals wpx.Id
                                     where pe.Value != 0
@@ -128,14 +125,12 @@ namespace TRS2._0.Controllers
 
             if (unicoWpxId != 0)
             {
-                // ProjId del único WP
                 var projId = await _context.Wpxpeople
                                 .Include(x => x.WpNavigation).ThenInclude(wp => wp.Proj)
                                 .Where(x => x.Id == unicoWpxId)
                                 .Select(x => x.WpNavigation.Proj.ProjId)
                                 .FirstOrDefaultAsync();
 
-                // ¿Bloqueado para esa persona-proyecto-mes?
                 isLockedForUnique = await _context.ProjectMonthLocks.AnyAsync(l =>
                     l.PersonId == validPersonId &&
                     l.ProjectId == projId &&
@@ -144,14 +139,8 @@ namespace TRS2._0.Controllers
                     l.IsLocked);
             }
 
-            // Mostrar botón solo si: único WP + mes pasado + NO bloqueado
             ViewBag.ShowAutoFillButton = canAutoFill && isPastMonth && !isLockedForUnique;
 
-            
-
-
-
-            // Obtener las bajas de tipo 11 y 12 para el mes actual
             var leaveReductions = await _context.Leaves
                 .Where(l => l.PersonId == validPersonId &&
                             l.Day >= startDate &&
@@ -160,30 +149,23 @@ namespace TRS2._0.Controllers
                             l.LeaveReduction > 0 && l.LeaveReduction <= 1)
                 .ToDictionaryAsync(l => l.Day, l => l.LeaveReduction);
 
-            // Obtener las horas diarias iniciales con dedicación
             var hoursPerDayWithDedication = await _workCalendarService.CalculateDailyWorkHoursWithDedicationNotRounded(validPersonId, currentYear, currentMonth);
 
-            // Ajustar las horas por día considerando las bajas de tipo 11 y 12 (Parciales)
             foreach (var day in hoursPerDayWithDedication.Keys.ToList())
             {
                 if (leaveReductions.TryGetValue(day, out var reduction))
                 {
-                    // Aplicar la reducción al máximo de horas diarias
-                    //hoursPerDayWithDedication[day] = RoundToNearestHalfOrWhole(hoursPerDayWithDedication[day] * (1 - reduction)); // ANTERIOR AL CAMBIO DE DECIMALES
                     hoursPerDayWithDedication[day] = Math.Round(hoursPerDayWithDedication[day] * (1 - reduction), 2);
 
                 }
             }
 
-            // Obtener las bajas y viajes del mes
             var leavesthismonth = await _workCalendarService.GetLeavesForPerson(validPersonId, currentYear, currentMonth);
-            // Solo bajas completas para excluir del cálculo
             var leavesForExclusion = leavesthismonth
                 .Where(l => (l.Type != 11 && l.Type != 12) || (l.LeaveReduction == null || l.LeaveReduction == 1))
                 .ToList();
             var travelsthismonth = await _workCalendarService.GetTravelsForThisMonth(validPersonId, currentYear, currentMonth);
 
-            // Obtener los datos de la persona
             var person = await _context.Personnel.FindAsync(personId);
 
             if (person == null)
@@ -193,26 +175,6 @@ namespace TRS2._0.Controllers
             }
 
             var maxhoursthismonth = await _workCalendarService.CalculateMaxHoursForPersonInMonth(validPersonId, currentYear, currentMonth);
-
-            // ANTIGUO, SOLO PERSONAS CON WP CON EFFORT//
-            //// Obtener WPs para la persona en el rango de fecha especificado
-            //var wpxPersons = await _context.Wpxpeople
-            //    .Include(wpx => wpx.PersonNavigation)
-            //    .Include(wpx => wpx.WpNavigation)
-            //        .ThenInclude(wp => wp.Proj)
-            //    .Where(wpx => wpx.Person == personId && wpx.WpNavigation.StartDate <= endDate && wpx.WpNavigation.EndDate >= startDate)
-            //    .Select(wpx => new
-            //    {
-            //        WpxPerson = wpx,
-            //        Effort = _context.Persefforts
-            //            .Where(pe => pe.WpxPerson == wpx.Id && pe.Month >= startDate && pe.Month <= endDate)
-            //            .Sum(pe => (decimal?)pe.Value)
-            //    })
-            //    .Where(wpx => wpx.Effort.HasValue && wpx.Effort.Value > 0)
-            //    .Select(wpx => wpx.WpxPerson)
-            //    .ToListAsync();
-
-            //NUEVO INCLUYENDO WP SIN EFFORT PERO CON HORAS EN TIMESHEET//
             var allWpxPersons = await _context.Wpxpeople
                 .Include(wpx => wpx.PersonNavigation)
                 .Include(wpx => wpx.WpNavigation)
@@ -239,34 +201,23 @@ namespace TRS2._0.Controllers
                 .Where(wpx => wpxWithEffort.Contains(wpx.Id) || wpxWithTimesheet.Contains(wpx.Id))
                 .ToList();
 
-            // Obtener Timesheets para la persona en el rango de fecha especificado
             var timesheets = await _context.Timesheets
                 .Where(ts => wpxToShow.Select(wpx => wpx.Id).Contains(ts.WpxPersonId) && ts.Day >= startDate && ts.Day <= endDate)
                 .ToListAsync();
 
             var hoursUsed = timesheets.Sum(ts => ts.Hours);
 
-            // Obtener días festivos nacionales y locales
             var holidays = await _workCalendarService.GetHolidaysForMonth(currentYear, currentMonth);
 
-            // Obtener los esfuerzos del personal y mapearlos
             var persefforts = await _context.Persefforts
                                     .Include(pe => pe.WpxPersonNavigation)
                                     .Where(pe => pe.WpxPersonNavigation.Person == personId && pe.Month >= startDate && pe.Month <= endDate)
                                     .ToListAsync();
 
             var totalefforts = persefforts.Sum(pe => pe.Value);
-
-
-            // Calcular las horas totales trabajadas excluyendo los días con bajas y festivos
             var totalWorkHours = hoursPerDayWithDedication
     .Where(entry => !leavesForExclusion.Any(leave => leave.Day == entry.Key) && !holidays.Contains(entry.Key))
     .Sum(entry => entry.Value);
-
-
-
-
-
             decimal percentageUsed = totalWorkHours > 0 ? hoursUsed / totalWorkHours * 100 : 0;
 
             // Agrupar horas de timesheets por día
@@ -277,10 +228,8 @@ namespace TRS2._0.Controllers
                     group => group.Sum(ts => ts.Hours)
                 );
 
-            // Obtener los IDs de los proyectos
             var projectIds = wpxToShow.Select(wpx => wpx.WpNavigation.ProjId).Distinct().ToList();
 
-            // Obtener los estados de bloqueo para esos proyectos en el mes y año específicos
             var projectLocks = await _context.ProjectMonthLocks
                 .Where(l => projectIds.Contains(l.ProjectId) &&
                             l.Year == currentYear &&
@@ -336,7 +285,6 @@ namespace TRS2._0.Controllers
                 .ThenBy(wp => GetTimesheetWpSortKey(wp.WpName).tieBreak)
                 .ToList();
 
-            // Preparación del ViewModel
             var viewModel = new TimesheetViewModel
             {
                 Person = person,
@@ -359,17 +307,18 @@ namespace TRS2._0.Controllers
             return View(viewModel);
         }
 
+        /// <summary>
+        /// Builds the dataset used by the PDF exports for a single person, month and project.
+        /// </summary>
         [Authorize(Roles = "Admin, ProjectManager, User, Researcher")]
         public async Task<TimesheetViewModel> GetTimesheetDataForPerson(int personId, int year, int month, int project)
         {
-            // Determina el año y mes actual si no se proporcionan
             var currentYear = year;
             var currentMonth = month;
 
             var startDate = new DateTime(currentYear, currentMonth, 1);
             var endDate = startDate.AddMonths(1).AddDays(-1);
 
-            // Obtener bajas de tipo 11 y 12 con LeaveReduction para el mes y persona
             var leaveReductions = await _context.Leaves
                 .Where(l => l.PersonId == personId &&
                             l.Day >= startDate &&
@@ -378,22 +327,17 @@ namespace TRS2._0.Controllers
                             l.LeaveReduction > 0 && l.LeaveReduction <= 1)
                 .ToDictionaryAsync(l => l.Day, l => l.LeaveReduction);
 
-            // Calcular horas diarias iniciales con la dedicación
             var hoursPerDayWithDedication = await _workCalendarService.CalculateDailyWorkHoursWithDedicationNotRounded(personId, currentYear, currentMonth);
 
-            // Ajustar las horas por día considerando las bajas de tipo 11 y 12
             foreach (var day in hoursPerDayWithDedication.Keys.ToList())
             {
                 if (leaveReductions.TryGetValue(day, out var reduction))
                 {
-                    // Aplicar la reducción al máximo de horas diarias
-                    //hoursPerDayWithDedication[day] = RoundToNearestHalfOrWhole(hoursPerDayWithDedication[day] * (1 - reduction)); //ANTERIOR AL CAMBIO DE DECIMALES
                     hoursPerDayWithDedication[day] = Math.Round(hoursPerDayWithDedication[day] * (1 - reduction), 2);
 
                 }
             }
 
-            // Resto del código permanece igual
             var leavesthismonth = await _workCalendarService.GetLeavesForPerson(personId, currentYear, currentMonth);
             var travelsthismonth = await _workCalendarService.GetTravelsForThisMonth(personId, currentYear, currentMonth);
             var person = await _context.Personnel.FindAsync(personId);
@@ -472,7 +416,6 @@ namespace TRS2._0.Controllers
 
             foreach (var day in hoursPerDayWithDedication.Keys)
             {
-                // Excluir si el día es festivo, está de baja (distinta de tipo 11/12) o está de vacaciones
                 bool isHoliday = holidays.Contains(day);
                 bool isLeave = leavesthismonth.Any(leave => leave.Day == day && leave.Type != 11 && leave.Type != 12);
 
@@ -515,7 +458,6 @@ namespace TRS2._0.Controllers
                 WorkPackages = wpxPersons.Select(wpx =>
                 {
                     var effort = persefforts.FirstOrDefault(pe => pe.WpxPerson == wpx.Id && pe.Month.Year == currentYear && pe.Month.Month == currentMonth)?.Value ?? 0;
-                    //var estimatedHours = RoundToNearestHalfOrWhole((hoursPerDayWithDedication.Values.Sum()) * effort); //ANTERIOR AL CAMBIO DE DECIMALES
                     var estimatedHours = Math.Round((hoursPerDayWithDedication.Values.Sum()) * effort, 2);
 
 
@@ -539,7 +481,7 @@ namespace TRS2._0.Controllers
                 .ToList(),
                 HoursUsed = hoursUsed,
                 HoursForOtherProjects = hoursForOtherProjects,
-                TotalHoursForOtherProjects = totalHoursForOtherProjects // Añadir la suma total de horas para otros proyectos
+                TotalHoursForOtherProjects = totalHoursForOtherProjects
             };
 
             ViewBag.PercentageUsed = percentageUsed.ToString("0.0", CultureInfo.InvariantCulture);
@@ -548,6 +490,9 @@ namespace TRS2._0.Controllers
         }
 
 
+        /// <summary>
+        /// Persists a batch of daily timesheet updates.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> SaveTimesheetHours([FromBody] TimesheetUpdateModel model)
         {
@@ -558,28 +503,23 @@ namespace TRS2._0.Controllers
 
             foreach (var item in model.TimesheetDataList)
             {
-                // Buscar el WpxPersonId usando el PersonId y WpId
                 var wpxPerson = await _context.Wpxpeople
                     .FirstOrDefaultAsync(wpx => wpx.Person == item.PersonId && wpx.Wp == item.WpId);
 
                 if (wpxPerson == null)
                 {
-                    // No se encontró la relación WpxPerson, posiblemente registrar en el log o manejar el error
-                    continue; // Pasar al siguiente item en la lista
+                    continue;
                 }
 
-                // Ahora que tienes el WpxPersonId, busca o crea la entrada de Timesheet correspondiente
                 var timesheetEntry = await _context.Timesheets
                     .FirstOrDefaultAsync(ts => ts.WpxPersonId == wpxPerson.Id && ts.Day == item.Day);
 
                 if (timesheetEntry != null)
                 {
-                    // Si existe, actualiza las horas
                     timesheetEntry.Hours = item.Hours;
                 }
                 else
                 {
-                    // Si no existe, crea una nueva entrada de Timesheet
                     _context.Timesheets.Add(new Timesheet
                     {
                         WpxPersonId = wpxPerson.Id,
@@ -594,6 +534,9 @@ namespace TRS2._0.Controllers
         }
 
 
+        /// <summary>
+        /// Generates the standard PDF representation of a timesheet.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> ExportTimesheetToPdf(int personId, int year, int month, int project)
         {
@@ -871,7 +814,6 @@ namespace TRS2._0.Controllers
                                 innerCol.Item().Row(row =>
                                 {
                                     row.RelativeItem().Text("Date, name and signature of manager/supervisor:").FontSize(10);
-                                    // Asume que tienes una variable para el nombre del manager/supervisor
                                     row.ConstantItem(100).AlignRight().Text($"{model.Responsible}").FontSize(10);
                                 });
                             });
@@ -898,8 +840,6 @@ namespace TRS2._0.Controllers
                                 innerCol.Item().Row(row =>
                                 {
                                     row.RelativeItem().Text("Date and signature of staff member:").FontSize(10);
-                                    // Asume que model.Person contiene el nombre de la persona de la timesheet
-                                    // y usas DateTime.Now para la fecha actual
                                     row.ConstantItem(100).AlignRight().Text($"{model.Person.Name} {model.Person.Surname}, {DateTime.Now:dd/MM/yyyy}").FontSize(10);
                                 });
                             });
@@ -911,8 +851,6 @@ namespace TRS2._0.Controllers
             });
 
             using var stream = new MemoryStream();
-            //document.ShowInPreviewer();
-
             document.GeneratePdf(stream);
             stream.Seek(0, SeekOrigin.Begin);
 
@@ -925,8 +863,11 @@ namespace TRS2._0.Controllers
 
 
 
+        /// <summary>
+        /// Generates the signed PDF representation of a timesheet, including optional manual signature dates.
+        /// </summary>
         [HttpGet]
-        public async Task<IActionResult> ExportTimesheetToPdf2(int personId, int year, int month, int project, string manualDate = null, string manualCode = null)
+        public async Task<IActionResult> ExportTimesheetToPdf2(int personId, int year, int month, int project, string? manualDate = null, string? manualCode = null)
         {
             QuestPDF.Settings.License = LicenseType.Professional;
             TextStyle.Default.FontFamily("Arial");
@@ -938,11 +879,9 @@ namespace TRS2._0.Controllers
 
             var model = await GetTimesheetDataForPerson(personId, year, month, project);
 
-            // --- Responsable histórico para el periodo de la timesheet ---
             var monthStart = new DateTime(year, month, 1);
             var monthEnd = monthStart.AddMonths(1).AddDays(-1);
 
-            // Tramos de afiliación que se solapan con el mes de la TS
             var affLines = await _context.AffxPersons
                 .Where(a => a.PersonId == personId && a.Start <= monthEnd && a.End >= monthStart)
                 .ToListAsync();
@@ -952,7 +891,6 @@ namespace TRS2._0.Controllers
 
             if (affLines.Any())
             {
-                // Elegimos el tramo con MAYOR INTERSECCIÓN de días con el mes
                 var chosen = affLines
                     .OrderByDescending(a =>
                     {
@@ -970,13 +908,11 @@ namespace TRS2._0.Controllers
 
             if (responsible == null)
             {
-                // Fallback al responsable actual en Personnel si no hay histórico
                 responsible = await _context.Personnel.FindAsync(model.Person.Resp);
             }
 
             responsibleId = responsible?.Id ?? 0;
 
-            // Sobrescribe lo que imprime el PDF en la firma del manager
             model.Responsible = responsible != null
                 ? $"{responsible.Name} {responsible.Surname}"
                 : "N/A";
@@ -1060,11 +996,7 @@ namespace TRS2._0.Controllers
 
             var totalhours = model.TotalHours;
             var totalhoursworkedonproject = model.WorkPackages.Sum(wp => wp.Timesheets.Sum(ts => ts.Hours));
-            // Actualización del cálculo de días trabajados en el proyecto para incluir decimales
             var totaldaysWorkedOnProject = Math.Round(totalhoursworkedonproject / model.AffiliationHours, 1, MidpointRounding.AwayFromZero);
-            //CAMBIOS ANTES DE DECIMAL
-            //decimal roundedtotalHours = Math.Round(totalhours * 2, MidpointRounding.AwayFromZero) / 2;
-            //decimal roundedtotalHoursWorkedOnProject = Math.Round(totalhoursworkedonproject * 2, MidpointRounding.AwayFromZero) / 2;
 
             decimal roundedtotalHours = Math.Round(totalhours, 1, MidpointRounding.AwayFromZero);
             decimal roundedtotalHoursWorkedOnProject = Math.Round(totalhoursworkedonproject, 1, MidpointRounding.AwayFromZero);
@@ -1263,7 +1195,6 @@ namespace TRS2._0.Controllers
                                         for (int day = 1; day <= DateTime.DaysInMonth(year, month); day++)
                                         {
                                             var totalHoursForDay = model.WorkPackages.Sum(wp => wp.Timesheets.FirstOrDefault(ts => ts.Day.Day == day)?.Hours ?? 0);
-                                            //decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay * 2, MidpointRounding.AwayFromZero) / 2; //CAMBIOS ANTES DE DECIMAL
                                             decimal roundedtotalHoursForDay = Math.Round(totalHoursForDay, 1, MidpointRounding.AwayFromZero);
 
                                             footer.Cell().BorderVertical(1).BorderColor("#00BFFF").BorderBottom(1).Background("#0055A4").Padding(2).AlignCenter().Text($"{roundedtotalHoursForDay}").ExtraBold().FontColor("#FFFFFF").FontSize(8);
@@ -1366,17 +1297,6 @@ namespace TRS2._0.Controllers
                                             header.Cell().Background("#004488").Padding(2).AlignCenter().Text("EndDate").FontColor("#fff").FontSize(8);
                                         });
 
-                                        // Añadiendo filas de ejemplo
-                                        //for (int i = 1; i <= 4; i++)
-                                        //{
-                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"Liq-{i}").FontSize(8);
-                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"Project-{i}").FontSize(8);
-                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{i * 10.0}%").FontSize(8);
-                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"2024-01-{i:02}").FontSize(8);
-                                        //    table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"2024-01-{i + 1:02}").FontSize(8);
-                                        //}
-
-                                        //Filas de la tabla con los datos de viaje
                                         foreach (var travel in model.TravelsthisMonth)
                                         {
                                             table.Cell().BorderHorizontal(1).BorderColor("#00BFFF").AlignCenter().Text($"{travel.LiqId}").FontSize(8);
@@ -1404,7 +1324,6 @@ namespace TRS2._0.Controllers
                                 innerCol.Item().Row(row =>
                                 {
                                     row.RelativeItem().Text("Date, name and signature of manager/supervisor:").FontSize(10);
-                                    // Asume que tienes una variable para el nombre del manager/supervisor
                                     row.ConstantItem(100).AlignRight().Text($"{model.Responsible}, {finalDateResponsible:dd/MM/yyyy}").FontSize(10);
                                 });
                             });
@@ -1431,8 +1350,6 @@ namespace TRS2._0.Controllers
                                 innerCol.Item().Row(row =>
                                 {
                                     row.RelativeItem().Text("Date, name and signature of staff member:").FontSize(10);
-                                    // Asume que model.Person contiene el nombre de la persona de la timesheet
-                                    // y usas DateTime.Now para la fecha actual                                    
                                     row.ConstantItem(100).AlignRight().Text($"{model.Person.Name} {model.Person.Surname}, {finalDateInvestigator:dd/MM/yyyy}").FontSize(10);
 
                                 });
@@ -1443,15 +1360,16 @@ namespace TRS2._0.Controllers
             });
 
             using var stream = new MemoryStream();
-            //document.ShowInPreviewer(); // Remover esta línea si se quiere generar directamente el PDF sin previsualización
-
-            document.GeneratePdf(stream); // Descomentar para generar el PDF
+            document.GeneratePdf(stream);
             stream.Seek(0, SeekOrigin.Begin);
 
             var pdfFileName = $"Timesheet_{model.Person.Surname},{model.Person.Name}_{year}_{month}.pdf";
             return File(stream.ToArray(), "application/pdf", pdfFileName);
         }
 
+        /// <summary>
+        /// Validates that a manually selected signature date does not fall on holidays or leave days.
+        /// </summary>
         private async Task<(bool IsValid, string Message)> ValidateManualDateAsync(int personId, DateTime selectedDate)
         {
             var selectedDay = selectedDate.Date;
@@ -1540,13 +1458,9 @@ namespace TRS2._0.Controllers
             }
         }
 
-        // Método auxiliar para redondear al entero o .5 más cercano
-        // MÉTODO INACTIVO - SE COMENTA TRAS EL CAMBIO A DECIMALES COMPLETOS EN HORAS
-        //private decimal RoundToNearestHalfOrWhole(decimal value)
-        //{
-        //    // Multiplicar por 2, redondear al entero más cercano y dividir por 2
-        //    return Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2;
-        //}
+        /// <summary>
+        /// Returns the latest effective login date for the requested person and month.
+        /// </summary>
         public async Task<string> GetLastLoginDateForPerson(int personId, int year, int month)
         {
             var loginEntries = await _context.UserLoginHistories
@@ -1563,9 +1477,11 @@ namespace TRS2._0.Controllers
             return effectiveDate.HasValue ? effectiveDate.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
         }
 
+        /// <summary>
+        /// Returns the latest effective login date registered in the month immediately following the timesheet period.
+        /// </summary>
         public async Task<string> GetLastLoginDateForNextMonth(int personId, int year, int month)
         {
-            // Calcular el siguiente mes y el año correspondiente
             month++;
             if (month > 12)
             {
@@ -1587,6 +1503,9 @@ namespace TRS2._0.Controllers
             return effectiveDate.HasValue ? effectiveDate.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
         }
 
+        /// <summary>
+        /// Automatically fills a monthly timesheet when the person has effort in a single work package.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> AutoFillTimesheetForPersonAndMonth([FromBody] AutoFillRequest model)
         {
@@ -1595,7 +1514,6 @@ namespace TRS2._0.Controllers
 
             var monthStart = new DateTime(model.TargetMonth.Year, model.TargetMonth.Month, 1);
 
-            // Verificamos si cumple condiciones para poder autocompletar
             var cumpleCondiciones = await (from pf in _context.Persefforts
                                            join wxp in _context.Wpxpeople on pf.WpxPerson equals wxp.Id
                                            where pf.Value != 0 &&

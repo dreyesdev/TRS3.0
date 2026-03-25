@@ -12,6 +12,9 @@ using TRS2._0.Services;
 
 namespace TRS2._0.Controllers
 {
+    /// <summary>
+    /// Manages personnel master data and the operational views related to calendars, dedications, external rates and travel approvals.
+    /// </summary>
     public class PersonnelsController : Controller
     {
         private readonly TRSDBContext _context;
@@ -25,7 +28,9 @@ namespace TRS2._0.Controllers
             _loadDataService = loadDataService;
         }
 
-        // GET: Personnels
+        /// <summary>
+        /// Displays the personnel catalog.
+        /// </summary>
         public async Task<IActionResult> Index()
         {
             TempData.Remove("SelectedPersonId");
@@ -33,7 +38,9 @@ namespace TRS2._0.Controllers
             return View(await tRSDBContext.ToListAsync());
         }
 
-        // GET: Personnels/Details/5
+        /// <summary>
+        /// Displays the details of a single personnel record.
+        /// </summary>
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null || _context.Personnel == null)
@@ -52,16 +59,18 @@ namespace TRS2._0.Controllers
             return View(personnel);
         }
 
-        // GET: Personnels/Create
+        /// <summary>
+        /// Displays the personnel creation form.
+        /// </summary>
         public IActionResult Create()
         {
             ViewData["Department"] = new SelectList(_context.Departments, "Id", "Id");
             return View();
         }
 
-        // POST: Personnels/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+        /// <summary>
+        /// Creates a personnel record from the MVC maintenance form.
+        /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("Id,BscId,Name,Surname,Department,Affiliation,StartDate,EndDate,Category,Resp,PersonnelGroup,Email,A3code")] Personnel personnel)
@@ -76,7 +85,9 @@ namespace TRS2._0.Controllers
             return View(personnel);
         }
 
-        // GET: Personnels/Edit/5
+        /// <summary>
+        /// Displays the edit form for a personnel record.
+        /// </summary>
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null || _context.Personnel == null)
@@ -93,9 +104,9 @@ namespace TRS2._0.Controllers
             return View(personnel);
         }
 
-        // POST: Personnels/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+        /// <summary>
+        /// Persists changes to an existing personnel record.
+        /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, [Bind("Id,BscId,Name,Surname,Department,Affiliation,StartDate,EndDate,Category,Resp,PersonnelGroup,Email,A3code")] Personnel personnel)
@@ -129,7 +140,9 @@ namespace TRS2._0.Controllers
             return View(personnel);
         }
 
-        // GET: Personnels/Delete/5
+        /// <summary>
+        /// Displays the delete confirmation for a personnel record.
+        /// </summary>
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null || _context.Personnel == null)
@@ -148,7 +161,9 @@ namespace TRS2._0.Controllers
             return View(personnel);
         }
 
-        // POST: Personnels/Delete/5
+        /// <summary>
+        /// Deletes a personnel record.
+        /// </summary>
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
@@ -172,12 +187,14 @@ namespace TRS2._0.Controllers
             return (_context.Personnel?.Any(e => e.Id == id)).GetValueOrDefault();
         }
 
+        /// <summary>
+        /// Returns personnel suggestions for the search box used across operational views.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetFilteredPersonnel(string searchTerm)
         {
             if (string.IsNullOrWhiteSpace(searchTerm))
             {
-                // Devolver una lista vacía si no hay término de búsqueda
                 return Json(new List<object>());
             }
 
@@ -186,21 +203,17 @@ namespace TRS2._0.Controllers
 
             if (searchParts.Length > 1)
             {
-                // Buscar por nombre y apellido si el término de búsqueda contiene un espacio
                 string namePart = searchParts[0];
                 string surnamePart = searchParts[1];
                 query = query.Where(p => p.Name.Contains(namePart) && p.Surname.Contains(surnamePart));
             }
             else
             {
-                // Buscar por nombre o apellido si el término de búsqueda no contiene un espacio
                 query = query.Where(p => p.Name.Contains(searchTerm) || p.Surname.Contains(searchTerm));
             }
 
-            // Ordenar los resultados por apellido y nombre
             query = query.OrderBy(p => p.Surname).ThenBy(p => p.Name);
 
-            // Limitar los resultados a los primeros 50
             var filteredPersonnel = await query.Take(50)
                 .Select(p => new
                 {
@@ -211,7 +224,6 @@ namespace TRS2._0.Controllers
                 })
                 .ToListAsync();
 
-            // Opcional: Guardar el ID de la primera persona encontrada en TempData
             if (filteredPersonnel.Any())
             {
                 TempData["SelectedPersonId"] = filteredPersonnel.First().Id;
@@ -220,8 +232,9 @@ namespace TRS2._0.Controllers
             return Json(filteredPersonnel);
         }
 
-
-
+        /// <summary>
+        /// Returns the operational detail card displayed when a person is selected in the search UI.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetPersonDetails(int id)
         {
@@ -242,8 +255,7 @@ namespace TRS2._0.Controllers
                     PersonnelGroupName = _context.Personnelgroups
                                         .Where(pg => pg.Id == p.PersonnelGroup)
                                         .Select(pg => pg.GroupName)
-                                        .FirstOrDefault(), // Esto obtiene el nombre del grupo de personal
-                                                          // Agrega otros campos que necesites mostrar
+                                        .FirstOrDefault(),
                     Affiliation = p.Affiliation == 1 ? "BSC" : ""
 
                 })
@@ -255,32 +267,27 @@ namespace TRS2._0.Controllers
             return Json(new { success = true, data = personWithDetails });
         }
 
+        /// <summary>
+        /// Displays the personnel calendar view.
+        /// </summary>
         [HttpGet]
-        // Método que muestra la vista del calendario
         public async Task<IActionResult> Calendar(int? personId)
         {
-
-            if (personId.HasValue)
-            {
-                ViewBag.SelectedPersonId = personId.Value;
-            }
-            else if (TempData["SelectedPersonId"] != null)
-            {
-                ViewBag.SelectedPersonId = TempData["SelectedPersonId"];
-                TempData.Keep("SelectedPersonId");
-            }
+            SetSelectedPerson(personId);
 
             var persons = await _context.Personnel.ToListAsync();
             return View(persons);
         }
 
+        /// <summary>
+        /// Returns holidays, travels and leaves in the calendar event format expected by the frontend.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetLeaveEvents(int? personId)
         {
             if (!personId.HasValue)
                 return Json(new List<object>());
 
-            // Ejecutar en secuencia para evitar acceso simultáneo al DbContext
             var nationalHolidays = await _context.NationalHolidays
                 .Select(n => new {
                     title = n.Description,
@@ -320,45 +327,33 @@ namespace TRS2._0.Controllers
             return Json(events);
         }
 
-
-
-
+        /// <summary>
+        /// Displays the dedication maintenance view.
+        /// </summary>
         [HttpGet]
-        // Método que muestra la dedicacion de cada persona
         public async Task<IActionResult> Dedication(int? personId)
         {
-
-            if (personId.HasValue)
-            {
-                ViewBag.SelectedPersonId = personId.Value;
-            }
-            else if (TempData["SelectedPersonId"] != null)
-            {
-                ViewBag.SelectedPersonId = TempData["SelectedPersonId"];
-                TempData.Keep("SelectedPersonId");
-            }
+            SetSelectedPerson(personId);
 
             var persons = await _context.Personnel.ToListAsync();
             return View(persons);
         }
 
+        /// <summary>
+        /// Displays the manual external-rate maintenance view.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> ExternalRate(int? personId)
         {
-            if (personId.HasValue)
-            {
-                ViewBag.SelectedPersonId = personId.Value;
-            }
-            else if (TempData["SelectedPersonId"] != null)
-            {
-                ViewBag.SelectedPersonId = TempData["SelectedPersonId"];
-                TempData.Keep("SelectedPersonId");
-            }
+            SetSelectedPerson(personId);
 
             var persons = await _context.Personnel.ToListAsync();
             return View(persons);
         }
 
+        /// <summary>
+        /// Returns the manual external rates configured for a person.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetExternalRateData(int personId)
         {
@@ -382,6 +377,9 @@ namespace TRS2._0.Controllers
             return Json(rates);
         }
 
+        /// <summary>
+        /// Creates one or more manual external-rate segments aligned with the affiliation and dedication changes in the selected period.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> AddExternalRate(int personId, DateTime startDate, DateTime endDate, string hourlyRate)
         {
@@ -446,6 +444,9 @@ namespace TRS2._0.Controllers
             return Json(new { success = true, message });
         }
 
+        /// <summary>
+        /// Removes a manual external-rate segment.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> RemoveExternalRate(int id)
         {
@@ -460,6 +461,9 @@ namespace TRS2._0.Controllers
             return Json(new { success = true, message = "Manual external rate removed successfully." });
         }
 
+        /// <summary>
+        /// Returns the dedication history used by the dedication maintenance grid.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetDedicationData(int personId)
         {
@@ -478,6 +482,9 @@ namespace TRS2._0.Controllers
             return Json(dedicationData);
         }
 
+        /// <summary>
+        /// Updates an existing dedication record.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> UpdateDedication(int id, DateTime startDate, DateTime endDate, double dedication)
         {
@@ -497,6 +504,9 @@ namespace TRS2._0.Controllers
             return Json(new { success = true, message = "Dedication updated successfully." });
         }
 
+        /// <summary>
+        /// Removes a dedication record.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> RemoveDedication(int id)
         {
@@ -512,18 +522,18 @@ namespace TRS2._0.Controllers
             return Json(new { success = true, message = "Dedication removed successfully." });
         }
 
+        /// <summary>
+        /// Creates a new dedication interval and appends it to the historical sequence of the person.
+        /// </summary>
         [HttpPost]
-
         public async Task<IActionResult> AddDedication(int personId, DateTime startDate, DateTime endDate, double dedication)
         {
-            // Encontrar el valor máximo actual de Type para esa persona
             int maxType = await _context.Dedications
                 .Where(d => d.PersId == personId)
                 .Select(d => d.Type)
-                .DefaultIfEmpty() // Esto asegura que se devuelva 0 si no hay registros
+                .DefaultIfEmpty()
                 .MaxAsync();
 
-            // Incrementa el valor máximo en 1, o usa 2 si no hay registros existentes
             int newType = maxType == 0 ? 2 : maxType + 1;
 
             var dedicationToAdd = new Dedication
@@ -541,6 +551,9 @@ namespace TRS2._0.Controllers
             return Json(new { success = true, message = "Dedication added successfully." });
         }
 
+        /// <summary>
+        /// Builds the manual-rate segments required to cover the requested period while respecting affiliation and dedication changes.
+        /// </summary>
         private async Task<ManualRateBuildResult> BuildManualExternalRateSegmentsAsync(int personId, DateTime startDate, DateTime endDate, decimal baseHourlyRate)
         {
             var affSegments = await _context.AffxPersons
@@ -867,34 +880,26 @@ namespace TRS2._0.Controllers
             return Json(new { success = true, data = monthlyPM });
         }
 
-        // Método para mostrar la vista inicial de Travels
+        /// <summary>
+        /// Displays the travel view for the selected person.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> Travels(int? personId)
         {
-            // Si se ha proporcionado un ID de persona, lo pasamos a la vista
-            if (personId.HasValue)
-            {
-                ViewBag.SelectedPersonId = personId.Value;
-            }
-            else if (TempData["SelectedPersonId"] != null)
-            {
-                // Si no hay ID, pero existe en TempData, se recupera
-                ViewBag.SelectedPersonId = TempData["SelectedPersonId"];
-                TempData.Keep("SelectedPersonId");
-            }
+            SetSelectedPerson(personId);
 
-            // Obtenemos la lista de personas del sistema
             var persons = await _context.Personnel.ToListAsync();
-            return View(persons); // Pasamos la lista de personas a la vista
+            return View(persons);
         }
 
-        // Método para obtener los datos de viajes de una persona específica
+        /// <summary>
+        /// Returns the travel history of a person for the travel maintenance view.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetTravelData(int personId)
         {
-            // Obtiene la lista de viajes relacionados con la persona
             var travels = await _context.Liquidations
-                .Where(l => l.PersId == personId) // Filtra los viajes por el ID de la persona
+                .Where(l => l.PersId == personId)
                 .Select(l => new
                 {
                     Code = l.Id.ToString(),
@@ -906,20 +911,20 @@ namespace TRS2._0.Controllers
                     Dedication2 = (decimal?)l.Dedication2 ?? 0m,
                     Status = l.Status == "3" ? "Approved" : l.Status == "2" ? "Cancelled" : "Pending"
                 })
-                .OrderBy(l => l.Status == "Pending" ? 0 : 1) // Ordena los viajes pendientes primero
-                .ToListAsync(); // Convierte el resultado en una lista
+                .OrderBy(l => l.Status == "Pending" ? 0 : 1)
+                .ToListAsync();
 
-            // Si no hay viajes, retorna un mensaje informativo
             if (travels == null || !travels.Any())
             {
                 return Json(new { success = false, message = "No se encontraron viajes para esta persona." });
             }
 
-            // Devuelve la lista de viajes con éxito
             return Json(new { success = true, data = travels });
         }
 
-        // Método para mostrar la vista de viajes pendientes
+        /// <summary>
+        /// Displays the list of pending travels without role-based scoping.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> PendingTravels()
         {
@@ -931,7 +936,7 @@ namespace TRS2._0.Controllers
                     PersonName = _context.Personnel
                         .Where(p => p.Id == l.PersId)
                         .Select(p => p.Name + " " + p.Surname)
-                        .FirstOrDefault(), // Obtiene el nombre completo de la persona
+                        .FirstOrDefault(),
                     StartDate = l.Start.ToString("yyyy-MM-dd"),
                     EndDate = l.End.ToString("yyyy-MM-dd"),
                     Project1 = l.Project1 ?? "N/A",
@@ -941,19 +946,19 @@ namespace TRS2._0.Controllers
                     Destiny = l.Destiny,
                     Status = l.Status == "3" ? "Approved" : l.Status == "2" ? "Cancelled" : "Pending"
                 })
-                .ToListAsync(); // Convierte el resultado en una lista
+                .ToListAsync();
 
-            // Ordena los resultados en memoria
             var orderedPendingTravels = pendingTravels
-                .OrderBy(l => l.Code.Substring(5, 2)) // Ordena por año
-                .ThenBy(l => l.Code.Substring(0, 4)) // Luego ordena por el número de viaje
+                .OrderBy(l => l.Code.Substring(5, 2))
+                .ThenBy(l => l.Code.Substring(0, 4))
                 .ToList();
 
             return View(orderedPendingTravels);
         }
 
-
-
+        /// <summary>
+        /// Displays the list of pending travels filtered by the projects managed by the current user.
+        /// </summary>
         [HttpGet]
         [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,ProjectManager")]
         public async Task<IActionResult> PendingTravelsForApproval()
@@ -1024,12 +1029,14 @@ namespace TRS2._0.Controllers
             return View(orderedPendingTravels);
         }
 
+        /// <summary>
+        /// Returns all pending travels as JSON.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetAllPendingTravels()
         {
-            // Obtiene la lista de todos los viajes pendientes
             var pendingTravels = await _context.Liquidations
-                .Where(l => l.Status == "4") // Filtra los viajes que están pendientes
+                .Where(l => l.Status == "4")
                 .Select(l => new
                 {
                     Code = l.Id.ToString(),
@@ -1037,7 +1044,7 @@ namespace TRS2._0.Controllers
                     PersonName = _context.Personnel
                         .Where(p => p.Id == l.PersId)
                         .Select(p => p.Name + " " + p.Surname)
-                        .FirstOrDefault(), // Obtiene el nombre completo de la persona
+                        .FirstOrDefault(),
                     StartDate = l.Start.ToString("yyyy-MM-dd"),
                     EndDate = l.End.ToString("yyyy-MM-dd"),
                     Project1 = l.Project1 ?? "N/A",
@@ -1046,84 +1053,74 @@ namespace TRS2._0.Controllers
                     Dedication2 = (decimal?)l.Dedication2 ?? 0m,
                     Status = "Pending"
                 })
-                .ToListAsync(); // Convierte el resultado en una lista
+                .ToListAsync();
 
-            // Si no hay viajes pendientes, retorna un mensaje informativo
             if (pendingTravels == null || !pendingTravels.Any())
             {
                 return Json(new { success = false, message = "No se encontraron viajes pendientes." });
             }
 
-            // Devuelve la lista de viajes pendientes con éxito
             return Json(new { success = true, data = pendingTravels });
         }
 
-
-
-
-        // Método para aprobar un viaje (cambiar el estado a 3)
+        /// <summary>
+        /// Approves a travel request and reprocesses liquidation projections.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> ApproveTravel(string id)
         {
             try
             {
-                // Buscamos el viaje por su ID
                 var travel = await _context.Liquidations.FindAsync(id);
                 if (travel == null)
                 {
-                    // Si no se encuentra, devolvemos un error
                     return Json(new { success = false, message = "Registro de viaje no encontrado." });
                 }
 
-                // Cambiamos el estado a 7 (aprobado y validado)
                 travel.Status = "7";
-                _context.Update(travel); // Marcamos el cambio
-                await _context.SaveChangesAsync(); // Guardamos en la base de datos
-                // Cargar de nuevo las liquidaciones a 0
+                _context.Update(travel);
+                await _context.SaveChangesAsync();
                 await _loadDataService.ProcessLiquidationsAsync();
-
                 await _loadDataService.ProcessAdvancedLiquidationsAsync();
 
-
-                return Json(new { success = true, message = "Viaje aprobado correctamente." }); // Respuesta de éxito
+                return Json(new { success = true, message = "Viaje aprobado correctamente." });
             }
             catch (Exception ex)
             {
-                // Manejar errores inesperados
                 return Json(new { success = false, message = $"Error al aprobar el viaje: {ex.Message}" });
             }
         }
 
+        /// <summary>
+        /// Cancels a travel request through the liquidation service.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> CancelTravel(string id)
         {
             try
-            {                
-
-                // Llama al método CancelLiquidation
+            {
                 var result = await _loadDataService.CancelLiquidation(id);
 
-                // Convertir el resultado a JsonResult para retornarlo directamente
                 if (result is JsonResult jsonResult)
                 {
                     return jsonResult;
                 }
 
-                // En caso de que no sea un JsonResult, retornar un error genérico
                 return Json(new { success = false, message = "Unexpected response format from service." });
             }
             catch (Exception ex)
             {
-                // Manejar errores inesperados
                 return Json(new { success = false, message = $"Error canceling travel: {ex.Message}" });
             }
         }
 
+        /// <summary>
+        /// Displays the yearly first-login report for personnel with open-project effort and active contracts.
+        /// </summary>
         public async Task<IActionResult> LoginLog(int? year)
         {
             int selectedYear = year ?? DateTime.Now.Year;
 
-            // Personas con contrato que toca el año
             var personIdsWithContract = await _context.Dedications
                 .Where(d => d.Start != null && d.End != null
                     && d.Start <= new DateTime(selectedYear, 12, 31)
@@ -1132,7 +1129,6 @@ namespace TRS2._0.Controllers
                 .Distinct()
                 .ToListAsync();
 
-            // Personas que además tienen algún effort en proyectos ABIERTO ese año
             var personIdsWithOpenEffort = await _context.Persefforts
                 .Where(pe => pe.Month.Year == selectedYear)
                 .Include(pe => pe.WpxPersonNavigation)
@@ -1144,7 +1140,6 @@ namespace TRS2._0.Controllers
                 .Distinct()
                 .ToListAsync();
 
-            // Intersección: contrato + effort en proyecto abierto
             var eligibleIds = personIdsWithContract.Intersect(personIdsWithOpenEffort).ToList();
 
             var persons = await _context.Personnel
@@ -1158,7 +1153,6 @@ namespace TRS2._0.Controllers
                 .Select(l => new { l.PersonId, l.LoginTime })
                 .ToListAsync();
 
-            // Primer login por persona/mes
             var firstLoginByPersMonth = loginRows
                 .GroupBy(x => new { x.PersonId, Month = x.LoginTime.Month })
                 .ToDictionary(
@@ -1186,12 +1180,11 @@ namespace TRS2._0.Controllers
                     var key = CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(m);
                     if (firstLoginByPersMonth.TryGetValue((p.Id, m), out var dt))
                     {
-                        // Formato compacto; cambia a "dd/MM/yyyy HH:mm" si quieres incluir hora
                         entry.MonthlyFirstLogin[key] = dt.ToLocalTime().ToString("dd/MM/yyyy");
                     }
                     else
                     {
-                        entry.MonthlyFirstLogin[key] = ""; // sin login
+                        entry.MonthlyFirstLogin[key] = string.Empty;
                     }
                 }
 
@@ -1205,6 +1198,21 @@ namespace TRS2._0.Controllers
             };
 
             return View("LoginLog", vm);
+        }
+
+        private void SetSelectedPerson(int? personId)
+        {
+            if (personId.HasValue)
+            {
+                ViewBag.SelectedPersonId = personId.Value;
+                return;
+            }
+
+            if (TempData["SelectedPersonId"] != null)
+            {
+                ViewBag.SelectedPersonId = TempData["SelectedPersonId"];
+                TempData.Keep("SelectedPersonId");
+            }
         }
 
     }

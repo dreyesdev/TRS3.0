@@ -7,6 +7,9 @@ using TRS2._0.Services.Alarms;
 
 namespace TRS2._0.Controllers
 {
+    /// <summary>
+    /// Renders management views for alarms that require operational follow-up by administrators and project managers.
+    /// </summary>
     [Authorize(Roles = "Admin,ProjectManager")]
     public class AlarmCenterController : Controller
     {
@@ -21,6 +24,9 @@ namespace TRS2._0.Controllers
             _outOfContractAssignedEffortService = outOfContractAssignedEffortService;
         }
 
+        /// <summary>
+        /// Displays the assignments that currently fall outside an active contract window for the logged-in scope.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> OutOfContractAssignedEffort()
         {
@@ -31,8 +37,9 @@ namespace TRS2._0.Controllers
             }
 
             var roles = await _userManager.GetRolesAsync(currentUser);
-            var assignments = await _outOfContractAssignedEffortService
-                .GetOutOfContractAssignmentsAsync(currentUser.PersonnelId.Value, (IReadOnlyCollection<string>)roles);
+            var assignments = await _outOfContractAssignedEffortService.GetOutOfContractAssignmentsAsync(
+                currentUser.PersonnelId.Value,
+                (IReadOnlyCollection<string>)roles);
 
             var model = new OutOfContractAssignedEffortPageViewModel
             {
@@ -47,7 +54,10 @@ namespace TRS2._0.Controllers
                             : a.ProjectAcronym!,
                         Month = a.Month,
                         AssignedEffort = a.AssignedEffort,
-                        ResolveUrl = Url.Action("GetPersonnelEffortsByPerson", "Projects", new { projId = a.ProjectId, personId = a.PersonId })
+                        ResolveUrl = Url.Action(
+                                "GetPersonnelEffortsByPerson",
+                                "Projects",
+                                new { projId = a.ProjectId, personId = a.PersonId })
                             ?? $"/Projects/GetPersonnelEffortsByPerson/{a.ProjectId}/{a.PersonId}"
                     })
                     .ToList()

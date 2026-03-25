@@ -14,7 +14,9 @@ namespace TRS2._0.Controllers
 {
     [Authorize(Roles = "Leader, Admin, ProjectManager")]   
 
-
+    /// <summary>
+    /// Provides the leadership reporting views used to supervise effort allocation and timesheet completion across departments and groups.
+    /// </summary>
     public class LeaderController : Controller
     {
         private readonly TRSDBContext _context;
@@ -28,6 +30,9 @@ namespace TRS2._0.Controllers
             _workCalendarService = workCalendarService;
         }
 
+        /// <summary>
+        /// Displays the yearly effort breakdown of the personnel that belong to the leader scope.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> EffortSummary(int? year = null)
         {
@@ -42,7 +47,6 @@ namespace TRS2._0.Controllers
 
             IQueryable<Personnel> personsQuery = _context.Personnel.AsQueryable();
 
-            // Cargar TODAS las entradas del líder
             var leaderEntries = await _context.Leaders
                 .Where(l => l.LeaderId == effectiveLeaderId.Value)
                 .ToListAsync();
@@ -55,7 +59,6 @@ namespace TRS2._0.Controllers
                 return Forbid();
             }
 
-            // Identificar todos los grupos y departamentos del líder
             var groupIds = leaderEntries
                 .Where(l => l.Tipo == "G")
                 .Select(l => l.GrupoDepartamento)
@@ -66,7 +69,6 @@ namespace TRS2._0.Controllers
                 .Select(l => l.GrupoDepartamento)
                 .ToList();
 
-            // Filtrar personas que pertenezcan a cualquiera de los grupos o departamentos del líder
             personsQuery = personsQuery.Where(p =>                            
                             (
                                 (groupIds.Any() && groupIds.Contains((int)p.PersonnelGroup)) ||
@@ -74,12 +76,9 @@ namespace TRS2._0.Controllers
                             )
                         );
 
-
-            // Fechas de inicio y fin del año
             var monthStart = new DateTime(year.Value, 1, 1);
             var monthEnd = new DateTime(year.Value, 12, 31);
 
-            // Filtrar solo personas con contrato activo en cualquier momento del año
             personsQuery = personsQuery.Where(p =>
                 _context.Dedications.Any(d =>
                     d.PersId == p.Id &&
@@ -90,7 +89,6 @@ namespace TRS2._0.Controllers
             var persons = await personsQuery.ToListAsync();
             var personIds = persons.Select(p => p.Id).ToList();
 
-            // Obtener los WPX de esas personas
             var wpxPeople = await _context.Wpxpeople
                 .Include(wpx => wpx.WpNavigation)
                     .ThenInclude(wp => wp.Proj)
@@ -99,13 +97,11 @@ namespace TRS2._0.Controllers
 
             var wpxIds = wpxPeople.Select(wpx => wpx.Id).ToList();
 
-            // Cargar efforts
             var persefforts = await _context.Persefforts
                 .Where(p => wpxIds.Contains(p.WpxPerson) &&
                             p.Month >= monthStart && p.Month <= monthEnd)
                 .ToListAsync();
 
-            // Agrupar efforts por persona → proyecto → WP
             var effortsByPerson = wpxPeople
                 .GroupBy(wpx => wpx.Person)
                 .ToDictionary(g => g.Key, g =>
@@ -131,7 +127,7 @@ namespace TRS2._0.Controllers
 
                                 return new { wpx, monthlyEffort, totalEffort };
                             })
-                            .Where(x => x.totalEffort > 0) // Solo WPs con algo de esfuerzo
+                            .Where(x => x.totalEffort > 0)
                             .Select(x => new LeaderEffortDetail
                             {
                                 WP = x.wpx.WpNavigation.Name,
@@ -152,7 +148,6 @@ namespace TRS2._0.Controllers
                     .ToList()
                 );
 
-            // Construir el modelo
             var model = new LeaderEffortViewModel
             {
                 Year = year.Value,
@@ -172,6 +167,9 @@ namespace TRS2._0.Controllers
         }
 
 
+        /// <summary>
+        /// Displays the yearly timesheet completion overview for the personnel in the leader scope.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> TimesheetOverview(int? year = null)
         {
@@ -187,7 +185,7 @@ namespace TRS2._0.Controllers
                 if (Request.Query.ContainsKey("leaderId") && int.TryParse(Request.Query["leaderId"], out int parsedId))
                     effectiveLeaderId = parsedId;
                 else
-                    effectiveLeaderId = 1071; // Simulación por defecto
+                    effectiveLeaderId = 1071;
             }
             else if (User.IsInRole("Leader"))
             {
@@ -197,7 +195,6 @@ namespace TRS2._0.Controllers
             if (!effectiveLeaderId.HasValue)
                 return Forbid();
 
-            // ⬇️ NUEVO: cargar TODAS las entradas del líder
             var leaderEntries = await _context.Leaders
                 .Where(l => l.LeaderId == effectiveLeaderId.Value)
                 .ToListAsync();
@@ -210,7 +207,6 @@ namespace TRS2._0.Controllers
                 return Forbid();
             }
 
-            // ⬇️ NUEVO: identificar todos los grupos y departamentos del líder
             var groupIds = leaderEntries
                 .Where(l => l.Tipo == "G")
                 .Select(l => l.GrupoDepartamento)
@@ -221,18 +217,15 @@ namespace TRS2._0.Controllers
                 .Select(l => l.GrupoDepartamento)
                 .ToList();
 
-            // ⬇️ NUEVO: filtrar personas que pertenezcan a cualquiera de los grupos/departamentos
             IQueryable<Personnel> personsQuery = _context.Personnel.AsQueryable();
             personsQuery = personsQuery.Where(p =>
                 (groupIds.Any() && groupIds.Contains((int)p.PersonnelGroup)) ||
                 (deptIds.Any() && deptIds.Contains((int)p.Department))
             );
 
-            // Fechas del año seleccionado
             var monthStart = new DateTime(selectedYear, 1, 1);
             var monthEnd = new DateTime(selectedYear, 12, 31);
 
-            // Igual que en EffortSummary: sólo personas con contrato activo en algún momento del año
             personsQuery = personsQuery.Where(p =>
                 _context.Dedications.Any(d =>
                     d.PersId == p.Id &&
@@ -240,7 +233,6 @@ namespace TRS2._0.Controllers
                     (d.End == null || d.End >= monthStart))
             );
 
-            // A partir de aquí, el código original
             var persons = await personsQuery
                 .OrderBy(p => p.Surname).ThenBy(p => p.Name)
                 .ToListAsync();
@@ -308,6 +300,9 @@ namespace TRS2._0.Controllers
         }
 
 
+        /// <summary>
+        /// Displays the yearly aggregate effort versus PM overview for the leader scope.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> GlobalEffortSummary(int? year = null)
         {
@@ -318,7 +313,6 @@ namespace TRS2._0.Controllers
             if (!effectiveLeaderId.HasValue)
                 return Forbid();
 
-            // 1) Cargar TODAS las entradas del líder (G y D)
             var leaderEntries = await _context.Leaders
                 .Where(l => l.LeaderId == effectiveLeaderId.Value)
                 .ToListAsync();
@@ -341,11 +335,9 @@ namespace TRS2._0.Controllers
                 .Select(l => l.GrupoDepartamento)
                 .ToList();
 
-            // 2) Fechas del año (usaremos rango en vez de comparar por .Year)
             var yearStart = new DateTime(selectedYear, 1, 1);
             var yearEnd = new DateTime(selectedYear, 12, 31);
 
-            // 3) Personas en el ámbito (unión de grupos/deptos) y con contrato activo en algún momento del año
             IQueryable<Personnel> personsQuery = _context.Personnel.AsQueryable();
 
             personsQuery = personsQuery.Where(p =>
@@ -372,17 +364,14 @@ namespace TRS2._0.Controllers
                     People = new List<LeaderGlobalEffortPersonViewModel>()
                 });
 
-            // 4) WPxPerson de las personas filtradas
             var wpxpeople = await _context.Wpxpeople
                 .Where(wpx => personIds.Contains(wpx.Person))
                 .ToListAsync();
 
             var wpxIds = wpxpeople.Select(wpx => wpx.Id).ToList();
 
-            // Mapa rápido wpxId -> personId para evitar First(...) en el GroupBy
             var wpxToPerson = wpxpeople.ToDictionary(w => w.Id, w => w.Person);
 
-            // 5) Efforts del año (rango, no .Year) y agregado por persona/mes
             var efforts = await _context.Persefforts
                 .Where(p => wpxIds.Contains(p.WpxPerson) && p.Month >= yearStart && p.Month <= yearEnd)
                 .ToListAsync();
@@ -397,7 +386,6 @@ namespace TRS2._0.Controllers
                 })
                 .ToList();
 
-            // 6) Máximos de la tabla PersMonthEfforts (mismo rango)
             var maxEfforts = await _context.PersMonthEfforts
                 .Where(p => personIds.Contains(p.PersonId) && p.Month >= yearStart && p.Month <= yearEnd)
                 .ToListAsync();
@@ -408,7 +396,6 @@ namespace TRS2._0.Controllers
                 People = new List<LeaderGlobalEffortPersonViewModel>()
             };
 
-            // 7) Construcción del modelo por persona
             foreach (var person in persons)
             {
                 var monthly = new Dictionary<int, (decimal Registered, decimal Max)>();
@@ -433,6 +420,9 @@ namespace TRS2._0.Controllers
         }
 
 
+        /// <summary>
+        /// Exports the yearly global effort summary of the current leader scope to CSV.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> ExportGlobalEffortToCsv(int? year = null)
         {
@@ -496,7 +486,6 @@ namespace TRS2._0.Controllers
 
             var sb = new StringBuilder();
 
-            // Cabecera: Person, January, February, ...
             sb.Append("Person");
             for (int m = 1; m <= 12; m++)
             {
@@ -527,6 +516,9 @@ namespace TRS2._0.Controllers
 
         }
 
+        /// <summary>
+        /// Exports the yearly timesheet overview of the current leader scope to CSV.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> ExportTimesheetOverviewToCsv(int? year = null)
         {
@@ -604,6 +596,9 @@ namespace TRS2._0.Controllers
             return File(csvBytes, "text/csv", fileName);
         }
 
+        /// <summary>
+        /// Exports the detailed yearly effort assignment summary of the current leader scope to CSV.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> ExportEffortSummaryToCsv(int year)
         {
@@ -650,7 +645,6 @@ namespace TRS2._0.Controllers
                 .Where(e => wpxIds.Contains(e.WpxPerson) && e.Month.Year == year)
                 .ToListAsync();
 
-            // Agrupar los datos y filtrar los que no tienen ningún esfuerzo en todo el año
             var grouped = wpxpeople
                 .Select(wpx =>
                 {
@@ -670,7 +664,7 @@ namespace TRS2._0.Controllers
                         Total = total
                     };
                 })
-                .Where(g => g.Total > 0) // ❌ Excluir sin ningún effort en todo el año
+                .Where(g => g.Total > 0)
                 .OrderBy(g => g.PersonName.Surname)
                 .ThenBy(g => g.PersonName.Name)
                 .ThenBy(g => g.Project)
@@ -699,6 +693,9 @@ namespace TRS2._0.Controllers
             return File(csvBytes, "text/csv", fileName);
         }
 
+        /// <summary>
+        /// Resolves the effective leader identifier used to scope leadership reports for the current request.
+        /// </summary>
         private async Task<int?> GetEffectiveLeaderId(ApplicationUser currentUser)
         {
             if (User.IsInRole("Admin"))

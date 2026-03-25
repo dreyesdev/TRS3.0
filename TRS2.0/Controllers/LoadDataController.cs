@@ -1,13 +1,20 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Quartz;
+using System;
+using System.IO;
 using TRS2._0.Services;
 
 namespace TRS2._0.Controllers
 {
+    /// <summary>
+    /// Exposes manual endpoints that trigger the Quartz jobs behind TRS operational data loads and maintenance tasks.
+    /// </summary>
     [ApiController]
     [Route("[controller]")]
     public class LoadDataController : ControllerBase
     {
+        private const string LoadDataJobName = "LoadDataServiceJob";
+
         private readonly ISchedulerFactory _schedulerFactory;
 
         public LoadDataController(ISchedulerFactory schedulerFactory)
@@ -15,551 +22,258 @@ namespace TRS2._0.Controllers
             _schedulerFactory = schedulerFactory;
         }
 
+        /// <summary>
+        /// Launches the monthly PM recalculation job.
+        /// </summary>
         [HttpGet("/Carga")]
         public async Task<IActionResult> TriggerLoadDataJob()
         {
-            try
-            {
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-                {
-                    {"Action", "UpdateMonthlyPMs"},
-            
-                };
-
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena con los parámetros específicos
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey, jobDataMap);
-                    return Ok("El trabajo de carga de datos se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de carga de datos no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Maneja adecuadamente la excepción
-                return StatusCode(500, $"Error al iniciar el trabajo de carga de datos: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "UpdateMonthlyPMs",
+                successMessage: "El trabajo de carga de datos se ha iniciado.",
+                notFoundMessage: "El trabajo de carga de datos no se encontró.",
+                errorContext: "el trabajo de carga de datos");
         }
 
-
+        /// <summary>
+        /// Launches the liquidation import job using the standard input file.
+        /// </summary>
         [HttpGet("/Liquidaciones")]
         public async Task<IActionResult> TriggerLiquidationJob()
         {
-            try
-            {
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dataload", "Liquid.txt");
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-                {
-                    {"Action", "LoadLiquidationsFromFile"},
-                    {"FilePath", filePath}
-                 };
-
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey,jobDataMap);
-                    return Ok("El trabajo de liquidación se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de liquidación no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Maneja adecuadamente la excepción
-                return StatusCode(500, $"Error al iniciar el trabajo de liquidación: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "LoadLiquidationsFromFile",
+                successMessage: "El trabajo de liquidación se ha iniciado.",
+                notFoundMessage: "El trabajo de liquidación no se encontró.",
+                errorContext: "el trabajo de liquidación",
+                fileName: "Liquid.txt");
         }
 
+        /// <summary>
+        /// Launches the standard liquidation processing workflow.
+        /// </summary>
         [HttpGet("/ProcesaLiquidaciones")]
-
         public async Task<IActionResult> TriggerProcessLiquidationJob()
         {
-            try
-            {
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-                {
-                    {"Action", "ProcessLiquidations"},                    
-                };
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey,jobDataMap);
-                    return Ok("El trabajo de procesamiento de liquidaciones se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de procesamiento de liquidaciones no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Maneja adecuadamente la excepción
-                return StatusCode(500, $"Error al iniciar el trabajo de procesamiento de liquidaciones: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "ProcessLiquidations",
+                successMessage: "El trabajo de procesamiento de liquidaciones se ha iniciado.",
+                notFoundMessage: "El trabajo de procesamiento de liquidaciones no se encontró.",
+                errorContext: "el trabajo de procesamiento de liquidaciones");
         }
 
+        /// <summary>
+        /// Launches the advanced liquidation processing workflow.
+        /// </summary>
         [HttpGet("/ProcesoLiquidacionesAvd")]
-
         public async Task<IActionResult> TriggerProcessLiquidationAdvJob()
         {
-            try
-            {
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-                {
-                    {"Action", "ProcessLiquidationsAdvanced"},
-                };
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey, jobDataMap);
-                    return Ok("El trabajo de procesamiento de liquidaciones avanzado se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de procesamiento de liquidaciones avanzado no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Maneja adecuadamente la excepción
-                return StatusCode(500, $"Error al iniciar el trabajo de procesamiento de liquidaciones avanzado: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "ProcessLiquidationsAdvanced",
+                successMessage: "El trabajo de procesamiento de liquidaciones avanzado se ha iniciado.",
+                notFoundMessage: "El trabajo de procesamiento de liquidaciones avanzado no se encontró.",
+                errorContext: "el trabajo de procesamiento de liquidaciones avanzado");
         }
 
+        /// <summary>
+        /// Launches the personnel import job using the standard source file.
+        /// </summary>
         [HttpGet("/CargaPersonal")]
-
         public async Task<IActionResult> TriggerLoadPersonnelJob()
         {
-            try
-            {
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Construye la ruta al archivo dentro del directorio de salida de la aplicación
-                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dataload", "PERSONAL.txt");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-                {
-                    {"Action", "LoadPersonnelFromFile"},
-                    {"FilePath", filePath}
-                };
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey,jobDataMap);
-                    return Ok("El trabajo de carga de personal se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de carga de personal no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Maneja adecuadamente la excepción
-                return StatusCode(500, $"Error al iniciar el trabajo de carga de personal: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "LoadPersonnelFromFile",
+                successMessage: "El trabajo de carga de personal se ha iniciado.",
+                notFoundMessage: "El trabajo de carga de personal no se encontró.",
+                errorContext: "el trabajo de carga de personal",
+                fileName: "PERSONAL.txt");
         }
 
+        /// <summary>
+        /// Launches the affiliations and dedications import job.
+        /// </summary>
         [HttpGet("/CargaAfiliacionesYDedicaciones")]
         public async Task<IActionResult> TriggerLoadAffiliationsAndDedicationsJob()
         {
-            try
-            {
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Construye la ruta al archivo dentro del directorio de salida de la aplicación
-                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dataload", "DEDICACIO3.txt");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-                                {
-                                    {"Action", "LoadAffiliationsAndDedicationsFromFile"},
-                                    {"FilePath", filePath}
-                                };
-
-
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey, jobDataMap);
-                    return Ok("El trabajo de carga de afiliaciones y dedicaciones se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de carga de afiliaciones y dedicaciones no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Maneja adecuadamente la excepción
-                return StatusCode(500, $"Error al iniciar el trabajo de carga de afiliaciones y dedicaciones: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "LoadAffiliationsAndDedicationsFromFile",
+                successMessage: "El trabajo de carga de afiliaciones y dedicaciones se ha iniciado.",
+                notFoundMessage: "El trabajo de carga de afiliaciones y dedicaciones no se encontró.",
+                errorContext: "el trabajo de carga de afiliaciones y dedicaciones",
+                fileName: "DEDICACIO3.txt");
         }
 
+        /// <summary>
+        /// Launches the personnel groups import job.
+        /// </summary>
         [HttpGet("/CargaGruposPersonas")]
-
         public async Task<IActionResult> TriggerLoadPersonGroupsJob()
         {
-            try
-            {
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Construye la ruta al archivo dentro del directorio de salida de la aplicación
-                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dataload", "GRUPS.txt");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-                {
-                    {"Action", "LoadPersonnelGroupsFromFile"},
-                    {"FilePath", filePath}
-                };
-
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey,jobDataMap);
-                    return Ok("El trabajo de carga de grupos de personas se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de carga de grupos de personas no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Maneja adecuadamente la excepción
-                return StatusCode(500, $"Error al iniciar el trabajo de carga de grupos de personas: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "LoadPersonnelGroupsFromFile",
+                successMessage: "El trabajo de carga de grupos de personas se ha iniciado.",
+                notFoundMessage: "El trabajo de carga de grupos de personas no se encontró.",
+                errorContext: "el trabajo de carga de grupos de personas",
+                fileName: "GRUPS.txt");
         }
 
+        /// <summary>
+        /// Launches the leaders import job.
+        /// </summary>
         [HttpGet("/CargaLideres")]
-
         public async Task<IActionResult> TriggerLoadLeadersJob()
         {
-            try
-            {
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Construye la ruta al archivo dentro del directorio de salida de la aplicación
-                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dataload", "Leaders.txt");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-                {
-                    {"Action", "LoadLeadersFromFile"},
-                    {"FilePath", filePath}
-                };
-
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey,jobDataMap);
-                    return Ok("El trabajo de carga de líderes se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de carga de líderes no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Maneja adecuadamente la excepción
-                return StatusCode(500, $"Error al iniciar el trabajo de carga de líderes: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "LoadLeadersFromFile",
+                successMessage: "El trabajo de carga de líderes se ha iniciado.",
+                notFoundMessage: "El trabajo de carga de líderes no se encontró.",
+                errorContext: "el trabajo de carga de líderes",
+                fileName: "Leaders.txt");
         }
 
+        /// <summary>
+        /// Launches the projects import job.
+        /// </summary>
         [HttpGet("/CargaProyectos")]
-
         public async Task<IActionResult> TriggerLoadProjectsJob()
         {
-            try
-            {
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Construye la ruta al archivo dentro del directorio de salida de la aplicación
-                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dataload", "PROJECTES.txt");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-                {
-                    {"Action", "LoadProjectsFromFile"},
-                    {"FilePath", filePath}
-                };
-
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey,jobDataMap);
-                    return Ok("El trabajo de carga de proyectos se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de carga de proyectos no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Maneja adecuadamente la excepción
-                return StatusCode(500, $"Error al iniciar el trabajo de carga de proyectos: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "LoadProjectsFromFile",
+                successMessage: "El trabajo de carga de proyectos se ha iniciado.",
+                notFoundMessage: "El trabajo de carga de proyectos no se encontró.",
+                errorContext: "el trabajo de carga de proyectos",
+                fileName: "PROJECTES.txt");
         }
 
+        /// <summary>
+        /// Launches the agreement events synchronization job.
+        /// </summary>
         [HttpGet("/FetchAndSaveAgreementEvents")]
         public async Task<IActionResult> TriggerFetchAndSaveAgreementEventsJob()
         {
-            try
-            {
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-                {
-                    {"Action", "FetchAndSaveAgreementEvents"}
-                };
-
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey, jobDataMap);
-                    return Ok("El trabajo de obtención y guardado de eventos de acuerdos se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de obtención y guardado de eventos de acuerdos no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Maneja adecuadamente la excepción
-                return StatusCode(500, $"Error al iniciar el trabajo de obtención y guardado de eventos de acuerdos: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "FetchAndSaveAgreementEvents",
+                successMessage: "El trabajo de obtención y guardado de eventos de acuerdos se ha iniciado.",
+                notFoundMessage: "El trabajo de obtención y guardado de eventos de acuerdos no se encontró.",
+                errorContext: "el trabajo de obtención y guardado de eventos de acuerdos");
         }
 
+        /// <summary>
+        /// Launches the user-to-personnel reconciliation job.
+        /// </summary>
         [HttpGet("/UpdatePersonnelUserIds")]
         public async Task<IActionResult> TriggerUpdatePersonnelUserIdsJob()
         {
-            try
-            {
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-            {
-                {"Action", "UpdatePersonnelUserIds"}
-            };
-
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey, jobDataMap);
-                    return Ok("El trabajo de actualización de UserIds se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de actualización de UserIds no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Maneja adecuadamente la excepción
-                return StatusCode(500, $"Error al iniciar el trabajo de actualización de UserIds: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "UpdatePersonnelUserIds",
+                successMessage: "El trabajo de actualización de UserIds se ha iniciado.",
+                notFoundMessage: "El trabajo de actualización de UserIds no se encontró.",
+                errorContext: "el trabajo de actualización de UserIds");
         }
 
+        /// <summary>
+        /// Launches the leave table synchronization job.
+        /// </summary>
         [HttpGet("/UpdateLeaveTable")]
         public async Task<IActionResult> TriggerUpdateLeaveTableJob()
         {
-            try
-            {
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-        {
-            {"Action", "UpdateLeaveTable"}
-        };
-
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey, jobDataMap);
-                    return Ok("El trabajo de actualización de la tabla leave se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de actualización de la tabla leave no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Maneja adecuadamente la excepción
-                return StatusCode(500, $"Error al iniciar el trabajo de actualización de la tabla leave: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "UpdateLeaveTable",
+                successMessage: "El trabajo de actualización de la tabla leave se ha iniciado.",
+                notFoundMessage: "El trabajo de actualización de la tabla leave no se encontró.",
+                errorContext: "el trabajo de actualización de la tabla leave");
         }
 
+        /// <summary>
+        /// Launches the automatic timesheet completion job for investigators.
+        /// </summary>
         [HttpGet("/ProcessInvestigatorsTimesheet")]
         public async Task<IActionResult> TriggerProcessInvestigatorsTimesheetJob()
         {
-            try
-            {
-                // Obtén una instancia del scheduler
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-        {
-            { "Action", "ProcessInvestigatorsTimesheet" }
-        };
-
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey, jobDataMap);
-                    return Ok("El trabajo de procesamiento del timesheet para investigadores se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de procesamiento del timesheet para investigadores no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Manejo adecuado de excepciones con un código de error HTTP 500
-                return StatusCode(500, $"Error al iniciar el trabajo de procesamiento del timesheet para investigadores: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "ProcessInvestigatorsTimesheet",
+                successMessage: "El trabajo de procesamiento del timesheet para investigadores se ha iniciado.",
+                notFoundMessage: "El trabajo de procesamiento del timesheet para investigadores no se encontró.",
+                errorContext: "el trabajo de procesamiento del timesheet para investigadores");
         }
 
+        /// <summary>
+        /// Launches the batch that flags out-of-contract effort situations.
+        /// </summary>
         [HttpGet("/OutOfContractLoad")]
         public async Task<IActionResult> TriggerOutOfContractLoadJob()
         {
-            try
-            {
-                // Obtén una instancia del scheduler
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-        {
-            {"Action", "LoadOutOfContract"}
-        };
-
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey, jobDataMap);
-                    return Ok("El trabajo de procesamiento fuera de contrato se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de procesamiento fuera de contrato no se encontró.");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Manejo adecuado de excepciones con un código de error HTTP 500
-                return StatusCode(500, $"Error al iniciar el trabajo de procesamiento fuera de contrato: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "LoadOutOfContract",
+                successMessage: "El trabajo de procesamiento fuera de contrato se ha iniciado.",
+                notFoundMessage: "El trabajo de procesamiento fuera de contrato no se encontró.",
+                errorContext: "el trabajo de procesamiento fuera de contrato");
         }
 
+        /// <summary>
+        /// Launches the global effort adjustment job.
+        /// </summary>
         [HttpGet("/AdjustGlobalEffort")]
-
         public async Task<IActionResult> TriggerAdjustGlobalEffortJob()
         {
-            try
-            {
-                var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Configura JobDataMap con los parámetros específicos para esta acción
-                var jobDataMap = new JobDataMap
-                {
-                    {"Action", "AdjustGlobalEffort"}
-                };
-
-                // Verifica si el trabajo ya está planificado o en ejecución y lo desencadena
-
-                if (await scheduler.CheckExists(jobKey))
-                {
-                    await scheduler.TriggerJob(jobKey, jobDataMap);
-                    return Ok("El trabajo de ajuste de esfuerzo global se ha iniciado.");
-                }
-                else
-                {
-                    return NotFound("El trabajo de ajuste de esfuerzo global no se encontró.");
-                }
-            }
-
-            catch (Exception ex)
-            {
-                // Manejo adecuado de excepciones con un código de error HTTP 500
-                return StatusCode(500, $"Error al iniciar el trabajo de ajuste de esfuerzo global: {ex.Message}");
-            }
+            return await TriggerJobAsync(
+                action: "AdjustGlobalEffort",
+                successMessage: "El trabajo de ajuste de esfuerzo global se ha iniciado.",
+                notFoundMessage: "El trabajo de ajuste de esfuerzo global no se encontró.",
+                errorContext: "el trabajo de ajuste de esfuerzo global");
         }
 
+        /// <summary>
+        /// Launches the person rates generation job.
+        /// </summary>
         [HttpGet("/GenerarRates")]
         public async Task<IActionResult> TriggerGeneratePersonRatesJob()
         {
+            return await TriggerJobAsync(
+                action: "GeneratePersonRates",
+                successMessage: "El trabajo de generación de Rates se ha iniciado.",
+                notFoundMessage: "El trabajo de carga de datos no se encontró.",
+                errorContext: "el trabajo de generación de Rates");
+        }
+
+        private async Task<IActionResult> TriggerJobAsync(
+            string action,
+            string successMessage,
+            string notFoundMessage,
+            string errorContext,
+            string? fileName = null)
+        {
             try
             {
                 var scheduler = await _schedulerFactory.GetScheduler();
-                var jobKey = new JobKey("LoadDataServiceJob");
-
-                // Acción específica para generación de PersonRates
-                var jobDataMap = new JobDataMap
-        {
-            { "Action", "GeneratePersonRates" }
-        };
-
-                // Verifica si el trabajo existe y lo lanza con la acción especificada
-                if (await scheduler.CheckExists(jobKey))
+                var jobKey = new JobKey(LoadDataJobName);
+                if (!await scheduler.CheckExists(jobKey))
                 {
-                    await scheduler.TriggerJob(jobKey, jobDataMap);
-                    return Ok("El trabajo de generación de Rates se ha iniciado.");
+                    return NotFound(notFoundMessage);
                 }
-                else
-                {
-                    return NotFound("El trabajo de carga de datos no se encontró.");
-                }
+
+                await scheduler.TriggerJob(jobKey, BuildJobDataMap(action, fileName));
+                return Ok(successMessage);
             }
             catch (Exception ex)
             {
-                // Devolvemos un 500 con el mensaje de error para poder diagnosticar rápido
-                return StatusCode(500, $"Error al iniciar el trabajo de generación de Rates: {ex.Message}");
+                return StatusCode(500, $"Error al iniciar {errorContext}: {ex.Message}");
             }
         }
 
+        private static JobDataMap BuildJobDataMap(string action, string? fileName)
+        {
+            var jobDataMap = new JobDataMap
+            {
+                { "Action", action }
+            };
 
+            if (!string.IsNullOrWhiteSpace(fileName))
+            {
+                jobDataMap["FilePath"] = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Dataload", fileName);
+            }
+
+            return jobDataMap;
+        }
     }
 }

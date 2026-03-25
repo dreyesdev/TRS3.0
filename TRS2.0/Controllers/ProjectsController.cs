@@ -16,12 +16,12 @@ using static TRS2._0.Models.ViewModels.PersonnelEffortPlanViewModel;
 using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using System.Text;
-using OfficeOpenXml;
-using System.Text.RegularExpressions;
 
 namespace TRS2._0.Controllers
 {
-    
+    /// <summary>
+    /// Centralizes project administration, effort planning, reporting periods, locking rules and project-level export workflows.
+    /// </summary>
     public class ProjectsController : Controller
     {
         private readonly TRSDBContext _context;
@@ -35,21 +35,22 @@ namespace TRS2._0.Controllers
             _logger = logger;
         }
 
-        // GET: Projects
-
-
+        /// <summary>
+        /// Redirects the localized entry route to the main project catalog.
+        /// </summary>
         [Route("Proyectos/InitialRedirect")]
         [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public IActionResult InitialRedirect()
         {
-            // Simplemente redirige a Index sin parámetros
             return RedirectToAction("Index");
         }
 
+        /// <summary>
+        /// Displays the active project catalog used by project managers and administrators.
+        /// </summary>
         [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public IActionResult Index()
         {
-            // Obtener todos los años únicos de inicio y fin
             ViewBag.UniqueYears = _context.Projects
                 .Where(p => p.St1 == "ABIERTO" &&
                             (p.St2 == "CONCEDIDO" || string.IsNullOrEmpty(p.St2)) &&
@@ -68,22 +69,20 @@ namespace TRS2._0.Controllers
                 .OrderBy(y => y)
                 .ToList();
 
-            // Obtener todos los proyectos válidos
             var projects = _context.Projects
                 .Where(p => p.St1 == "ABIERTO" &&
                             (p.St2 == "CONCEDIDO" || string.IsNullOrEmpty(p.St2)) &&
                             p.Visible == 1)
                 .ToList();
 
-            // Año actual como selección inicial en la vista
             ViewBag.DefaultSelectedYear = DateTime.Now.Year;
 
             return View(projects);
         }
 
-
-
-        // GET: Projects/Details/5
+        /// <summary>
+        /// Displays the high-level project detail view, including work-package totals and management roles.
+        /// </summary>
         [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public async Task<IActionResult> Details(int? id)
         {
@@ -102,18 +101,15 @@ namespace TRS2._0.Controllers
                 return NotFound();
             }
 
-            // Recuperar los nombres completos del PM, PI y FM
             var pm = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == project.Pm);
             var pi = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == project.Pi);
             var fm = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == project.Fm);
 
-            // Preparar los datos para la vista
             ViewBag.PmFullName = pm != null ? $"{pm.Name} {pm.Surname}" : "No asignado";
             ViewBag.PiFullName = pi != null ? $"{pi.Name} {pi.Surname}" : "No asignado";
             ViewBag.FmFullName = fm != null ? $"{fm.Name} {fm.Surname}" : "No asignado";
             ViewBag.ProjId = id;
 
-            // Calcular los valores distribuidos y los esfuerzos cubiertos para cada WP
             var wpDetails = project.Wps.Select(wp => new
             {
                 wp.Id,
@@ -126,7 +122,6 @@ namespace TRS2._0.Controllers
                             .Sum(pe => pe.Value)
             }).ToList();
 
-            // Añadir wpDetails al ViewBag para acceder desde la vista
             ViewBag.WpDetails = wpDetails;
             ViewBag.CurrentProject = project.Acronim;
 
@@ -135,16 +130,11 @@ namespace TRS2._0.Controllers
 
 
 
-        // GET: Projects/Create
-        
         public IActionResult Create()
         {
             return View();
         }
 
-        // POST: Projects/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         
@@ -159,8 +149,6 @@ namespace TRS2._0.Controllers
             return View(project);
         }
 
-        // GET: Projects/Edit/5
-        
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null || _context.Projects == null)
@@ -176,9 +164,6 @@ namespace TRS2._0.Controllers
             return View(project);
         }
 
-        // POST: Projects/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         
@@ -256,6 +241,9 @@ namespace TRS2._0.Controllers
           return (_context.Projects?.Any(e => e.ProjId == id)).GetValueOrDefault();
         }
 
+        /// <summary>
+        /// Displays the project-level planned effort distribution by work package and month.
+        /// </summary>
         [HttpGet]
         [Route("Projects/EffortPlan/{projId}")]
         [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
@@ -346,11 +334,12 @@ namespace TRS2._0.Controllers
         }
 
 
+        /// <summary>
+        /// Displays the personnel assignment screen of a project, including project membership and work-package links.
+        /// </summary>
         [HttpGet]
         [Route("Projects/PersonnelSelection/{projId}")]
         [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
-
-        // Método para la selección de personal dentro del contexto de un proyecto específico
         public async Task<IActionResult> PersonnelSelection(int projId)
         {
             var projectDetails = await _context.Projects.FindAsync(projId);
@@ -495,38 +484,35 @@ namespace TRS2._0.Controllers
         }
 
 
+        /// <summary>
+        /// Displays the detailed personnel effort planning grid of a project, optionally filtered to a single work package.
+        /// </summary>
         [HttpGet]
         [Route("Projects/PersonnelEffortPlan/{projId}/{wpId?}")]
         [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public async Task<IActionResult> PersonnelEffortPlan(int projId, int? wpId = null)
         {
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew(); // Inicia el cronómetro
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
             ViewBag.projId = projId;     
             
 
-            // Obtener el proyecto
             var project = await _context.Projects.FindAsync(projId);
             ViewBag.CurrentProject = project.Acronim;
             if (project == null)
             {
                 return NotFound();
             }
-            // Obtener WP del proyecto
             var workPackages = await _context.Wps.Where(wp => wp.ProjId == projId).ToListAsync();
 
-            // Obtener relaciones entre personal y proyecto
             var projectPersonnel = await _context.Projectxpeople.Where(px => px.ProjId == projId).ToListAsync();
 
-            // Obtener IDs de las personas involucradas en el proyecto
             var personIds = projectPersonnel.Select(p => p.Person).Distinct().ToList();
 
-            // Obtener el rango de fechas del proyecto
             var projectStartDate = project.Start;
             DateTime projectEndReportDate = project.EndReportDate;
 
 
-            // NEW: fin efectivo si algún WP se extiende más allá del EndReportDate
             DateTime? maxWpEndDate = workPackages.Count > 0
                 ? workPackages.Max(wp => (DateTime?)wp.EndDate)
                 : null;
@@ -535,7 +521,6 @@ namespace TRS2._0.Controllers
                 ? maxWpEndDate.Value
                 : projectEndReportDate;
 
-            // Normaliza a inicio/fin de mes
             DateTime adjustedProjectStartDate = project.Start.HasValue
                 ? new DateTime(project.Start.Value.Year, project.Start.Value.Month, 1)
                 : DateTime.MinValue;
@@ -547,14 +532,12 @@ namespace TRS2._0.Controllers
             );
 
 
-            // Recuperar todos los registros relevantes de PersMonthEfforts usando las fechas ajustadas
             var persMonthEfforts = await _context.PersMonthEfforts
                 .Where(pme => personIds.Contains(pme.PersonId) &&
                               pme.Month >= adjustedProjectStartDate &&
                               pme.Month <= adjustedProjectEndDate)
                 .ToListAsync();
 
-            // Transformar a un diccionario para facilitar el acceso
             var pmValuesByPersonAndMonth = persMonthEfforts
                 .GroupBy(pme => pme.PersonId)
                 .ToDictionary(
@@ -565,7 +548,6 @@ namespace TRS2._0.Controllers
                     )
                 );
 
-            // Recuperar y sumar los esfuerzos por persona y mes usando las fechas ajustadas
             var totalEffortsByPersonAndMonth = await _context.Persefforts
                 .Include(pe => pe.WpxPersonNavigation)
                 .Where(pe => personIds.Contains(pe.WpxPersonNavigation.Person) &&
@@ -579,7 +561,6 @@ namespace TRS2._0.Controllers
                 })
                 .ToListAsync();
 
-            // Transformar a un diccionario para facilitar el acceso
             var totalEffortsByPersonAndMonthDict = totalEffortsByPersonAndMonth
                 .GroupBy(e => e.PersonId)
                 .ToDictionary(
@@ -591,7 +572,6 @@ namespace TRS2._0.Controllers
                 );
                         
 
-            // Obtener relaciones entre personal y WP
             var wpxPersons = await _context.Wpxpeople.Include(wpx => wpx.PersonNavigation)
                                                      .Include(wpx => wpx.WpNavigation)
                                                      .Where(wpx => workPackages.Select(wp => wp.Id).Contains(wpx.Wp))
@@ -600,7 +580,6 @@ namespace TRS2._0.Controllers
             var wpxPersonIdsListed = wpxPersons.Select(wpx => wpx.Id).ToList();
 
 
-            // Obtener esfuerzos del personal y mapearlos
             var persefforts = await _context.Persefforts
                                             .Include(pe => pe.WpxPersonNavigation)
                                             .Where(pe => wpxPersonIdsListed.Contains(pe.WpxPerson) &&
@@ -616,31 +595,25 @@ namespace TRS2._0.Controllers
                                 (l.Year < adjustedProjectEndDate.Year || (l.Year == adjustedProjectEndDate.Year && l.Month <= adjustedProjectEndDate.Month))))
                     .ToListAsync();
 
-            // --- Datos para "Work Packages Details" (traspuesto) ---
-
             var wpIds = workPackages.Select(wp => wp.Id).ToList();
 
-            // Distributed (plan)
             var distributedByWp = await _context.Projefforts
                 .Where(pe => wpIds.Contains(pe.Wp))
                 .GroupBy(pe => pe.Wp)
                 .Select(g => new { WpId = g.Key, Total = g.Sum(x => x.Value) })
                 .ToDictionaryAsync(x => x.WpId, x => x.Total);
 
-            // Covered (real) desde persefforts ya cargados
             var coveredByWp = persefforts
                 .GroupBy(pe => pe.WpxPersonNavigation.Wp)
                 .ToDictionary(g => g.Key, g => g.Sum(x => x.Value));
 
-            // Proyección (sin WP Id)
             var wpDetailsTransposed = workPackages.Select(wp => new
             {
-                Name = wp.Name,                                                  // Para el encabezado de columna
-                Estimated = wp.Pms,                                              // Antes "Pms"
+                Name = wp.Name,
+                Estimated = wp.Pms,
                 Distributed = distributedByWp.TryGetValue(wp.Id, out var d) ? d : 0m,
-                CoveredWithPersonnel = coveredByWp.TryGetValue(wp.Id, out var c) ? c : 0m // Antes "Covered"
+                CoveredWithPersonnel = coveredByWp.TryGetValue(wp.Id, out var c) ? c : 0m
             })
-            // Orden: alfabético y TRAVELS al final
             .OrderBy(x => string.Equals(x.Name, "TRAVELS", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
             .ThenBy(x => string.Equals(x.Name, "TRAVELS", StringComparison.OrdinalIgnoreCase) ? "" : x.Name)
             .ToList();
@@ -657,15 +630,12 @@ namespace TRS2._0.Controllers
                     .Where(wpx => wpx.Wp == wpId.Value)
                     .ToList();
 
-                // Obtiene los IDs de WpxPerson para el WP seleccionado
                 var wpxPersonIds = wpxPersons.Select(wpx => wpx.Id).ToList();
 
-                // Filtra Persefforts por los IDs de WpxPerson seleccionados
                 var filteredPersefforts = persefforts
                     .Where(pe => wpxPersonIds.Contains(pe.WpxPerson))
                     .ToList();
 
-                // Suma los esfuerzos por mes
                 var effortSumByMonth = filteredPersefforts
                     .GroupBy(pe => new { Year = pe.Month.Year, Month = pe.Month.Month })
                     .Select(group => new
@@ -674,20 +644,17 @@ namespace TRS2._0.Controllers
                         Month = group.Key.Month,
                         TotalEffort = group.Sum(pe => pe.Value)
                     })
-                    .OrderBy(x => x.Year).ThenBy(x => x.Month) // Asegura un orden cronológico
+                    .OrderBy(x => x.Year).ThenBy(x => x.Month)
                     .ToList();
 
-                // Opcional: Convertir a un diccionario o cualquier otra estructura que prefieras para la vista
                 var effortSumByMonthDict = effortSumByMonth.ToDictionary(
-                    k => new DateTime(k.Year, k.Month, 1), // Clave como fecha
+                    k => new DateTime(k.Year, k.Month, 1),
                     v => v.TotalEffort
                 );
 
                 var filteredProjectEfforts = await _context.Projefforts
                     .Where(pe => pe.Wp == wpId.Value)
                     .ToListAsync();
-
-                // Pasa los esfuerzos sumados a la vista
 
                 ViewBag.FilteredProjectEfforts = filteredProjectEfforts;
                 ViewBag.EffortSumByMonth = effortSumByMonthDict;
@@ -699,7 +666,6 @@ namespace TRS2._0.Controllers
             
 
 
-            // Construir ViewModel
             var viewModel = new PersonnelEffortPlanViewModel
             {
                 Project = project,
@@ -724,23 +690,18 @@ namespace TRS2._0.Controllers
             };
             _logger.LogInformation($"Filtrado completo de datos procesado en {stopwatch.ElapsedMilliseconds} ms total");
 
-            stopwatch.Restart(); // Reinicia el cronómetro para esta iteración
+            stopwatch.Restart();
             List<PersonnelInfo> personnelInfos = new List<PersonnelInfo>();
             var uniqueMonths = viewModel.GetMonthsForProject();
 
             foreach (var person in projectPersonnel)
             {
-                stopwatch.Restart(); // Reinicia el cronómetro para esta iteración
+                stopwatch.Restart();
 
-                
-
-                // Calcular PM y esfuerzos totales por mes
-                // Usa los PMs recuperados en lugar de calcularlos de nuevo
                 var pmValuesPerMonth = pmValuesByPersonAndMonth.ContainsKey(person.Person)
                                        ? pmValuesByPersonAndMonth[person.Person]
                                        : new Dictionary<string, decimal>();
 
-                // Usa los esfuerzos sumados en lugar de calcularlos de nuevo
                 var totalEffortsPerMonth = totalEffortsByPersonAndMonthDict.ContainsKey(person.Person)
                                            ? totalEffortsByPersonAndMonthDict[person.Person]
                                            : new Dictionary<string, decimal>();
@@ -755,7 +716,6 @@ namespace TRS2._0.Controllers
                 var monthStatuses = await _workCalendarService.CalculateMonthlyStatusesForPersonWithLists(person.Person, uniqueMonths, totalEffortsPerMonth, pmValuesPerMonth, personProjectMonthLocks);
                 _logger.LogInformation($"Estados mensuales calculados para persona {person.Person} en {stopwatch.ElapsedMilliseconds} ms");
 
-                // Añade la info de la persona a la lista
                 personnelInfos.Add(new PersonnelInfo
                 {
                     PersonId = person.Person,
@@ -764,7 +724,7 @@ namespace TRS2._0.Controllers
                 });
             }
             
-            stopwatch.Stop(); // Detiene el cronómetro
+            stopwatch.Stop();
             _logger.LogInformation($"Información de personal procesada en {stopwatch.ElapsedMilliseconds} ms total");
 
 
@@ -787,6 +747,9 @@ namespace TRS2._0.Controllers
         
 
 
+        /// <summary>
+        /// Persists the monthly effort assignments entered in the personnel effort planning grid.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> SaveEfforts([FromBody] EffortUpdateModel model)
         {
@@ -922,6 +885,9 @@ namespace TRS2._0.Controllers
 
 
 
+        /// <summary>
+        /// Displays the consolidated effort view of a person across every project that overlaps the selected project period.
+        /// </summary>
         [HttpGet]
         [Route("Projects/GetPersonnelEffortsByPerson/{projId}/{personId}")]
         [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
@@ -1134,6 +1100,9 @@ namespace TRS2._0.Controllers
             }
         }
 
+        /// <summary>
+        /// Displays the report-period configuration view for a project.
+        /// </summary>
         [HttpGet]
         [Route("Projects/ProjectReport/{projId}")]
         [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
@@ -1375,20 +1344,17 @@ namespace TRS2._0.Controllers
         }
 
 
+        /// <summary>
+        /// Builds the detailed compliance view of a report period, including declared hours, completion percentages, locks and login dates.
+        /// </summary>
         public async Task<IActionResult> PeriodDetails(int id, int projectId)
         {
-            var totalStopwatch = Stopwatch.StartNew();
-
             try
             {
-                var reportPeriodStopwatch = Stopwatch.StartNew();
                 var reportPeriod = await _context.ReportPeriods.FindAsync(id);
-                reportPeriodStopwatch.Stop();
-                Console.WriteLine($"Finding report period took {reportPeriodStopwatch.ElapsedMilliseconds} ms");
 
                 if (reportPeriod == null) return NotFound();
 
-                var workPackagesStopwatch = Stopwatch.StartNew();
                 var workPackages = _context.Wps
                     .Include(wp => wp.Wpxpeople)
                         .ThenInclude(wpxp => wpxp.PersonNavigation)
@@ -1396,8 +1362,6 @@ namespace TRS2._0.Controllers
                                  wp.StartDate <= reportPeriod.EndDate &&
                                  wp.EndDate >= reportPeriod.StartDate)
                     .ToList();
-                workPackagesStopwatch.Stop();
-                Console.WriteLine($"Fetching work packages took {workPackagesStopwatch.ElapsedMilliseconds} ms");
 
                 var projectPersonnel = await _context.Projectxpeople.Where(px => px.ProjId == projectId).ToListAsync();
                 var personIds = projectPersonnel.Select(p => p.Person).Distinct().ToList();
@@ -1478,19 +1442,13 @@ namespace TRS2._0.Controllers
                 if (!workPackages.Any()) return NotFound("No work packages found for the given period and project.");
 
                 var personDetailsList = new List<PeriodDetailsViewModel.PersonnelDetails>();
-                var personsProcessingStopwatch = Stopwatch.StartNew();
-                var declaredHoursStopwatch = new Stopwatch();
-                var totalHoursStopwatch = new Stopwatch();
                 var workingDaysPerMonth = await _workCalendarService.GetWorkingDaysFromDbForRange(reportPeriod.StartDate, reportPeriod.EndDate);
                 var months = await _workCalendarService.GenerateMonthList(reportPeriod.StartDate, reportPeriod.EndDate);
 
-                // ─────────────────────────────────────────────────────────────────────────
-                // NUEVO: Precargas para ESTADOS de login (INV/RESP) sin N+1
-                // ─────────────────────────────────────────────────────────────────────────
+                // Preload affiliation and login data once so period details can be built without per-person query storms.
                 var firstMonth = new DateTime(reportPeriod.StartDate.Year, reportPeriod.StartDate.Month, 1);
                 var lastMonth = new DateTime(reportPeriod.EndDate.Year, reportPeriod.EndDate.Month, 1);
 
-                // AffxPersons solapados con el periodo para todas las personas
                 var affAll = await _context.AffxPersons
                     .Where(a => personIds.Contains(a.PersonId) &&
                                 a.Start <= reportPeriod.EndDate &&
@@ -1499,10 +1457,8 @@ namespace TRS2._0.Controllers
                 var affByPerson = affAll.GroupBy(a => a.PersonId)
                                         .ToDictionary(g => g.Key, g => g.ToList());
 
-                // Posibles responsables por persona/mes (para consultar logins en bloque)
                 var candidateResponsibleIds = new HashSet<int>();
 
-                // Cache de Personnel para fallback .Resp (evita hits por persona en FindAsync)
                 var peopleRespCache = await _context.Personnel
                                                 .Where(p => personIds.Contains(p.Id))
                                                 .ToDictionaryAsync(p => p.Id, p => p.Resp);
@@ -1543,7 +1499,6 @@ namespace TRS2._0.Controllers
                     }
                 }
 
-                // Sujetos a consultar en UserLoginHistories (investigadores + responsables)
                 var subjectIds = personIds.Concat(candidateResponsibleIds).Distinct().ToList();
 
                 var minLoginDate = firstMonth.AddMonths(1);
@@ -1555,7 +1510,6 @@ namespace TRS2._0.Controllers
                                   ulh.LoginTime <= maxLoginDate)
                     .ToListAsync();
 
-                // (personId, year, month) -> string fecha "dd/MM/yyyy" del último login
                 var lastLoginByKey = logins
                     .GroupBy(l => new { l.PersonId, l.LoginTime.Year, l.LoginTime.Month })
                     .ToDictionary(
@@ -1580,14 +1534,10 @@ namespace TRS2._0.Controllers
                             return effectiveDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
                         }
                     );
-                // ─────────────────────────────────────────────────────────────────────────
 
                 foreach (var personId in workPackages.SelectMany(wp => wp.Wpxpeople).Select(wpxp => wpxp.Person).Distinct())
                 {
-                    var personFetchStopwatch = Stopwatch.StartNew();
                     var person = await _context.Personnel.FirstOrDefaultAsync(p => p.Id == personId);
-                    personFetchStopwatch.Stop();
-                    Console.WriteLine($"Fetching person {personId} took {personFetchStopwatch.ElapsedMilliseconds} ms");
                     if (person == null) continue;
 
                     var personLockStatusByMonth = new Dictionary<String, bool>();
@@ -1598,17 +1548,9 @@ namespace TRS2._0.Controllers
                         personLockStatusByMonth[yearMonthKey] = isLocked;
                     }
 
-                    declaredHoursStopwatch.Start();
                     var declaredHoursResult = await _workCalendarService.GetDeclaredHoursPerMonthForPersonInProyect(personId, reportPeriod.StartDate, reportPeriod.EndDate, projectId);
-                    declaredHoursStopwatch.Stop();
-                    Console.WriteLine($"Getting declared hours for person {personId} took {declaredHoursStopwatch.ElapsedMilliseconds} ms");
-                    declaredHoursStopwatch.Reset();
 
-                    totalHoursStopwatch.Start();
                     var totalHoursResult = await _workCalendarService.CalculateTotalHoursForPersonV2(personId, reportPeriod.StartDate, reportPeriod.EndDate);
-                    totalHoursStopwatch.Stop();
-                    Console.WriteLine($"Calculating total hours for person {personId} took {totalHoursStopwatch.ElapsedMilliseconds} ms");
-                    totalHoursStopwatch.Reset();
 
                     var outOfContractStatus = await _workCalendarService.IsOutOfContractForMonths(personId, months);
 
@@ -1666,9 +1608,6 @@ namespace TRS2._0.Controllers
                         completionPercentage[month] = percentCompleted;
                     }
 
-                    // ─────────────────────────────────────────────────────────────────────────
-                    // NUEVO: construir LoginStatusByMonth usando diccionarios precargados
-                    // ─────────────────────────────────────────────────────────────────────────
                     var loginStatusByMonth = new Dictionary<DateTime, (string InvestigatorDate, string ResponsibleDate)>();
 
                     foreach (var m in months)
@@ -1677,10 +1616,8 @@ namespace TRS2._0.Controllers
 
                         var target = new DateTime(y, mm, 1).AddMonths(1);
 
-                        // Investigador
                         lastLoginByKey.TryGetValue((personId, target.Year, target.Month), out var invDateStr);
 
-                        // Responsable: usa affByPerson -> chosen.ResponsibleId; fallback a Personnel.Resp
                         int? respId = null;
                         if (affByPerson.TryGetValue(personId, out var affsForPerson))
                         {
@@ -1712,7 +1649,6 @@ namespace TRS2._0.Controllers
 
                         loginStatusByMonth[m] = (invDateStr, respDateStr);
                     }
-                    // ─────────────────────────────────────────────────────────────────────────
 
                     var personnelDetails = new PeriodDetailsViewModel.PersonnelDetails
                     {
@@ -1724,16 +1660,11 @@ namespace TRS2._0.Controllers
                         TotalEffortinProyect = totalEffortInProyect,
                         LockStatusByMonth = personLockStatusByMonth,
                         CompletionPercentage = completionPercentage,
-
-                        // NUEVO:
                         LoginStatusByMonth = loginStatusByMonth
                     };
 
                     personDetailsList.Add(personnelDetails);
                 }
-
-                personsProcessingStopwatch.Stop();
-                Console.WriteLine($"Processing persons took {personsProcessingStopwatch.ElapsedMilliseconds} ms");
 
                 var model = new PeriodDetailsViewModel
                 {
@@ -1743,9 +1674,6 @@ namespace TRS2._0.Controllers
                 };
 
                 model.CalculateMonths(reportPeriod.StartDate, reportPeriod.EndDate);
-
-                totalStopwatch.Stop();
-                Console.WriteLine($"Total execution time of PeriodDetails was {totalStopwatch.ElapsedMilliseconds} ms");
                 ViewBag.ProjectId = projectId;
                 ViewBag.PeriodId = id;
 
@@ -1759,7 +1687,7 @@ namespace TRS2._0.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred: {ex.Message}");
+                _logger.LogError(ex, "Error while building project period details for period {PeriodId} and project {ProjectId}.", id, projectId);
                 return StatusCode(500, "Internal Server Error. Please try again later.");
             }
         }
@@ -2176,15 +2104,6 @@ namespace TRS2._0.Controllers
             }
         }
 
-        // -----------------------------------------------------------------------------------
-        // [CHANGE] ExportWorkedDaysToCSV
-        // Actualizado el 30/04/2025
-        // - Adaptado para usar el nuevo cálculo realista de días trabajados por persona/mes.
-        // - Se utilizan horas declaradas y afiliación máxima activa para cada mes.
-        // - Exportación a CSV con meses en formato "Jan-2025".
-        // - Se mantiene "SIN AFILIACIÓN" cuando no hay datos válidos.
-        // -----------------------------------------------------------------------------------
-
         [HttpPost]
         public async Task<IActionResult> ExportWorkedDaysToCSV([FromBody] ExportRequest model)
         {
@@ -2482,7 +2401,6 @@ namespace TRS2._0.Controllers
             {
                 result.Append($"{person.Surname}, {person.Name}");
 
-                // NUEVO: días estimados por mes para la persona en ESTE proyecto/rango
                 var estimatedDaysDict = await _workCalendarService
                     .GetEstimatedWorkedDaysPerMonthForPersonInProject(person.Id, periodStart, periodEnd, projectId);
 
@@ -2620,6 +2538,9 @@ namespace TRS2._0.Controllers
         }
 
 
+        /// <summary>
+        /// Displays the rate tabs associated with a report period.
+        /// </summary>
         [HttpGet]
         [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public async Task<IActionResult> PeriodRates(int id, int projectId)
@@ -2639,6 +2560,9 @@ namespace TRS2._0.Controllers
             return PartialView("_PeriodRates", vm);
         }
 
+        /// <summary>
+        /// Builds the estimated or timesheet-based cost grid for a report period.
+        /// </summary>
         [HttpGet]
         [Authorize(Policy = "ProjectManagerOrAdminPolicy")]
         public async Task<IActionResult> PeriodRatesGrid(int id, int projectId, string mode = "Estimated")
